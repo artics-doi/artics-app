@@ -1,0 +1,1151 @@
+/* チャット画面のスタイル - LINE風・青テーマ */
+
+.container {
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary);
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.loading {
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+}
+
+/* ヘッダー */
+.header {
+  background: var(--bg-header);
+  color: white;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.backButton {
+  background: transparent;
+  border: none;
+  color: white;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.backButton:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.roomInfo {
+  flex: 1;
+}
+
+.roomNameContainer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.roomName {
+  font-size: 17px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.headerOnlineIndicator {
+  width: 10px;
+  height: 10px;
+  background: #22c55e;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.headerOfflineIndicator {
+  width: 10px;
+  height: 10px;
+  background: #9ca3af;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.onlineStatus {
+  font-size: 12px;
+  color: #22c55e;
+}
+
+.offlineStatus {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.memberCount {
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+/* グループ編集ボタン */
+.editGroupButton {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.editGroupButton:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* 招待ボタン */
+.inviteButton {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.inviteButton:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* ピン留めボタン */
+.pinButton {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: background 0.2s;
+}
+
+.pinButton:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.pinCount {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  background: #e53935;
+  color: white;
+  font-size: 10px;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ピン留めメッセージセクション */
+.pinnedSection {
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.pinnedHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  background: rgba(26, 115, 232, 0.1);
+  font-size: 13px;
+  font-weight: 500;
+  color: #1a73e8;
+}
+
+.pinnedHeader button {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.pinnedItem {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-light);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.pinnedItem:hover {
+  background: var(--bg-primary);
+}
+
+.pinnedSender {
+  font-size: 12px;
+  color: #1a73e8;
+  font-weight: 500;
+}
+
+.pinnedText {
+  margin: 4px 0 0 0;
+  font-size: 13px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* メッセージ一覧 */
+.messageList {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--bg-chat);
+}
+
+.empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.empty p {
+  margin: 4px 0;
+  font-size: 14px;
+}
+
+/* メッセージ */
+.messageWrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  max-width: 75%;
+}
+
+.messageWrapper.own {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.messageWrapper.pinned {
+  background: rgba(26, 115, 232, 0.05);
+  margin: -4px -8px;
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+
+.messageWrapper.highlighted {
+  animation: highlight 2s ease-out;
+}
+
+@keyframes highlight {
+  0% { background: rgba(26, 115, 232, 0.3); }
+  100% { background: transparent; }
+}
+
+.senderName {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+  margin-left: 12px;
+  font-weight: 500;
+}
+
+/* 返信プレビュー（メッセージ内） */
+.replyPreview {
+  background: rgba(0, 0, 0, 0.05);
+  border-left: 3px solid #1a73e8;
+  padding: 6px 10px;
+  margin-bottom: 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  max-width: 100%;
+}
+
+.replyLabel {
+  font-size: 11px;
+  color: #1a73e8;
+  font-weight: 500;
+}
+
+.replyText {
+  margin: 2px 0 0 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.messageRow {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.messageInfo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.messageContainer {
+  position: relative;
+  cursor: pointer;
+}
+
+.message {
+  background: var(--bg-message);
+  color: var(--text-primary);
+  border-radius: 18px;
+  padding: 10px 14px;
+  box-shadow: var(--shadow-message);
+  max-width: 100%;
+}
+
+.messageWrapper.own .message {
+  background: var(--bg-message-own);
+  color: var(--text-message-own);
+}
+
+/* メッセージメニュー */
+
+.messageMenu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+  min-width: 120px;
+  overflow: hidden;
+}
+
+.messageWrapper.own .messageMenu {
+  left: auto;
+  right: 0;
+}
+
+.messageMenu button {
+  display: block;
+  width: 100%;
+  padding: 10px 14px;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-primary);
+  transition: background 0.15s;
+}
+
+.messageMenu button:hover {
+  background: var(--bg-primary);
+}
+
+.messageMenu .deleteOption {
+  color: #dc2626;
+}
+
+/* リアクションピッカー */
+.reactionPicker {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 24px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+  display: flex;
+  padding: 6px;
+  gap: 2px;
+}
+
+.messageWrapper.own .reactionPicker {
+  left: auto;
+  right: 0;
+}
+
+.reactionPicker button {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+
+.reactionPicker button:hover {
+  background: var(--bg-primary);
+}
+
+.reactionPicker button.reacted {
+  background: rgba(26, 115, 232, 0.2);
+}
+
+/* リアクション表示 */
+.reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.reactionBadge {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 2px 8px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.reactionBadge:hover {
+  background: var(--border-light);
+}
+
+.reactionBadge.myReaction {
+  background: rgba(26, 115, 232, 0.15);
+  border-color: #1a73e8;
+}
+
+.messageImage {
+  max-width: 220px;
+  max-height: 280px;
+  border-radius: 12px;
+  cursor: pointer;
+  margin-bottom: 4px;
+  display: block;
+}
+
+.fileLink {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #1a73e8;
+  text-decoration: none;
+  padding: 8px 0;
+  font-size: 14px;
+}
+
+.fileLink:hover {
+  text-decoration: underline;
+}
+
+.messageWrapper.own .fileLink {
+  color: #fff;
+}
+
+.messageText {
+  margin: 0;
+  word-break: break-word;
+  white-space: pre-wrap;
+  line-height: 1.45;
+  font-size: 15px;
+}
+
+.deletedFile {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.deletedMessage {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.editedLabel {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: 6px;
+}
+
+/* メンションハイライト */
+.mention {
+  color: #1a73e8;
+  font-weight: 500;
+}
+
+/* 編集エリア */
+.editArea {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.editInput {
+  padding: 8px 12px;
+  border: 1px solid #1a73e8;
+  border-radius: 8px;
+  font-size: 14px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.editButtons {
+  display: flex;
+  gap: 8px;
+}
+
+.editButtons button {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.editButtons button:first-child {
+  background: #1a73e8;
+  color: white;
+}
+
+.editButtons button:last-child {
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+}
+
+.readStatus {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.messageTime {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* 返信中バー */
+.replyingBar {
+  display: flex;
+  align-items: center;
+  padding: 10px 16px;
+  background: rgba(26, 115, 232, 0.1);
+  border-top: 1px solid var(--border-color);
+}
+
+.replyingContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.replyingLabel {
+  font-size: 12px;
+  color: #1a73e8;
+  font-weight: 500;
+}
+
+.replyingText {
+  margin: 2px 0 0 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cancelReply {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 4px 8px;
+}
+
+/* メンションリスト */
+.mentionList {
+  position: absolute;
+  bottom: 100%;
+  left: 50px;
+  right: 80px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.15);
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 100;
+}
+
+.mentionItem {
+  display: block;
+  width: 100%;
+  padding: 10px 14px;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-primary);
+  transition: background 0.15s;
+}
+
+.mentionItem:hover {
+  background: var(--bg-primary);
+}
+
+/* 入力エリア */
+.inputArea {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-color);
+  position: relative;
+}
+
+.attachButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  color: var(--text-secondary);
+  transition: color 0.2s, background 0.2s;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.attachButton:hover:not(:disabled) {
+  color: #1a73e8;
+  background: rgba(26, 115, 232, 0.1);
+}
+
+.attachButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.3;
+}
+
+.uploadingSpinner {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.messageInput {
+  flex: 1;
+  padding: 12px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 24px;
+  font-size: 15px;
+  outline: none;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.messageInput:focus {
+  border-color: #1a73e8;
+  background: var(--bg-secondary);
+}
+
+.messageInput:disabled {
+  background: var(--bg-input);
+}
+
+.messageInput::placeholder {
+  color: var(--text-muted);
+}
+
+.sendButton {
+  background: #1a73e8;
+  color: white;
+  border: none;
+  border-radius: 24px;
+  padding: 12px 20px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.sendButton:hover:not(:disabled) {
+  background: #1557b0;
+}
+
+.sendButton:disabled {
+  background: #93c5fd;
+  cursor: not-allowed;
+}
+
+/* ドラッグ&ドロップオーバーレイ */
+.dragOverlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(26, 115, 232, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.dragContent {
+  text-align: center;
+  color: white;
+}
+
+.dragContent p {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+}
+
+/* メニューオーバーレイ */
+.menuOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 480px) {
+  .header {
+    padding: 10px 12px;
+  }
+
+  .roomName {
+    font-size: 15px;
+  }
+
+  .messageList {
+    padding: 12px;
+  }
+
+  .messageWrapper {
+    max-width: 85%;
+  }
+
+  .messageImage {
+    max-width: 180px;
+  }
+
+  .inputArea {
+    padding: 8px 10px;
+  }
+
+  .messageInput {
+    padding: 10px 14px;
+    font-size: 16px;
+  }
+
+  .sendButton {
+    padding: 10px 16px;
+    font-size: 14px;
+  }
+
+}
+
+/* グループ編集モーダル */
+.groupEditOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.groupEditModal {
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  padding: 24px;
+  width: 100%;
+  max-width: 360px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.groupEditTitle {
+  margin: 0 0 20px 0;
+  font-size: 18px;
+  color: var(--text-primary);
+  text-align: center;
+}
+
+.groupEditImageSection {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.groupEditImagePreview {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: var(--bg-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  cursor: pointer;
+  position: relative;
+  border: 2px dashed var(--border-color);
+}
+
+.groupEditImagePreview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.groupEditImagePlaceholder {
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.groupEditImageOverlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+  border-radius: 50%;
+}
+
+.groupEditImagePreview:hover .groupEditImageOverlay {
+  opacity: 1;
+}
+
+.groupEditImageOverlay span {
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.groupEditImageHint {
+  margin: 8px 0 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.groupEditNameSection {
+  margin-bottom: 20px;
+}
+
+.groupEditNameSection label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.groupEditNameInput {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 15px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  box-sizing: border-box;
+}
+
+.groupEditNameInput:focus {
+  outline: none;
+  border-color: #1a73e8;
+  background: var(--bg-secondary);
+}
+
+.groupEditButtons {
+  display: flex;
+  gap: 10px;
+}
+
+.groupEditSaveButton {
+  flex: 1;
+  padding: 14px;
+  background: #1a73e8;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.groupEditSaveButton:hover:not(:disabled) {
+  background: #1557b0;
+}
+
+.groupEditSaveButton:disabled {
+  background: #93c5fd;
+  cursor: not-allowed;
+}
+
+.groupEditCancelButton {
+  flex: 1;
+  padding: 14px;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.groupEditCancelButton:hover {
+  background: var(--border-light);
+}
+
+/* 招待モーダル */
+.inviteUserList {
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.noInvitableUsers {
+  text-align: center;
+  padding: 24px;
+  color: var(--text-muted);
+  font-size: 14px;
+  margin: 0;
+}
+
+.inviteUserItem {
+  display: flex;
+  align-items: center;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.inviteUserItem:last-child {
+  border-bottom: none;
+}
+
+.inviteUserItem:hover {
+  background: var(--bg-primary);
+}
+
+.inviteUserItem.selected {
+  background: rgba(26, 115, 232, 0.15);
+}
+
+.inviteUserAvatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #d0e4f7;
+  margin-right: 12px;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.onlineIndicator {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  background: #22c55e;
+  border-radius: 50%;
+  border: 2px solid var(--bg-secondary);
+}
+
+.offlineIndicator {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  background: #9ca3af;
+  border-radius: 50%;
+  border: 2px solid var(--bg-secondary);
+}
+
+.inviteUserName {
+  flex: 1;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.checkmark {
+  color: #1a73e8;
+  font-weight: bold;
+  font-size: 16px;
+}
+
+/* メンバー一覧ボタン */
+.memberListButton {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.memberListButton:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* メンバー一覧モーダル */
+.memberListModal {
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  padding: 24px;
+  width: 100%;
+  max-width: 360px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.memberListContent {
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+
+.memberListItem {
+  display: flex;
+  align-items: center;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.memberListItem:last-child {
+  border-bottom: none;
+}
+
+.memberListAvatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #d0e4f7;
+  margin-right: 12px;
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.memberListAvatarImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.memberOnlineIndicator {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 12px;
+  height: 12px;
+  background: #22c55e;
+  border-radius: 50%;
+  border: 2px solid var(--bg-secondary);
+}
+
+.memberOfflineIndicator {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 12px;
+  height: 12px;
+  background: #9ca3af;
+  border-radius: 50%;
+  border: 2px solid var(--bg-secondary);
+}
+
+.memberListInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.memberListName {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--text-primary);
+}
+
+.memberYouLabel {
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-left: 6px;
+}
+
+.memberListStatusOnline {
+  font-size: 13px;
+  color: #22c55e;
+}
+
+.memberListStatusOffline {
+  font-size: 13px;
+  color: var(--text-muted);
+}

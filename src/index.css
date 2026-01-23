@@ -1,0 +1,103 @@
+/* グローバルスタイル - LINE風・青テーマ */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
+
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  font-family: 'Noto Sans JP', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', Meiryo, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color: #333;
+  background-color: #e8f4f8;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  /* ライトモード（デフォルト） */
+  --bg-primary: #e8f4f8;
+  --bg-secondary: #fff;
+  --bg-chat: #e8f0f5;
+  --bg-message: #fff;
+  --bg-message-own: #8bc34a;
+  --bg-input: #f8f8f8;
+  --bg-header: #1a73e8;
+  --text-primary: #333;
+  --text-secondary: #666;
+  --text-muted: #888;
+  --text-message-own: #333;
+  --border-color: #e5e5e5;
+  --border-light: #f0f0f0;
+  --shadow-message: 0 1px 3px rgba(0, 0, 0, 0.12);
+
+  color: var(--text-primary);
+  background-color: var(--bg-primary);
+}
+
+/* ダークモード */
+[data-theme="dark"] {
+  --bg-primary: #1e1e2e;
+  --bg-secondary: #2a2a3e;
+  --bg-chat: #252536;
+  --bg-message: #3a3a4e;
+  --bg-message-own: #689f38;
+  --bg-input: #3a3a4e;
+  --bg-header: #2a2a3e;
+  --text-primary: #f0f0f0;
+  --text-secondary: #c0c0c0;
+  --text-muted: #a0a0a0;
+  --text-message-own: #333;
+  --border-color: #4a4a5e;
+  --border-light: #3a3a4e;
+  --shadow-message: 0 2px 4px rgba(0, 0, 0, 0.4);
+
+  color: var(--text-primary);
+  background-color: var(--bg-primary);
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+}
+
+a {
+  color: #1a73e8;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* スクロールバーのスタイル */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a1a1a1;
+}
+
+/* 選択テキストのスタイル */
+::selection {
+  background: #1a73e8;
+  color: white;
+}

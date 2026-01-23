@@ -1,0 +1,43 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ユーザードキュメント
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+
+      // FCMトークンサブコレクション - ユーザー自身のみ書き込み可能
+      match /fcmTokens/{tokenId} {
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+
+    // 設定ドキュメント（更新ノート、ストレージ使用量など）
+    match /settings/{settingId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    // チャットルーム - 認証済みユーザーなら読み取り可能（メンバーチェックはアプリ側で実施）
+    match /chatRooms/{roomId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      allow delete: if request.auth != null;
+
+      // メッセージサブコレクション
+      match /messages/{messageId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null;
+        // 送信者は全フィールドを更新可能、それ以外のユーザーはreadByのみ更新可能
+        allow update: if request.auth != null && (
+          request.auth.uid == resource.data.senderId ||
+          // readBy配列への自分のUID追加のみ許可（既読処理）
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy']))
+        );
+        allow delete: if request.auth != null;
+      }
+    }
+  }
+}

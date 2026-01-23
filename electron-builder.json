@@ -1,0 +1,45 @@
+{
+  "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
+  "appId": "com.artics.chat",
+  "productName": "Artics",
+  "copyright": "Copyright © 2024",
+  "directories": {
+    "output": "release",
+    "buildResources": "build"
+  },
+  "files": [
+    "dist/**/*",
+    "dist-electron/**/*",
+    "public/**/*"
+  ],
+  "extraResources": [
+    {
+      "from": "public/favicon.png",
+      "to": "favicon.png"
+    }
+  ],
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      }
+    ],
+    "artifactName": "${productName} Setup ${version}.${ext}"
+  },
+  "nsis": {
+    "oneClick": false,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": true,
+    "deleteAppDataOnUninstall": false,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "Artics"
+  },
+  "publish": {
+    "provider": "github",
+    "owner": "artics-doi",
+    "repo": "artics-app",
+    "releaseType": "release"
+  }
+}
