@@ -18,6 +18,7 @@ import {
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
+import { useActiveRoom } from '../contexts/ActiveRoomContext';
 import type { Message, ChatRoom, User } from '../types';
 import { compressImage, isImageFile } from '../utils/imageCompression';
 import { addStorageUsage } from '../lib/storageUsage';
@@ -41,6 +42,7 @@ interface ExtendedMessage extends Message {
 export default function Chat() {
   const { roomId } = useParams<{ roomId: string }>();
   const [searchParams] = useSearchParams();
+  const { setActiveRoomId } = useActiveRoom();
   const [messages, setMessages] = useState<ExtendedMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [chatRoom, setChatRoom] = useState<ChatRoom | null>(null);
@@ -97,6 +99,15 @@ export default function Chat() {
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
   const messageListRef = useRef<HTMLDivElement>(null);
 
+  // 現在閲覧中のルームをグローバルに設定（通知抑制用）
+  useEffect(() => {
+    if (roomId) {
+      setActiveRoomId(roomId);
+    }
+    return () => {
+      setActiveRoomId(null);
+    };
+  }, [roomId, setActiveRoomId]);
 
   // チャットルーム情報を取得
   useEffect(() => {

@@ -14,6 +14,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
+import { useActiveRoom } from '../contexts/ActiveRoomContext';
 import { useElectronNotification } from './useElectronNotification';
 
 interface LastMessageInfo {
@@ -24,8 +25,21 @@ interface LastMessageInfo {
 export function useGlobalNotification() {
   const { currentUser } = useAuth();
   const { showNotification, isElectron } = useElectronNotification();
+  const { activeRoomId } = useActiveRoom();
   const lastMessagesRef = useRef<Map<string, LastMessageInfo>>(new Map());
   const initializedRef = useRef(false);
+  const showNotificationRef = useRef(showNotification);
+  const activeRoomIdRef = useRef(activeRoomId);
+
+  // showNotificationの最新版を常に保持
+  useEffect(() => {
+    showNotificationRef.current = showNotification;
+  }, [showNotification]);
+
+  // activeRoomIdの最新版を常に保持
+  useEffect(() => {
+    activeRoomIdRef.current = activeRoomId;
+  }, [activeRoomId]);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -105,13 +119,20 @@ export function useGlobalNotification() {
             const now = new Date();
             const messageAge = now.getTime() - createdAt.getTime();
             if (messageAge < 5000 && shouldShowNotification) {
-              const roomName = roomNames.get(roomId) || 'チャット';
-              console.log('[useGlobalNotification] Electron通知:', roomName, senderName, text);
-              showNotification(
-                `${senderName} (${roomName})`,
-                text,
-                messageId
-              );
+              // 現在閲覧中のルームからのメッセージは通知しない
+              if (activeRoomIdRef.current === roomId) {
+                console.log('[useGlobalNotification] 閲覧中のルームのため通知をスキップ:', roomId);
+              } else {
+                const roomName = roomNames.get(roomId) || 'チャット';
+                console.log('[useGlobalNotification] Electron通知:', roomName, senderName, text);
+                // refを通じて最新のshowNotificationを呼び出す
+                showNotificationRef.current(
+                  `${senderName} (${roomName})`,
+                  text,
+                  messageId,
+                  roomId  // roomIdを追加して通知から直接ルームに遷移できるようにする
+                );
+              }
             }
           }
 
@@ -136,5 +157,6 @@ export function useGlobalNotification() {
       unsubscribeRooms();
       initializedRef.current = false;
     };
-  }, [currentUser, showNotification, isElectron]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser, isElectron]); // showNotificationはrefを通じて呼び出すため依存配列から削除
 }

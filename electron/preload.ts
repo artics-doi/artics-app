@@ -7,8 +7,26 @@ interface NotificationSettings {
   showMessageContent: boolean;
 }
 
+// アップデート確認結果の型
+interface UpdateCheckResult {
+  available: boolean;
+  version?: string;
+  isDev?: boolean;
+  error?: boolean;
+}
+
 // レンダラープロセスに公開するAPI
 const electronAPI = {
+  // アプリバージョンを取得
+  getAppVersion: (): Promise<string> => {
+    return ipcRenderer.invoke('get-app-version');
+  },
+
+  // アップデートを確認
+  checkForUpdates: (): Promise<UpdateCheckResult> => {
+    return ipcRenderer.invoke('check-for-updates');
+  },
+
   // 通知設定を取得
   getNotificationSettings: (): Promise<NotificationSettings> => {
     return ipcRenderer.invoke('get-notification-settings');
@@ -29,8 +47,8 @@ const electronAPI = {
     return ipcRenderer.invoke('set-startup-enabled', enabled);
   },
 
-  // 通知を表示
-  showNotification: (options: { title: string; body: string }): Promise<boolean> => {
+  // 通知を表示（roomIdを含む）
+  showNotification: (options: { title: string; body: string; roomId?: string }): Promise<boolean> => {
     return ipcRenderer.invoke('show-notification', options);
   },
 
@@ -54,6 +72,19 @@ const electronAPI = {
     // クリーンアップ関数を返す
     return () => {
       ipcRenderer.removeListener('notification-settings-changed', listener);
+    };
+  },
+
+  // ルーム遷移のリスナー
+  onNavigateToRoom: (callback: (roomId: string) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, roomId: string) => {
+      callback(roomId);
+    };
+    ipcRenderer.on('navigate-to-room', listener);
+
+    // クリーンアップ関数を返す
+    return () => {
+      ipcRenderer.removeListener('navigate-to-room', listener);
     };
   }
 };

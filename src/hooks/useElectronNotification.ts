@@ -51,10 +51,10 @@ export function useElectronNotification() {
   }, []);
 
   // 通知を表示
-  const showNotification = useCallback(async (title: string, body: string, messageId?: string) => {
+  const showNotification = useCallback(async (title: string, body: string, messageId?: string, roomId?: string) => {
     if (isElectron && window.electronAPI) {
-      // Electron環境
-      return await window.electronAPI.showNotification({ title, body });
+      // Electron環境（roomIdを渡して通知から直接ルームに遷移できるようにする）
+      return await window.electronAPI.showNotification({ title, body, roomId });
     } else {
       // ブラウザ環境
       if ('Notification' in window && Notification.permission === 'granted') {

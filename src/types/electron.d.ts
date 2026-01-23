@@ -5,7 +5,20 @@ export interface NotificationSettings {
   showMessageContent: boolean;
 }
 
+export interface UpdateCheckResult {
+  available: boolean;
+  version?: string;
+  isDev?: boolean;
+  error?: boolean;
+}
+
 export interface ElectronAPI {
+  // アプリバージョンを取得
+  getAppVersion: () => Promise<string>;
+
+  // アップデートを確認
+  checkForUpdates: () => Promise<UpdateCheckResult>;
+
   // 通知設定を取得
   getNotificationSettings: () => Promise<NotificationSettings>;
 
@@ -19,7 +32,7 @@ export interface ElectronAPI {
   setStartupEnabled: (enabled: boolean) => Promise<boolean>;
 
   // 通知を表示
-  showNotification: (options: { title: string; body: string }) => Promise<boolean>;
+  showNotification: (options: { title: string; body: string; roomId?: string }) => Promise<boolean>;
 
   // Electron環境かどうかを確認
   isElectron: () => Promise<boolean>;
@@ -29,6 +42,9 @@ export interface ElectronAPI {
 
   // 通知設定変更のリスナー
   onNotificationSettingsChanged: (callback: (settings: NotificationSettings) => void) => () => void;
+
+  // ルーム遷移のリスナー
+  onNavigateToRoom: (callback: (roomId: string) => void) => () => void;
 }
 
 declare global {

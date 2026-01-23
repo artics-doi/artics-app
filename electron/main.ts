@@ -6,9 +6,9 @@ import {
   Menu,
   nativeImage,
   ipcMain,
-  Notification,
   shell,
-  dialog
+  dialog,
+  screen
 } from 'electron';
 import path from 'path';
 import fs from 'fs';
@@ -21,6 +21,15 @@ interface StoreSchema {
     showMessageContent: boolean;
   };
   startupEnabled: boolean;
+}
+
+// 通知アイテムの型
+interface NotificationItem {
+  id: number;
+  title: string;
+  body: string;
+  roomId?: string;
+  timestamp: Date;
 }
 
 // シンプルな設定ストア実装
@@ -71,53 +80,121 @@ class SimpleStore {
   }
 }
 
-let store: SimpleStore;
-let mainWindow: BrowserWindow | null = null;
-let tray: Tray | null = null;
-let isQuitting = false;
-let notificationWindows: BrowserWindow[] = [];
+// 通知マネージャークラス（1つの通知欄にメッセージを追加していく形式）
+class NotificationManager {
+  private notifications: NotificationItem[] = [];
+  private containerWindow: BrowserWindow | null = null;
+  private nextId: number = 1;
+  private readonly MAX_NOTIFICATIONS = 10;
+  private readonly NOTIF_WIDTH = 350;
+  private readonly HEADER_HEIGHT = 50; // ヘッダー部分
+  private readonly FOOTER_HEIGHT = 60; // OKボタン部分
+  private readonly ITEM_HEIGHT = 55; // 各メッセージの高さ
+  private readonly MAX_HEIGHT = 500;
+  private readonly PADDING = 10;
 
-// 開発モードかどうか
-const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+  addNotification(title: string, body: string, roomId?: string): void {
+    const notification: NotificationItem = {
+      id: this.nextId++,
+      title,
+      body,
+      roomId,
+      timestamp: new Date()
+    };
 
-// カスタム通知ウィンドウを作成
-function showCustomNotification(title: string, body: string) {
-  const { screen } = require('electron');
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const { width, height } = primaryDisplay.workAreaSize;
-
-  const notifWidth = 350;
-  const notifHeight = 120;
-  const padding = 10;
-
-  // 既存の通知ウィンドウの数に応じて位置を調整（下から上に積み上げる）
-  const yOffset = notificationWindows.length * (notifHeight + padding);
-
-  const notifWindow = new BrowserWindow({
-    width: notifWidth,
-    height: notifHeight,
-    x: width - notifWidth - padding,
-    y: height - notifHeight - padding - yOffset,
-    frame: false,
-    alwaysOnTop: true,
-    skipTaskbar: true,
-    resizable: false,
-    movable: false,
-    focusable: true,
-    show: false,
-    transparent: true,
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      preload: path.join(__dirname, 'notificationPreload.js')
+    // 最大数を超えたら古いものを削除
+    if (this.notifications.length >= this.MAX_NOTIFICATIONS) {
+      this.notifications.shift();
     }
-  });
 
-  // 「開く」ボタンが押されたかどうかのフラグ
-  let shouldOpenMainWindow = false;
+    this.notifications.push(notification);
+    this.updateUI();
+  }
 
-  // 通知のHTMLコンテンツ
-  const htmlContent = `
+  clearAll(): void {
+    this.notifications = [];
+    this.closeWindow();
+  }
+
+  private closeWindow(): void {
+    if (this.containerWindow && !this.containerWindow.isDestroyed()) {
+      this.containerWindow.close();
+    }
+    this.containerWindow = null;
+    this.notifications = []; // ウィンドウを閉じたら通知リストもクリア
+  }
+
+  private calculateWindowHeight(): number {
+    if (this.notifications.length === 0) return 0;
+    // ヘッダー + メッセージリスト + フッター（OKボタン）
+    const contentHeight = this.HEADER_HEIGHT + this.notifications.length * this.ITEM_HEIGHT + this.FOOTER_HEIGHT;
+    return Math.min(contentHeight, this.MAX_HEIGHT);
+  }
+
+  private updateUI(): void {
+    if (this.notifications.length === 0) {
+      this.closeWindow();
+      return;
+    }
+
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+    const windowHeight = this.calculateWindowHeight();
+
+    // ウィンドウが存在しない場合は作成
+    if (!this.containerWindow || this.containerWindow.isDestroyed()) {
+      this.containerWindow = new BrowserWindow({
+        width: this.NOTIF_WIDTH,
+        height: windowHeight,
+        x: screenWidth - this.NOTIF_WIDTH - this.PADDING,
+        y: screenHeight - windowHeight - this.PADDING,
+        frame: false,
+        alwaysOnTop: true,
+        skipTaskbar: true,
+        resizable: false,
+        movable: false,
+        focusable: true,
+        show: false,
+        transparent: true,
+        webPreferences: {
+          nodeIntegration: false,
+          contextIsolation: true,
+          preload: path.join(__dirname, 'notificationPreload.js')
+        }
+      });
+
+      this.containerWindow.once('ready-to-show', () => {
+        this.containerWindow?.show();
+      });
+
+      this.containerWindow.on('closed', () => {
+        this.containerWindow = null;
+        this.notifications = []; // ウィンドウが閉じられたら通知もクリア
+      });
+    } else {
+      // ウィンドウサイズと位置を更新
+      this.containerWindow.setBounds({
+        x: screenWidth - this.NOTIF_WIDTH - this.PADDING,
+        y: screenHeight - windowHeight - this.PADDING,
+        width: this.NOTIF_WIDTH,
+        height: windowHeight
+      });
+    }
+
+    // HTMLコンテンツを更新
+    const htmlContent = this.generateHTML();
+    this.containerWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
+  }
+
+  private generateHTML(): string {
+    const notificationsJson = JSON.stringify(this.notifications.map(n => ({
+      id: n.id,
+      title: n.title,
+      body: n.body,
+      roomId: n.roomId || ''
+    })));
+
+    return `
     <!DOCTYPE html>
     <html>
     <head>
@@ -129,13 +206,13 @@ function showCustomNotification(title: string, body: string) {
           background: transparent;
           overflow: hidden;
         }
-        .notification {
+        .notification-panel {
+          width: 100%;
+          height: 100%;
           background: linear-gradient(135deg, #1a73e8 0%, #1557b0 100%);
           border-radius: 12px;
-          padding: 16px;
           color: white;
-          box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-          height: 100%;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.25);
           display: flex;
           flex-direction: column;
           animation: slideIn 0.3s ease-out;
@@ -144,128 +221,147 @@ function showCustomNotification(title: string, body: string) {
           from { transform: translateX(100%); opacity: 0; }
           to { transform: translateX(0); opacity: 1; }
         }
-        .header {
+        .panel-header {
+          padding: 12px 16px;
+          border-bottom: 1px solid rgba(255,255,255,0.2);
           display: flex;
           justify-content: space-between;
           align-items: center;
-          margin-bottom: 8px;
         }
-        .title {
-          font-size: 14px;
+        .panel-title {
+          font-size: 13px;
           font-weight: 600;
+        }
+        .panel-badge {
+          background: #ff4444;
+          font-size: 11px;
+          font-weight: 600;
+          padding: 2px 8px;
+          border-radius: 10px;
+        }
+        .message-list {
+          flex: 1;
+          overflow-y: auto;
+          padding: 8px;
+        }
+        .message-list::-webkit-scrollbar {
+          width: 4px;
+        }
+        .message-list::-webkit-scrollbar-thumb {
+          background: rgba(255,255,255,0.3);
+          border-radius: 2px;
+        }
+        .message-item {
+          padding: 8px 10px;
+          background: rgba(255,255,255,0.1);
+          border-radius: 8px;
+          margin-bottom: 6px;
+          cursor: pointer;
+          transition: background 0.2s;
+        }
+        .message-item:hover {
+          background: rgba(255,255,255,0.2);
+        }
+        .message-item:last-child {
+          margin-bottom: 0;
+        }
+        .message-sender {
+          font-size: 12px;
+          font-weight: 600;
+          margin-bottom: 2px;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
-          flex: 1;
         }
-        .app-name {
+        .message-text {
           font-size: 11px;
-          opacity: 0.8;
-        }
-        .body {
-          font-size: 13px;
-          line-height: 1.4;
-          flex: 1;
+          opacity: 0.9;
+          white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
-          display: -webkit-box;
-          -webkit-line-clamp: 2;
-          -webkit-box-orient: vertical;
         }
-        .actions {
-          display: flex;
-          gap: 8px;
-          margin-top: 12px;
+        .panel-footer {
+          padding: 10px 16px;
+          border-top: 1px solid rgba(255,255,255,0.2);
         }
         .btn {
-          flex: 1;
-          padding: 8px 16px;
+          width: 100%;
+          padding: 10px;
           border: none;
           border-radius: 6px;
-          font-size: 12px;
+          font-size: 13px;
           font-weight: 600;
           cursor: pointer;
-          transition: all 0.2s;
-        }
-        .btn-primary {
           background: white;
           color: #1a73e8;
+          transition: background 0.2s;
         }
-        .btn-primary:hover {
+        .btn:hover {
           background: #f0f0f0;
-        }
-        .btn-secondary {
-          background: rgba(255,255,255,0.2);
-          color: white;
-        }
-        .btn-secondary:hover {
-          background: rgba(255,255,255,0.3);
         }
       </style>
     </head>
     <body>
-      <div class="notification">
-        <div class="header">
-          <span class="title">${title.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>
-          <span class="app-name">Artics</span>
+      <div class="notification-panel">
+        <div class="panel-header">
+          <span class="panel-title">Artics</span>
+          <span class="panel-badge">${this.notifications.length}件</span>
         </div>
-        <div class="body">${body.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
-        <div class="actions">
-          <button class="btn btn-primary" id="openBtn">開く</button>
-          <button class="btn btn-secondary" id="closeBtn">OK</button>
+        <div class="message-list" id="messageList"></div>
+        <div class="panel-footer">
+          <button class="btn" id="okBtn">OK</button>
         </div>
       </div>
       <script>
-        document.getElementById('openBtn').addEventListener('click', () => {
+        const notifications = ${notificationsJson};
+
+        function escapeHtml(str) {
+          const div = document.createElement('div');
+          div.textContent = str;
+          return div.innerHTML;
+        }
+
+        // メッセージリストを描画
+        const messageList = document.getElementById('messageList');
+        notifications.forEach(notif => {
+          const item = document.createElement('div');
+          item.className = 'message-item';
+          item.innerHTML = \`
+            <div class="message-sender">\${escapeHtml(notif.title)}</div>
+            <div class="message-text">\${escapeHtml(notif.body)}</div>
+          \`;
+          item.onclick = () => {
+            if (notif.roomId && window.notificationAPI) {
+              window.notificationAPI.openRoom(notif.roomId);
+            } else if (window.notificationAPI) {
+              window.notificationAPI.openMainWindow();
+            }
+            window.notificationAPI.clearAll();
+          };
+          messageList.appendChild(item);
+        });
+
+        // OKボタンで全ての通知をクリア
+        document.getElementById('okBtn').onclick = () => {
           if (window.notificationAPI) {
-            window.notificationAPI.openMainWindow();
+            window.notificationAPI.clearAll();
           }
-          window.close();
-        });
-        document.getElementById('closeBtn').addEventListener('click', () => {
-          window.close();
-        });
+        };
       </script>
     </body>
     </html>
-  `;
-
-  notifWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
-
-  notifWindow.once('ready-to-show', () => {
-    notifWindow.show();
-  });
-
-  // ウィンドウが閉じられたらリストから削除
-  notifWindow.on('closed', () => {
-    const index = notificationWindows.indexOf(notifWindow);
-    if (index > -1) {
-      notificationWindows.splice(index, 1);
-    }
-    // 残りの通知ウィンドウの位置を再調整
-    repositionNotificationWindows();
-  });
-
-  notificationWindows.push(notifWindow);
+    `;
+  }
 }
 
-// 通知ウィンドウの位置を再調整
-function repositionNotificationWindows() {
-  const { screen } = require('electron');
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const { width, height } = primaryDisplay.workAreaSize;
+let store: SimpleStore;
+let mainWindow: BrowserWindow | null = null;
+let tray: Tray | null = null;
+let isQuitting = false;
+let notificationManager: NotificationManager;
 
-  const notifWidth = 350;
-  const notifHeight = 120;
-  const padding = 10;
-
-  notificationWindows.forEach((win, index) => {
-    if (!win.isDestroyed()) {
-      const yOffset = index * (notifHeight + padding);
-      win.setPosition(width - notifWidth - padding, height - notifHeight - padding - yOffset);
-    }
-  });
-}
+// 開発モードかどうか
+const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
 function createWindow() {
   // アイコンパスの設定
@@ -482,6 +578,55 @@ function setupIPC() {
     mainWindow?.focus();
   });
 
+  // 通知ウィンドウを閉じる（IPC経由で確実に閉じる）
+  ipcMain.on('close-notification', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win && !win.isDestroyed()) {
+      win.close();
+    }
+  });
+
+  // 特定のチャットルームを開く
+  ipcMain.on('open-room', (_event, roomId: string) => {
+    mainWindow?.show();
+    mainWindow?.focus();
+    // レンダラープロセスにルーム遷移イベントを送信
+    mainWindow?.webContents.send('navigate-to-room', roomId);
+  });
+
+  // 全ての通知をクリアしてウィンドウを閉じる
+  ipcMain.on('clear-all-notifications', () => {
+    notificationManager.clearAll();
+  });
+
+  // アプリバージョンを取得
+  ipcMain.handle('get-app-version', () => {
+    return app.getVersion();
+  });
+
+  // アップデートを確認
+  ipcMain.handle('check-for-updates', async () => {
+    if (isDev) {
+      return { available: false, isDev: true };
+    }
+
+    try {
+      const result = await autoUpdater.checkForUpdates();
+      if (result && result.updateInfo) {
+        const currentVersion = app.getVersion();
+        const latestVersion = result.updateInfo.version;
+        // バージョン比較
+        if (latestVersion !== currentVersion) {
+          return { available: true, version: latestVersion };
+        }
+      }
+      return { available: false };
+    } catch (error) {
+      console.error('アップデート確認エラー:', error);
+      return { available: false, error: true };
+    }
+  });
+
   // 通知設定を取得
   ipcMain.handle('get-notification-settings', () => {
     return store.get('notificationSettings');
@@ -507,8 +652,8 @@ function setupIPC() {
     return true;
   });
 
-  // 通知を表示（カスタム通知ウィンドウを使用）
-  ipcMain.handle('show-notification', (_event, options: { title: string; body: string }) => {
+  // 通知を表示（NotificationManagerを使用）
+  ipcMain.handle('show-notification', (_event, options: { title: string; body: string; roomId?: string }) => {
     const settings = store.get('notificationSettings');
 
     if (!settings.enableNotifications) {
@@ -516,7 +661,7 @@ function setupIPC() {
     }
 
     const body = settings.showMessageContent ? options.body : 'メッセージが届きました';
-    showCustomNotification(options.title, body);
+    notificationManager.addNotification(options.title, body, options.roomId);
     return true;
   });
 
@@ -601,6 +746,9 @@ function setupAutoUpdater() {
 app.whenReady().then(() => {
   // ストアを初期化
   store = new SimpleStore();
+
+  // 通知マネージャーを初期化
+  notificationManager = new NotificationManager();
 
   createWindow();
   createTray();
