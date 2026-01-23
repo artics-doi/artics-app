@@ -41,10 +41,21 @@ export const sendPushNotificationOnNewMessage = onDocumentCreated(
 
     console.log(`Room: ${roomName}, members: ${JSON.stringify(memberIds)}, senderId: ${senderId}`);
 
-    // 送信者以外のメンバーに通知を送信
-    const recipientIds = memberIds.filter((id: string) => id !== senderId);
+    // メンションがある場合はメンションされた人だけに通知
+    // メンションがない場合は通知を送らない（全員への通知は不要）
+    const mentions: string[] = message.mentions || [];
+    console.log(`Mentions: ${JSON.stringify(mentions)}`);
 
-    console.log(`Recipients: ${JSON.stringify(recipientIds)}`);
+    // メンションがない場合は通知を送らない
+    if (mentions.length === 0) {
+      console.log('No mentions found, skipping notification');
+      return;
+    }
+
+    // メンションされた人のうち、送信者以外に通知を送信
+    const recipientIds = mentions.filter((id: string) => id !== senderId);
+
+    console.log(`Recipients (mentioned users): ${JSON.stringify(recipientIds)}`);
 
     if (recipientIds.length === 0) {
       console.log('No recipients to notify (memberIds might not include other members)');

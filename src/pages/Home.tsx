@@ -22,7 +22,7 @@ import { updateProfile } from 'firebase/auth';
 import { db, storage } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { cleanupOldFiles, shouldRunCleanup, recordCleanupRun } from '../lib/cleanupOldFiles';
-import { getStorageUsage, formatBytes, calculateUsagePercent, STORAGE_FREE_LIMIT, addStorageUsage } from '../lib/storageUsage';
+import { getStorageUsage, formatBytes, calculateUsagePercent, STORAGE_FREE_LIMIT, addStorageUsage, setStorageUsageValue } from '../lib/storageUsage';
 import { useElectronNotification, useStartupSettings, isElectronEnv } from '../hooks/useElectronNotification';
 import type { ChatRoom, User } from '../types';
 import styles from './Home.module.css';
@@ -64,6 +64,9 @@ export default function Home() {
   const [savingReleaseNotes, setSavingReleaseNotes] = useState(false);
   const [settingsTitleClickCount, setSettingsTitleClickCount] = useState(0);
   const [storageUsage, setStorageUsage] = useState<number>(0);
+  const [storageClickCount, setStorageClickCount] = useState(0);
+  const [showStorageEdit, setShowStorageEdit] = useState(false);
+  const [storageEditValue, setStorageEditValue] = useState('');
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
 
   const profileImageInputRef = useRef<HTMLInputElement>(null);
@@ -356,10 +359,12 @@ export default function Home() {
   useEffect(() => {
     if (!currentUser) return;
 
-    const updateOnlineStatus = async (isOnline: boolean) => {
+    const isElectron = isElectronEnv();
+
+    const updateOnlineStatus = async (online: boolean) => {
       try {
         await updateDoc(doc(db, 'users', currentUser.uid), {
-          isOnline: isOnline,
+          isOnline: online,
           lastSeen: serverTimestamp()
         });
       } catch (error) {
@@ -375,10 +380,16 @@ export default function Home() {
       updateOnlineStatus(false);
     };
 
-    // 可視性が変わった時の処理
+    // 可視性が変わった時の処理（PWA/モバイルのみ）
     const handleVisibilityChange = () => {
+      // Electronの場合は常にオンライン（アプリが起動している限り）
+      if (isElectron) return;
+
+      // PWA/モバイルの場合はタブの表示状態に連動
       if (document.visibilityState === 'visible') {
         updateOnlineStatus(true);
+      } else {
+        updateOnlineStatus(false);
       }
     };
 
@@ -434,6 +445,38 @@ export default function Home() {
     }
     fetchStorageUsage();
   }, []);
+
+  // ストレージ表示クリックで編集モード
+  function handleStorageClick() {
+    const newCount = storageClickCount + 1;
+    setStorageClickCount(newCount);
+    if (newCount >= 10) {
+      setStorageEditValue((storageUsage / (1024 * 1024)).toFixed(2)); // MB単位で表示
+      setShowStorageEdit(true);
+      setStorageClickCount(0);
+    }
+    // 3秒でリセット
+    setTimeout(() => setStorageClickCount(0), 3000);
+  }
+
+  // ストレージ使用量を保存
+  async function saveStorageUsage() {
+    try {
+      const mbValue = parseFloat(storageEditValue);
+      if (isNaN(mbValue) || mbValue < 0) {
+        alert('正しい数値を入力してください');
+        return;
+      }
+      const bytes = Math.round(mbValue * 1024 * 1024);
+      await setStorageUsageValue(bytes);
+      setStorageUsage(bytes);
+      setShowStorageEdit(false);
+      alert('ストレージ使用量を更新しました');
+    } catch (error) {
+      console.error('ストレージ使用量の更新エラー:', error);
+      alert('更新に失敗しました');
+    }
+  }
 
   // 更新ノートを保存
   async function saveReleaseNotes() {
@@ -672,7 +715,7 @@ export default function Home() {
     <div className={styles.container}>
       {/* ヘッダー */}
       <header className={styles.header}>
-        <div className={styles.storageIndicator}>
+        <div className={styles.storageIndicator} onClick={handleStorageClick} style={{ cursor: 'pointer' }}>
           <div className={styles.storageBarContainer}>
             <div
               className={`${styles.storageBar} ${
@@ -1010,6 +1053,38 @@ export default function Home() {
               </button>
               <button className={styles.closeButton} onClick={() => setShowProfile(false)}>
                 キャンセル
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ストレージ使用量編集モーダル */}
+      {showStorageEdit && (
+        <div className={styles.modal} onClick={() => setShowStorageEdit(false)}>
+          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <h2>ストレージ使用量を編集</h2>
+            <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+              Firebaseコンソールで確認した値を入力してください（MB単位）
+            </p>
+            <div className={styles.inputGroup}>
+              <input
+                type="number"
+                step="0.01"
+                value={storageEditValue}
+                onChange={(e) => setStorageEditValue(e.target.value)}
+                className={styles.textInput}
+                placeholder="例: 1.36"
+                autoFocus
+              />
+              <span style={{ marginLeft: '8px' }}>MB</span>
+            </div>
+            <div className={styles.modalButtons}>
+              <button className={styles.cancelButton} onClick={() => setShowStorageEdit(false)}>
+                キャンセル
+              </button>
+              <button className={styles.saveButton} onClick={saveStorageUsage}>
+                保存
               </button>
             </div>
           </div>

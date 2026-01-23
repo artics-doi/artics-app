@@ -33,9 +33,18 @@ exports.sendPushNotificationOnNewMessage = (0, firestore_1.onDocumentCreated)('c
     // フロントエンドでは 'members' フィールドを使用
     const memberIds = chatRoom.members || [];
     console.log(`Room: ${roomName}, members: ${JSON.stringify(memberIds)}, senderId: ${senderId}`);
-    // 送信者以外のメンバーに通知を送信
-    const recipientIds = memberIds.filter((id) => id !== senderId);
-    console.log(`Recipients: ${JSON.stringify(recipientIds)}`);
+    // メンションがある場合はメンションされた人だけに通知
+    // メンションがない場合は通知を送らない（全員への通知は不要）
+    const mentions = message.mentions || [];
+    console.log(`Mentions: ${JSON.stringify(mentions)}`);
+    // メンションがない場合は通知を送らない
+    if (mentions.length === 0) {
+        console.log('No mentions found, skipping notification');
+        return;
+    }
+    // メンションされた人のうち、送信者以外に通知を送信
+    const recipientIds = mentions.filter((id) => id !== senderId);
+    console.log(`Recipients (mentioned users): ${JSON.stringify(recipientIds)}`);
     if (recipientIds.length === 0) {
         console.log('No recipients to notify (memberIds might not include other members)');
         return;

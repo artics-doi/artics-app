@@ -47,6 +47,20 @@ export async function getStorageUsage(): Promise<number> {
   }
 }
 
+// 使用量を直接設定（管理者用）
+export async function setStorageUsageValue(bytes: number): Promise<void> {
+  try {
+    const docRef = doc(db, 'settings', 'storageUsage');
+    await setDoc(docRef, {
+      totalBytes: bytes,
+      lastUpdated: new Date()
+    }, { merge: true });
+  } catch (error) {
+    console.error('ストレージ使用量の設定に失敗:', error);
+    throw error;
+  }
+}
+
 // バイトを読みやすい形式に変換
 export function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';

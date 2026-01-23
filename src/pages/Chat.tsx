@@ -94,7 +94,7 @@ export default function Chat() {
   const navigate = useNavigate();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const messageInputRef = useRef<HTMLInputElement>(null);
+  const messageInputRef = useRef<HTMLTextAreaElement>(null);
   const messageListRef = useRef<HTMLDivElement>(null);
 
 
@@ -211,14 +211,24 @@ export default function Chat() {
 
   // 初回読み込み時のみ最下部にスクロール
   const initialScrollDoneRef = useRef(false);
+  const prevMessagesLengthRef = useRef(0);
+
   useEffect(() => {
-    if (!initialScrollDoneRef.current && messages.length > 0 && !searchParams.get('messageId')) {
-      // 少し遅延させてDOMが安定してからスクロール
+    // 検索パラメータがある場合はスクロールしない
+    if (searchParams.get('messageId')) return;
+
+    if (!initialScrollDoneRef.current && messages.length > 0) {
+      // 初回読み込み時
       setTimeout(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
       }, 100);
       initialScrollDoneRef.current = true;
+    } else if (messages.length > prevMessagesLengthRef.current) {
+      // 新しいメッセージが追加された時
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
+
+    prevMessagesLengthRef.current = messages.length;
   }, [messages.length, searchParams]);
 
   // メッセージを既読にする（処理済みIDを追跡して重複防止）
@@ -263,9 +273,14 @@ export default function Chat() {
   }, [messages, currentUser, roomId]);
 
   // メッセージ入力でメンション検出
-  const handleMessageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleMessageChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     setNewMessage(value);
+
+    // テキストエリアの高さを自動調整
+    const textarea = e.target;
+    textarea.style.height = 'auto';
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`;
 
     // @の後の文字列を検出
     const mentionMatch = value.match(/@(\S*)$/);
@@ -316,8 +331,7 @@ export default function Chat() {
   };
 
   // メッセージを送信
-  async function sendMessage(e: React.FormEvent) {
-    e.preventDefault();
+  async function sendMessage() {
     if (!newMessage.trim() || !currentUser || !roomId || sending) return;
 
     setSending(true);
@@ -363,6 +377,11 @@ export default function Chat() {
 
       setNewMessage('');
       setReplyingTo(null);
+
+      // テキストエリアの高さをリセット
+      if (messageInputRef.current) {
+        messageInputRef.current.style.height = 'auto';
+      }
 
       // ブラウザ通知（メンションされたユーザーへ）
       if (mentions.length > 0 && 'Notification' in window && Notification.permission === 'granted') {
@@ -1076,23 +1095,23 @@ export default function Chat() {
         </div>
       )}
 
-      {/* メンションリスト */}
-      {showMentionList && getFilteredMembers().length > 0 && (
-        <div className={styles.mentionList}>
-          {getFilteredMembers().map(member => (
-            <button
-              key={member.uid}
-              className={styles.mentionItem}
-              onClick={() => insertMention(member.displayName, member.uid)}
-            >
-              @{member.displayName}
-            </button>
-          ))}
-        </div>
-      )}
-
       {/* 入力エリア */}
-      <form className={styles.inputArea} onSubmit={sendMessage}>
+      <div className={styles.inputArea}>
+        {/* メンションリスト */}
+        {showMentionList && getFilteredMembers().length > 0 && (
+          <div className={styles.mentionList}>
+            {getFilteredMembers().map(member => (
+              <button
+                key={member.uid}
+                type="button"
+                className={styles.mentionItem}
+                onClick={() => insertMention(member.displayName, member.uid)}
+              >
+                @{member.displayName}
+              </button>
+            ))}
+          </div>
+        )}
         <input
           type="file"
           ref={fileInputRef}
@@ -1116,23 +1135,30 @@ export default function Chat() {
             </svg>
           )}
         </button>
-        <input
-          type="text"
+        <textarea
           ref={messageInputRef}
           value={newMessage}
           onChange={handleMessageChange}
-          placeholder="メッセージを入力... (@でメンション)"
+          onKeyDown={(e) => {
+            if (e.ctrlKey && e.key === 'Enter' && newMessage.trim() && !sending) {
+              e.preventDefault();
+              sendMessage();
+            }
+          }}
+          placeholder="メッセージを入力... (Ctrl+Enterで送信)"
           className={styles.messageInput}
           disabled={sending}
+          rows={1}
         />
         <button
-          type="submit"
+          type="button"
           className={styles.sendButton}
           disabled={!newMessage.trim() || sending}
+          onClick={sendMessage}
         >
           {sending ? '...' : '送信'}
         </button>
-      </form>
+      </div>
 
       {/* 画像プレビューモーダル */}
       {previewImage && (

@@ -605,15 +605,16 @@
 .mentionList {
   position: absolute;
   bottom: 100%;
-  left: 50px;
-  right: 80px;
-  background: var(--bg-secondary);
+  left: 0;
+  right: 0;
+  margin-bottom: 4px;
+  background: var(--bg-primary);
   border: 1px solid var(--border-color);
   border-radius: 8px;
   box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.15);
   max-height: 200px;
   overflow-y: auto;
-  z-index: 100;
+  z-index: 1000;
 }
 
 .mentionItem {
@@ -682,6 +683,12 @@
   background: var(--bg-input);
   color: var(--text-primary);
   transition: border-color 0.2s, background 0.2s;
+  resize: none;
+  min-height: 44px;
+  max-height: 120px;
+  line-height: 1.4;
+  font-family: inherit;
+  overflow-y: auto;
 }
 
 .messageInput:focus {
