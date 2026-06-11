@@ -1,6 +1,6 @@
 // ホーム画面（チャット一覧）
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   collection,
@@ -74,6 +74,7 @@ export default function Home() {
 
   // ユーザー管理機能用
   const [usersTitleClickCount, setUsersTitleClickCount] = useState(0);
+  const usersTitleClickTimerRef = useRef<number | null>(null);
   const [selectedUserForEdit, setSelectedUserForEdit] = useState<User | null>(null);
   const [editUserName, setEditUserName] = useState('');
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
@@ -482,8 +483,11 @@ export default function Home() {
       closeModal('showUsers');
       openModal('showUserManagement');
     }
-    // 3秒でリセット
-    setTimeout(() => setUsersTitleClickCount(0), 3000);
+    // 3秒でリセット（古いタイマーを残すと先にリセットが発火して5回に到達できない）
+    if (usersTitleClickTimerRef.current !== null) {
+      window.clearTimeout(usersTitleClickTimerRef.current);
+    }
+    usersTitleClickTimerRef.current = window.setTimeout(() => setUsersTitleClickCount(0), 3000);
   }
 
   // ユーザー編集を開く
@@ -558,15 +562,20 @@ export default function Home() {
       const results: { roomId: string; roomName: string; messageId: string; text: string; senderName: string; timestamp: Date }[] = [];
       const normalizedQuery = searchQuery.toLowerCase();
 
-      // 全チャットルームのメッセージを検索
-      for (const room of chatRooms) {
-        const messagesQuery = query(
-          collection(db, 'chatRooms', room.id, 'messages'),
-          orderBy('createdAt', 'desc'),
-          limit(SEARCH_LIMIT_PER_ROOM)
-        );
-        const messagesSnapshot = await getDocs(messagesQuery);
+      // チャットルームのメッセージを検索（メモは /memo/ 配下が正路のため対象外）
+      const targetRooms = chatRooms.filter((room) => room.type !== 'memo');
+      const snapshots = await Promise.all(
+        targetRooms.map((room) =>
+          getDocs(query(
+            collection(db, 'chatRooms', room.id, 'messages'),
+            orderBy('createdAt', 'desc'),
+            limit(SEARCH_LIMIT_PER_ROOM)
+          ))
+        )
+      );
 
+      snapshots.forEach((messagesSnapshot, index) => {
+        const room = targetRooms[index];
         messagesSnapshot.forEach((doc) => {
           const data = doc.data();
           const text = data.text || '';
@@ -583,7 +592,7 @@ export default function Home() {
             });
           }
         });
-      }
+      });
 
       // 新しい順にソート
       results.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());

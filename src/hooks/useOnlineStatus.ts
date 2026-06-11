@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ref, onValue, off } from 'firebase/database';
+import { ref, onValue } from 'firebase/database';
 import { rtdb } from '../lib/firebase';
 
 export function useOnlineStatus(userIds: string[]): Record<string, boolean> {
@@ -10,18 +10,21 @@ export function useOnlineStatus(userIds: string[]): Record<string, boolean> {
   useEffect(() => {
     if (userIds.length === 0) return;
 
-    const refs: Array<ReturnType<typeof ref>> = [];
+    // off(ref) はそのパスの全リスナーを解除してしまい、同じユーザーを監視する
+    // 他のフックインスタンスまで巻き添えになるため、onValue の戻り値で個別解除する
+    const unsubscribers: Array<() => void> = [];
 
     userIds.forEach((uid) => {
       const statusRef = ref(rtdb, `/status/${uid}/online`);
-      refs.push(statusRef);
-      onValue(statusRef, (snapshot) => {
-        setStatusMap((prev) => ({ ...prev, [uid]: snapshot.val() === true }));
-      });
+      unsubscribers.push(
+        onValue(statusRef, (snapshot) => {
+          setStatusMap((prev) => ({ ...prev, [uid]: snapshot.val() === true }));
+        })
+      );
     });
 
     return () => {
-      refs.forEach((r) => off(r));
+      unsubscribers.forEach((unsubscribe) => unsubscribe());
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);

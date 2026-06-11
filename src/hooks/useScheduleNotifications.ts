@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { User as FirebaseUser } from 'firebase/auth';
 import { useSchedules } from './useSchedules';
-import { useElectronNotification } from './useElectronNotification';
+import { isElectronEnv, useElectronNotification } from './useElectronNotification';
 import {
   formatScheduleNotificationBody,
   getScheduleNotificationKey,
@@ -25,12 +25,15 @@ function writeSentKeys(keys: Set<string>) {
 }
 
 export function useScheduleNotifications(currentUser: FirebaseUser | null) {
-  const { schedules } = useSchedules(currentUser);
+  // PWA では Cloud Functions（sendScheduleNotifications）の FCM プッシュが予定通知を
+  // 担当する。ローカル通知も出すと同じ予定が二重表示されるため Electron 限定にする
+  const isElectron = isElectronEnv();
+  const { schedules } = useSchedules(isElectron ? currentUser : null);
   const { showNotification } = useElectronNotification();
   const sentKeysRef = useRef<Set<string>>(readSentKeys());
 
   useEffect(() => {
-    if (!currentUser) return;
+    if (!isElectron || !currentUser) return;
 
     const checkDueSchedules = async () => {
       const now = Date.now();
@@ -66,5 +69,5 @@ export function useScheduleNotifications(currentUser: FirebaseUser | null) {
       void checkDueSchedules();
     }, 30 * 1000);
     return () => window.clearInterval(intervalId);
-  }, [currentUser, schedules, showNotification]);
+  }, [isElectron, currentUser, schedules, showNotification]);
 }

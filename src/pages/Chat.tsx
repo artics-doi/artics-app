@@ -129,6 +129,11 @@ export default function Chat() {
   const [isAtBottom, setIsAtBottom] = useState(true);
   const [newMessageCount, setNewMessageCount] = useState(0);
   const lastMessageCountRef = useRef(0);
+  // スクロール effect から最新の isAtBottom を参照するためのミラー
+  const isAtBottomRef = useRef(true);
+  useEffect(() => {
+    isAtBottomRef.current = isAtBottom;
+  }, [isAtBottom]);
 
   // スクロールハンドラ（M-8 isAtBottom 判定を上乗せ）
   const handleScrollEnhanced = useCallback(() => {
@@ -366,6 +371,17 @@ export default function Chat() {
   const initialScrollDoneRef = useRef(false);
   const prevMessagesLengthRef = useRef(0);
 
+  // ルーム切替時にスクロール関連の記憶をリセット。
+  // 漏れると別ルームで初回スクロールが走らず、新着件数も誤検出する
+  useEffect(() => {
+    initialScrollDoneRef.current = false;
+    prevMessagesLengthRef.current = 0;
+    lastMessageCountRef.current = 0;
+    isAtBottomRef.current = true;
+    setIsAtBottom(true);
+    setNewMessageCount(0);
+  }, [roomId]);
+
   useEffect(() => {
     // 検索パラメータがある場合はスクロールしない
     if (searchParams.get('messageId')) return;
@@ -377,12 +393,16 @@ export default function Chat() {
       }, 100);
       initialScrollDoneRef.current = true;
     } else if (messages.length > prevMessagesLengthRef.current) {
-      // 新しいメッセージが追加された時
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      // 新着での自動スクロールは「最下部にいる」か「自分の送信」のときだけ。
+      // 過去ログ閲覧中まで強制スクロールすると「N件の新着」ボタンが機能しない
+      const lastMessage = messages[messages.length - 1];
+      if (isAtBottomRef.current || lastMessage?.senderId === currentUser?.uid) {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }
     }
 
     prevMessagesLengthRef.current = messages.length;
-  }, [messages.length, searchParams]);
+  }, [messages, currentUser, searchParams]);
 
 
   // メッセージ入力でメンション検出
@@ -434,19 +454,11 @@ export default function Chat() {
   // メッセージからメンションを抽出
   const extractMentions = (text: string): string[] => {
     if (!chatRoom) return [];
-    const mentions: string[] = [];
-    const mentionPattern = /@(\S+)/g;
-    let match;
-    while ((match = mentionPattern.exec(text)) !== null) {
-      const mentionName = match[1];
-      const user = Object.entries(chatRoom.memberDetails).find(
-        ([, details]) => details.displayName === mentionName
-      );
-      if (user) {
-        mentions.push(user[0]);
-      }
-    }
-    return mentions;
+    // \S+ の正規表現では空白を含む表示名が途中で切れて解決できないため、
+    // 「@表示名」がそのまま本文に含まれるかで判定する
+    return Object.entries(chatRoom.memberDetails)
+      .filter(([, details]) => details.displayName && text.includes(`@${details.displayName}`))
+      .map(([uid]) => uid);
   };
 
   // 失敗した楽観的メッセージを再送（H-2）
@@ -612,6 +624,13 @@ export default function Chat() {
           fileURL: null,
           storagePath: null,
           fileSize: null,
+        });
+
+        // 反映後は非表示を解除し、他ユーザーと同じ「削除されました」表示に揃える
+        setPendingDeleteIds((prev) => {
+          const next = new Set(prev);
+          next.delete(messageId);
+          return next;
         });
       } catch (error) {
         console.error('メッセージ削除エラー:', error);
@@ -1431,8 +1450,8 @@ export default function Chat() {
                           }
                         }}
                       >
-                        {/* メッセージメニュー */}
-                        {showMessageMenu === message.id && (
+                        {/* メッセージメニュー（送信中の楽観的メッセージは Firestore 未確定のため非表示） */}
+                        {showMessageMenu === message.id && !message._pending && (
                           <div
                             className={`${styles.messageMenu} ${menuPosition.vertical === 'below' ? styles.menuBelow : ''}`}
                             data-menu-horizontal={menuPosition.horizontal}

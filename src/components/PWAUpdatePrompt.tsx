@@ -24,11 +24,31 @@ function PWAUpdatePrompt() {
     }
 
     let intervalId: ReturnType<typeof setInterval>;
+    let disposed = false;
+    let registration: ServiceWorkerRegistration | null = null;
+    const workerListeners: Array<{ worker: ServiceWorker; handler: () => void }> = [];
+
+    const onUpdateFound = () => {
+      const newWorker = registration?.installing;
+      if (newWorker) {
+        const onStateChange = () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller && !hasShownRef.current) {
+            // 新しいバージョンが利用可能
+            hasShownRef.current = true;
+            setShowPrompt(true);
+          }
+        };
+        workerListeners.push({ worker: newWorker, handler: onStateChange });
+        newWorker.addEventListener('statechange', onStateChange);
+      }
+    };
 
     const registerAndCheck = async () => {
       try {
         // 既存のService Worker登録を取得
         const reg = await navigator.serviceWorker.ready;
+        if (disposed) return;
+        registration = reg;
 
         // 新しいService Workerが待機中かチェック
         if (reg.waiting && !hasShownRef.current) {
@@ -37,18 +57,7 @@ function PWAUpdatePrompt() {
         }
 
         // updatefoundイベントをリッスン
-        reg.addEventListener('updatefound', () => {
-          const newWorker = reg.installing;
-          if (newWorker) {
-            newWorker.addEventListener('statechange', () => {
-              if (newWorker.state === 'installed' && navigator.serviceWorker.controller && !hasShownRef.current) {
-                // 新しいバージョンが利用可能
-                hasShownRef.current = true;
-                setShowPrompt(true);
-              }
-            });
-          }
-        });
+        reg.addEventListener('updatefound', onUpdateFound);
 
         // 定期的に更新をチェック（1時間ごと）
         intervalId = setInterval(() => {
@@ -66,9 +75,13 @@ function PWAUpdatePrompt() {
     registerAndCheck();
 
     return () => {
+      disposed = true;
       if (intervalId) {
         clearInterval(intervalId);
       }
+      // registration は常駐オブジェクトのため、解除しないとリスナーが残り続ける
+      registration?.removeEventListener('updatefound', onUpdateFound);
+      workerListeners.forEach(({ worker, handler }) => worker.removeEventListener('statechange', handler));
     };
   }, []);
 

@@ -29,14 +29,15 @@ export function useGlobalNotification() {
   const { activeRoomId } = useActiveRoom();
   const { isRoomMuted } = useRoomNotificationSettings();
   const lastMessagesRef = useRef<Map<string, LastMessageInfo>>(new Map());
-  const initializedRef = useRef(false);
+  // ルームごとの「初回スナップショット受信済みか」。全ルーム共通のフラグ＋遅延タイマー
+  // だと、後から購読が増えたルームの既存メッセージや起動直後の新着を誤判定する
+  const initializedRoomsRef = useRef<Set<string>>(new Set());
   const showNotificationRef = useRef(showNotification);
   const activeRoomIdRef = useRef(activeRoomId);
   const isRoomMutedRef = useRef(isRoomMuted);
   const electronSettingsRef = useRef(electronSettings);
   const messageUnsubscribersRef = useRef<Map<string, () => void>>(new Map());
   const roomNamesRef = useRef<Map<string, string>>(new Map());
-  const initTimerRef = useRef<number | null>(null);
 
   // showNotificationの最新版を常に保持
   useEffect(() => {
@@ -62,6 +63,7 @@ export function useGlobalNotification() {
     if (!currentUser) return;
     const messageUnsubscribers = messageUnsubscribersRef.current;
     const lastMessages = lastMessagesRef.current;
+    const initializedRooms = initializedRoomsRef.current;
 
     // PWA環境（非Electron）ではService Workerが通知を担当するため、
     // このフックでは通知を表示しない
@@ -87,11 +89,11 @@ export function useGlobalNotification() {
         const data = doc.data();
         // グループ名またはメンバー名を取得
         let roomName = data.name || 'チャット';
-        if (!data.isGroup && data.memberNames) {
-          // 1対1チャットの場合、相手の名前を取得
-          const otherName = Object.entries(data.memberNames)
-            .find(([uid]) => uid !== currentUser.uid)?.[1] as string;
-          if (otherName) roomName = otherName;
+        if (data.type === 'direct' && data.memberDetails) {
+          // 1対1チャットの場合、memberDetails から相手の表示名を取得
+          const other = Object.entries(data.memberDetails as Record<string, { displayName?: string }>)
+            .find(([uid]) => uid !== currentUser.uid)?.[1];
+          if (other?.displayName) roomName = other.displayName;
         }
         roomNames.set(doc.id, roomName);
       });
@@ -103,6 +105,7 @@ export function useGlobalNotification() {
           unsubscribe();
           messageUnsubscribers.delete(roomId);
           lastMessages.delete(roomId);
+          initializedRooms.delete(roomId);
         }
       });
 
@@ -116,6 +119,10 @@ export function useGlobalNotification() {
         );
 
         const unsubscribe = onSnapshot(messagesQuery, (messagesSnapshot) => {
+          // このルームの初回スナップショットは既存メッセージの読み込みなので通知しない
+          const isFirstSnapshot = !initializedRooms.has(roomId);
+          initializedRooms.add(roomId);
+
           if (messagesSnapshot.empty) return;
 
           const doc = messagesSnapshot.docs[0];
@@ -135,8 +142,7 @@ export function useGlobalNotification() {
           // 前回の最新メッセージと比較
           const lastMessage = lastMessagesRef.current.get(roomId);
 
-          // 初回読み込み時は通知しない
-          if (!initializedRef.current) {
+          if (isFirstSnapshot) {
             lastMessagesRef.current.set(roomId, { id: messageId, timestamp: createdAt });
             return;
           }
@@ -172,14 +178,6 @@ export function useGlobalNotification() {
 
         messageUnsubscribers.set(roomId, unsubscribe);
       });
-
-      // 初期化完了フラグ（少し遅延させる）
-      if (initTimerRef.current !== null) {
-        window.clearTimeout(initTimerRef.current);
-      }
-      initTimerRef.current = window.setTimeout(() => {
-        initializedRef.current = true;
-      }, 2000);
     });
 
     return () => {
@@ -187,11 +185,7 @@ export function useGlobalNotification() {
       messageUnsubscribers.forEach((unsubscribe) => unsubscribe());
       messageUnsubscribers.clear();
       lastMessages.clear();
-      if (initTimerRef.current !== null) {
-        window.clearTimeout(initTimerRef.current);
-        initTimerRef.current = null;
-      }
-      initializedRef.current = false;
+      initializedRooms.clear();
     };
   }, [currentUser, isElectron]); // showNotificationはrefを通じて呼び出すため依存配列から削除
 }
