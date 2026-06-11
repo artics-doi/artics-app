@@ -13,7 +13,8 @@ import {
 import type { User as FirebaseUser } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, set, serverTimestamp as rtdbServerTimestamp } from 'firebase/database';
-import { auth, db, rtdb } from '../lib/firebase';
+import { auth, db, rtdb, deleteFCMToken } from '../lib/firebase';
+import { isElectronEnv } from '../hooks/useElectronNotification';
 
 // Contextの型定義
 interface AuthContextType {
@@ -91,10 +92,31 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // ログアウト処理
   async function logout() {
     if (currentUser) {
-      await set(ref(rtdb, `/status/${currentUser.uid}`), {
-        online: false,
-        lastSeen: rtdbServerTimestamp()
-      });
+      // 後始末はベストエフォート。オフライン等で完了しなくても、
+      // タイムアウト付きで必ず signOut まで到達させる
+      const cleanups: Promise<unknown>[] = [
+        set(ref(rtdb, `/status/${currentUser.uid}`), {
+          online: false,
+          lastSeen: rtdbServerTimestamp()
+        })
+      ];
+
+      // この端末のFCMトークンを削除（共有PCで別ユーザーへ通知が届くのを防ぐ）
+      if (
+        !isElectronEnv() &&
+        'serviceWorker' in navigator &&
+        'Notification' in window &&
+        Notification.permission === 'granted'
+      ) {
+        cleanups.push(deleteFCMToken(currentUser.uid));
+      }
+
+      const timeout = new Promise((resolve) => window.setTimeout(resolve, 3000));
+      try {
+        await Promise.race([Promise.allSettled(cleanups), timeout]);
+      } catch (error) {
+        console.error('ログアウト時の後始末エラー:', error);
+      }
     }
     await signOut(auth);
   }

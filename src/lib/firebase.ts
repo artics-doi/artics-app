@@ -3,8 +3,9 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getDatabase } from 'firebase/database';
-import { getMessaging, getToken, onMessage, isSupported } from 'firebase/messaging';
+import { getMessaging, getToken, deleteToken, onMessage, isSupported } from 'firebase/messaging';
 import type { Messaging } from 'firebase/messaging';
+import { doc, deleteDoc } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -81,6 +82,21 @@ export const getFCMToken = async (): Promise<string | null> => {
     console.error('[FCM] トークン取得エラー:', error);
     return null;
   }
+};
+
+// ログアウト時に呼ぶ。この端末のFCMトークンをFirestoreから削除し、ブラウザ側でも失効させる。
+// 残したままだと共有PCで次にログインした別ユーザーへ前ユーザー宛の通知が届いてしまう
+export const deleteFCMToken = async (userId: string): Promise<void> => {
+  const msg = await initializeMessaging();
+  if (!msg) return;
+
+  const token = await getFCMToken();
+  if (!token) return;
+
+  await deleteDoc(doc(db, 'users', userId, 'fcmTokens', token));
+  await deleteToken(msg).catch((error) => {
+    console.error('[FCM] トークン失効エラー:', error);
+  });
 };
 
 // フォアグラウンドメッセージのリスナー設定
