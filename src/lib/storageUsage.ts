@@ -1,36 +1,13 @@
 // ストレージ使用量の追跡・取得
 
-import { doc, getDoc, setDoc, increment } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from './firebase';
 
 // Firebase Storage無料枠: 5GB
 export const STORAGE_FREE_LIMIT = 5 * 1024 * 1024 * 1024; // 5GB in bytes
 
-// 使用量を追加
-export async function addStorageUsage(bytes: number): Promise<void> {
-  try {
-    const docRef = doc(db, 'settings', 'storageUsage');
-    await setDoc(docRef, {
-      totalBytes: increment(bytes),
-      lastUpdated: new Date()
-    }, { merge: true });
-  } catch (error) {
-    console.error('ストレージ使用量の記録に失敗:', error);
-  }
-}
-
-// 使用量を減少
-export async function removeStorageUsage(bytes: number): Promise<void> {
-  try {
-    const docRef = doc(db, 'settings', 'storageUsage');
-    await setDoc(docRef, {
-      totalBytes: increment(-bytes),
-      lastUpdated: new Date()
-    }, { merge: true });
-  } catch (error) {
-    console.error('ストレージ使用量の更新に失敗:', error);
-  }
-}
+// 使用量の加算・減算はクライアントでは行わない。
+// Cloud Functions（updateStorageUsageOnMessageWrite 等）が Admin SDK で集計する
 
 // 現在の使用量を取得
 export async function getStorageUsage(): Promise<number> {
