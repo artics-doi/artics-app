@@ -2,165 +2,15 @@ import * as admin from 'firebase-admin';
 import { onDocumentCreated, onDocumentUpdated, onDocumentWritten } from 'firebase-functions/v2/firestore';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
+import { adjustStorageUsage, getTrackedFileSize, getTrackedPhotoFileSize } from './storageUsage';
+import { computeUnreadCount } from './unread';
+import { deleteInvalidTokens, getFcmTokensForUsers, isInvalidRegistrationToken } from './fcm';
+import { getScheduleNotificationTime, SCHEDULE_NOTIFICATION_GRACE_MS, type ScheduleData } from './scheduleTime';
 
 admin.initializeApp();
 
 const db = admin.firestore();
 const messaging = admin.messaging();
-
-function getTrackedFileSize(data: admin.firestore.DocumentData | undefined): number {
-  if (!data?.storagePath || typeof data.fileSize !== 'number') return 0;
-  return data.fileSize;
-}
-
-function getTrackedPhotoFileSize(data: admin.firestore.DocumentData | undefined): number {
-  if (!data?.photoStoragePath || typeof data.photoFileSize !== 'number') return 0;
-  return data.photoFileSize;
-}
-
-async function adjustStorageUsage(deltaBytes: number): Promise<void> {
-  if (deltaBytes === 0) return;
-
-  await db.collection('settings').doc('storageUsage').set({
-    totalBytes: FieldValue.increment(deltaBytes),
-    lastUpdated: FieldValue.serverTimestamp()
-  }, { merge: true });
-}
-
-// lastReadAt 以降の「他人からの未削除メッセージ」件数を数える。
-// メッセージ作成時と readStates 書き込み時の両方がこの同じ計算式で
-// 絶対値を書くことで、増分方式と絶対値方式の併存による未読数のずれを防ぐ
-async function computeUnreadCount(
-  roomRef: admin.firestore.DocumentReference,
-  userId: string,
-  lastReadAt: Timestamp | null
-): Promise<number> {
-  let messagesQuery: admin.firestore.Query = roomRef.collection('messages');
-  if (lastReadAt) {
-    messagesQuery = messagesQuery.where('createdAt', '>', lastReadAt);
-  }
-  const messagesSnapshot = await messagesQuery.get();
-  return messagesSnapshot.docs.filter((messageDoc) => {
-    const message = messageDoc.data();
-    return message.senderId !== userId && message.isDeleted !== true;
-  }).length;
-}
-
-function isInvalidRegistrationToken(error: admin.FirebaseError | undefined): boolean {
-  return error?.code === 'messaging/registration-token-not-registered' ||
-    error?.code === 'messaging/invalid-registration-token' ||
-    error?.code === 'messaging/invalid-argument';
-}
-
-type ScheduleNotificationTiming =
-  | 'atStart'
-  | 'fiveMinutesBefore'
-  | 'fifteenMinutesBefore'
-  | 'thirtyMinutesBefore'
-  | 'oneHourBefore'
-  | 'previousDayEvening'
-  | 'sameDayMorning'
-  | 'custom';
-
-interface ScheduleData {
-  title?: string;
-  categoryId?: string;
-  targetUserIds?: string[];
-  targetUserNames?: string[];
-  startAt?: Timestamp;
-  endAt?: Timestamp | null;
-  allDay?: boolean;
-  createdBy?: string;
-  notification?: {
-    enabled?: boolean;
-    timings?: ScheduleNotificationTiming[];
-    customAt?: Timestamp | null;
-  };
-  sentNotificationKeys?: string[];
-}
-
-const SCHEDULE_NOTIFICATION_GRACE_MS = 2 * 60 * 1000;
-
-function withTime(date: Date, hours: number, minutes: number): Date {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), hours, minutes, 0, 0);
-}
-
-function getScheduleNotificationTime(schedule: ScheduleData, timing: ScheduleNotificationTiming): Date | null {
-  const startAt = schedule.startAt?.toDate();
-  if (!startAt) return null;
-  if (timing === 'custom') return schedule.notification?.customAt?.toDate() ?? null;
-
-  if (schedule.allDay !== false) {
-    const startDay = new Date(startAt.getFullYear(), startAt.getMonth(), startAt.getDate());
-    if (timing === 'previousDayEvening') {
-      const previousDay = new Date(startDay);
-      previousDay.setDate(previousDay.getDate() - 1);
-      return withTime(previousDay, 17, 0);
-    }
-    return withTime(startDay, 8, 30);
-  }
-
-  switch (timing) {
-    case 'atStart':
-      return startAt;
-    case 'fiveMinutesBefore':
-      return new Date(startAt.getTime() - 5 * 60 * 1000);
-    case 'fifteenMinutesBefore':
-      return new Date(startAt.getTime() - 15 * 60 * 1000);
-    case 'thirtyMinutesBefore':
-      return new Date(startAt.getTime() - 30 * 60 * 1000);
-    case 'oneHourBefore':
-      return new Date(startAt.getTime() - 60 * 60 * 1000);
-    case 'previousDayEvening': {
-      const previousDay = new Date(startAt);
-      previousDay.setDate(previousDay.getDate() - 1);
-      return withTime(previousDay, 17, 0);
-    }
-    case 'sameDayMorning':
-      return withTime(startAt, 8, 30);
-    default:
-      return null;
-  }
-}
-
-async function getFcmTokensForUsers(userIds: string[]): Promise<{ tokens: string[]; tokenOwners: Map<string, Set<string>> }> {
-  const tokens: string[] = [];
-  const tokenOwners = new Map<string, Set<string>>();
-
-  for (const userId of userIds) {
-    const tokensSnapshot = await db
-      .collection('users')
-      .doc(userId)
-      .collection('fcmTokens')
-      .get();
-
-    tokensSnapshot.docs.forEach((doc) => {
-      const token = doc.data().token;
-      if (!token) return;
-      if (!tokens.includes(token)) tokens.push(token);
-      const owners = tokenOwners.get(token) ?? new Set<string>();
-      owners.add(userId);
-      tokenOwners.set(token, owners);
-    });
-  }
-
-  return { tokens, tokenOwners };
-}
-
-async function deleteInvalidTokens(invalidTokens: string[], tokenOwners: Map<string, Set<string>>): Promise<void> {
-  for (const invalidToken of invalidTokens) {
-    const owners = tokenOwners.get(invalidToken) ?? new Set<string>();
-    for (const userId of owners) {
-      await db
-        .collection('users')
-        .doc(userId)
-        .collection('fcmTokens')
-        .doc(invalidToken)
-        .delete();
-      console.log(`Deleted invalid token for user ${userId}`);
-    }
-  }
-}
 
 // メッセージ作成時に未読カウントを更新
 export const updateUnreadCountsOnNewMessage = onDocumentCreated(
@@ -415,7 +265,7 @@ export const sendScheduleNotifications = onSchedule(
         const notificationKey = `${scheduleDoc.id}:${timing}:${notifyAtMs}`;
         if (sentKeys.has(notificationKey)) continue;
 
-        const { tokens, tokenOwners } = await getFcmTokensForUsers(recipientIds);
+        const { tokens, tokenOwners } = await getFcmTokensForUsers(db, recipientIds);
         if (tokens.length === 0) {
           console.log(`No FCM tokens found for schedule ${scheduleDoc.id}`);
           await scheduleDoc.ref.update({
@@ -461,7 +311,7 @@ export const sendScheduleNotifications = onSchedule(
               invalidTokens.push(tokens[index]);
             }
           });
-          await deleteInvalidTokens(invalidTokens, tokenOwners);
+          await deleteInvalidTokens(db, invalidTokens, tokenOwners);
 
           await scheduleDoc.ref.update({
             sentNotificationKeys: FieldValue.arrayUnion(notificationKey),
@@ -501,7 +351,7 @@ export const updateStorageUsageOnMessageWrite = onDocumentWritten(
   async (event) => {
     const beforeSize = getTrackedFileSize(event.data?.before.data());
     const afterSize = getTrackedFileSize(event.data?.after.data());
-    await adjustStorageUsage(afterSize - beforeSize);
+    await adjustStorageUsage(db, afterSize - beforeSize);
   }
 );
 
@@ -511,7 +361,7 @@ export const updateStorageUsageOnUserWrite = onDocumentWritten(
   async (event) => {
     const beforeSize = getTrackedPhotoFileSize(event.data?.before.data());
     const afterSize = getTrackedPhotoFileSize(event.data?.after.data());
-    await adjustStorageUsage(afterSize - beforeSize);
+    await adjustStorageUsage(db, afterSize - beforeSize);
   }
 );
 
@@ -521,7 +371,7 @@ export const updateStorageUsageOnRoomWrite = onDocumentWritten(
   async (event) => {
     const beforeSize = getTrackedPhotoFileSize(event.data?.before.data());
     const afterSize = getTrackedPhotoFileSize(event.data?.after.data());
-    await adjustStorageUsage(afterSize - beforeSize);
+    await adjustStorageUsage(db, afterSize - beforeSize);
   }
 );
 

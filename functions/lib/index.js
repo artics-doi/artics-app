@@ -19,126 +19,13 @@ const admin = require("firebase-admin");
 const firestore_1 = require("firebase-functions/v2/firestore");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
 const firestore_2 = require("firebase-admin/firestore");
+const storageUsage_1 = require("./storageUsage");
+const unread_1 = require("./unread");
+const fcm_1 = require("./fcm");
+const scheduleTime_1 = require("./scheduleTime");
 admin.initializeApp();
 const db = admin.firestore();
 const messaging = admin.messaging();
-function getTrackedFileSize(data) {
-    if (!(data === null || data === void 0 ? void 0 : data.storagePath) || typeof data.fileSize !== 'number')
-        return 0;
-    return data.fileSize;
-}
-function getTrackedPhotoFileSize(data) {
-    if (!(data === null || data === void 0 ? void 0 : data.photoStoragePath) || typeof data.photoFileSize !== 'number')
-        return 0;
-    return data.photoFileSize;
-}
-async function adjustStorageUsage(deltaBytes) {
-    if (deltaBytes === 0)
-        return;
-    await db.collection('settings').doc('storageUsage').set({
-        totalBytes: firestore_2.FieldValue.increment(deltaBytes),
-        lastUpdated: firestore_2.FieldValue.serverTimestamp()
-    }, { merge: true });
-}
-// lastReadAt 以降の「他人からの未削除メッセージ」件数を数える。
-// メッセージ作成時と readStates 書き込み時の両方がこの同じ計算式で
-// 絶対値を書くことで、増分方式と絶対値方式の併存による未読数のずれを防ぐ
-async function computeUnreadCount(roomRef, userId, lastReadAt) {
-    let messagesQuery = roomRef.collection('messages');
-    if (lastReadAt) {
-        messagesQuery = messagesQuery.where('createdAt', '>', lastReadAt);
-    }
-    const messagesSnapshot = await messagesQuery.get();
-    return messagesSnapshot.docs.filter((messageDoc) => {
-        const message = messageDoc.data();
-        return message.senderId !== userId && message.isDeleted !== true;
-    }).length;
-}
-function isInvalidRegistrationToken(error) {
-    return (error === null || error === void 0 ? void 0 : error.code) === 'messaging/registration-token-not-registered' ||
-        (error === null || error === void 0 ? void 0 : error.code) === 'messaging/invalid-registration-token' ||
-        (error === null || error === void 0 ? void 0 : error.code) === 'messaging/invalid-argument';
-}
-const SCHEDULE_NOTIFICATION_GRACE_MS = 2 * 60 * 1000;
-function withTime(date, hours, minutes) {
-    return new Date(date.getFullYear(), date.getMonth(), date.getDate(), hours, minutes, 0, 0);
-}
-function getScheduleNotificationTime(schedule, timing) {
-    var _a, _b, _c, _d;
-    const startAt = (_a = schedule.startAt) === null || _a === void 0 ? void 0 : _a.toDate();
-    if (!startAt)
-        return null;
-    if (timing === 'custom')
-        return (_d = (_c = (_b = schedule.notification) === null || _b === void 0 ? void 0 : _b.customAt) === null || _c === void 0 ? void 0 : _c.toDate()) !== null && _d !== void 0 ? _d : null;
-    if (schedule.allDay !== false) {
-        const startDay = new Date(startAt.getFullYear(), startAt.getMonth(), startAt.getDate());
-        if (timing === 'previousDayEvening') {
-            const previousDay = new Date(startDay);
-            previousDay.setDate(previousDay.getDate() - 1);
-            return withTime(previousDay, 17, 0);
-        }
-        return withTime(startDay, 8, 30);
-    }
-    switch (timing) {
-        case 'atStart':
-            return startAt;
-        case 'fiveMinutesBefore':
-            return new Date(startAt.getTime() - 5 * 60 * 1000);
-        case 'fifteenMinutesBefore':
-            return new Date(startAt.getTime() - 15 * 60 * 1000);
-        case 'thirtyMinutesBefore':
-            return new Date(startAt.getTime() - 30 * 60 * 1000);
-        case 'oneHourBefore':
-            return new Date(startAt.getTime() - 60 * 60 * 1000);
-        case 'previousDayEvening': {
-            const previousDay = new Date(startAt);
-            previousDay.setDate(previousDay.getDate() - 1);
-            return withTime(previousDay, 17, 0);
-        }
-        case 'sameDayMorning':
-            return withTime(startAt, 8, 30);
-        default:
-            return null;
-    }
-}
-async function getFcmTokensForUsers(userIds) {
-    const tokens = [];
-    const tokenOwners = new Map();
-    for (const userId of userIds) {
-        const tokensSnapshot = await db
-            .collection('users')
-            .doc(userId)
-            .collection('fcmTokens')
-            .get();
-        tokensSnapshot.docs.forEach((doc) => {
-            var _a;
-            const token = doc.data().token;
-            if (!token)
-                return;
-            if (!tokens.includes(token))
-                tokens.push(token);
-            const owners = (_a = tokenOwners.get(token)) !== null && _a !== void 0 ? _a : new Set();
-            owners.add(userId);
-            tokenOwners.set(token, owners);
-        });
-    }
-    return { tokens, tokenOwners };
-}
-async function deleteInvalidTokens(invalidTokens, tokenOwners) {
-    var _a;
-    for (const invalidToken of invalidTokens) {
-        const owners = (_a = tokenOwners.get(invalidToken)) !== null && _a !== void 0 ? _a : new Set();
-        for (const userId of owners) {
-            await db
-                .collection('users')
-                .doc(userId)
-                .collection('fcmTokens')
-                .doc(invalidToken)
-                .delete();
-            console.log(`Deleted invalid token for user ${userId}`);
-        }
-    }
-}
 // メッセージ作成時に未読カウントを更新
 exports.updateUnreadCountsOnNewMessage = (0, firestore_1.onDocumentCreated)('chatRooms/{chatRoomId}/messages/{messageId}', async (event) => {
     const snapshot = event.data;
@@ -170,7 +57,7 @@ exports.updateUnreadCountsOnNewMessage = (0, firestore_1.onDocumentCreated)('cha
             return;
         const readStateDoc = await roomRef.collection('readStates').doc(memberId).get();
         const lastReadAt = (_a = readStateDoc.data()) === null || _a === void 0 ? void 0 : _a.lastReadAt;
-        updateData[`unreadCounts.${memberId}`] = await computeUnreadCount(roomRef, memberId, lastReadAt instanceof firestore_2.Timestamp ? lastReadAt : null);
+        updateData[`unreadCounts.${memberId}`] = await (0, unread_1.computeUnreadCount)(roomRef, memberId, lastReadAt instanceof firestore_2.Timestamp ? lastReadAt : null);
     }));
     if (Object.keys(updateData).length > 0) {
         try {
@@ -303,7 +190,7 @@ exports.sendPushNotificationOnNewMessage = (0, firestore_1.onDocumentCreated)('c
             response.responses.forEach((resp, idx) => {
                 if (!resp.success) {
                     console.log(`Failed to send to token: ${tokens[idx]}`, resp.error);
-                    if (isInvalidRegistrationToken(resp.error)) {
+                    if ((0, fcm_1.isInvalidRegistrationToken)(resp.error)) {
                         invalidTokens.push(tokens[idx]);
                     }
                 }
@@ -350,16 +237,16 @@ exports.sendScheduleNotifications = (0, scheduler_1.onSchedule)({
         if (recipientIds.length === 0)
             continue;
         for (const timing of timings) {
-            const notifyAt = getScheduleNotificationTime(schedule, timing);
+            const notifyAt = (0, scheduleTime_1.getScheduleNotificationTime)(schedule, timing);
             if (!notifyAt)
                 continue;
             const notifyAtMs = notifyAt.getTime();
-            if (notifyAtMs > now || notifyAtMs < now - SCHEDULE_NOTIFICATION_GRACE_MS)
+            if (notifyAtMs > now || notifyAtMs < now - scheduleTime_1.SCHEDULE_NOTIFICATION_GRACE_MS)
                 continue;
             const notificationKey = `${scheduleDoc.id}:${timing}:${notifyAtMs}`;
             if (sentKeys.has(notificationKey))
                 continue;
-            const { tokens, tokenOwners } = await getFcmTokensForUsers(recipientIds);
+            const { tokens, tokenOwners } = await (0, fcm_1.getFcmTokensForUsers)(db, recipientIds);
             if (tokens.length === 0) {
                 console.log(`No FCM tokens found for schedule ${scheduleDoc.id}`);
                 await scheduleDoc.ref.update({
@@ -398,11 +285,11 @@ exports.sendScheduleNotifications = (0, scheduler_1.onSchedule)({
                 console.log(`Schedule ${scheduleDoc.id}: sent ${response.successCount} notifications`);
                 const invalidTokens = [];
                 response.responses.forEach((resp, index) => {
-                    if (!resp.success && isInvalidRegistrationToken(resp.error)) {
+                    if (!resp.success && (0, fcm_1.isInvalidRegistrationToken)(resp.error)) {
                         invalidTokens.push(tokens[index]);
                     }
                 });
-                await deleteInvalidTokens(invalidTokens, tokenOwners);
+                await (0, fcm_1.deleteInvalidTokens)(db, invalidTokens, tokenOwners);
                 await scheduleDoc.ref.update({
                     sentNotificationKeys: firestore_2.FieldValue.arrayUnion(notificationKey),
                     updatedAt: firestore_2.FieldValue.serverTimestamp()
@@ -425,7 +312,7 @@ exports.normalizeUnreadCountOnReadStateWrite = (0, firestore_1.onDocumentWritten
     if (!(lastReadAt instanceof firestore_2.Timestamp))
         return;
     const roomRef = db.collection('chatRooms').doc(chatRoomId);
-    const unreadCount = await computeUnreadCount(roomRef, userId, lastReadAt);
+    const unreadCount = await (0, unread_1.computeUnreadCount)(roomRef, userId, lastReadAt);
     await roomRef.update({
         [`unreadCounts.${userId}`]: unreadCount
     });
@@ -433,23 +320,23 @@ exports.normalizeUnreadCountOnReadStateWrite = (0, firestore_1.onDocumentWritten
 // メッセージ添付の fileSize 差分を storageUsage に反映
 exports.updateStorageUsageOnMessageWrite = (0, firestore_1.onDocumentWritten)('chatRooms/{chatRoomId}/messages/{messageId}', async (event) => {
     var _a, _b;
-    const beforeSize = getTrackedFileSize((_a = event.data) === null || _a === void 0 ? void 0 : _a.before.data());
-    const afterSize = getTrackedFileSize((_b = event.data) === null || _b === void 0 ? void 0 : _b.after.data());
-    await adjustStorageUsage(afterSize - beforeSize);
+    const beforeSize = (0, storageUsage_1.getTrackedFileSize)((_a = event.data) === null || _a === void 0 ? void 0 : _a.before.data());
+    const afterSize = (0, storageUsage_1.getTrackedFileSize)((_b = event.data) === null || _b === void 0 ? void 0 : _b.after.data());
+    await (0, storageUsage_1.adjustStorageUsage)(db, afterSize - beforeSize);
 });
 // プロフィール画像の fileSize 差分を storageUsage に反映
 exports.updateStorageUsageOnUserWrite = (0, firestore_1.onDocumentWritten)('users/{userId}', async (event) => {
     var _a, _b;
-    const beforeSize = getTrackedPhotoFileSize((_a = event.data) === null || _a === void 0 ? void 0 : _a.before.data());
-    const afterSize = getTrackedPhotoFileSize((_b = event.data) === null || _b === void 0 ? void 0 : _b.after.data());
-    await adjustStorageUsage(afterSize - beforeSize);
+    const beforeSize = (0, storageUsage_1.getTrackedPhotoFileSize)((_a = event.data) === null || _a === void 0 ? void 0 : _a.before.data());
+    const afterSize = (0, storageUsage_1.getTrackedPhotoFileSize)((_b = event.data) === null || _b === void 0 ? void 0 : _b.after.data());
+    await (0, storageUsage_1.adjustStorageUsage)(db, afterSize - beforeSize);
 });
 // グループ画像の fileSize 差分を storageUsage に反映
 exports.updateStorageUsageOnRoomWrite = (0, firestore_1.onDocumentWritten)('chatRooms/{chatRoomId}', async (event) => {
     var _a, _b;
-    const beforeSize = getTrackedPhotoFileSize((_a = event.data) === null || _a === void 0 ? void 0 : _a.before.data());
-    const afterSize = getTrackedPhotoFileSize((_b = event.data) === null || _b === void 0 ? void 0 : _b.after.data());
-    await adjustStorageUsage(afterSize - beforeSize);
+    const beforeSize = (0, storageUsage_1.getTrackedPhotoFileSize)((_a = event.data) === null || _a === void 0 ? void 0 : _a.before.data());
+    const afterSize = (0, storageUsage_1.getTrackedPhotoFileSize)((_b = event.data) === null || _b === void 0 ? void 0 : _b.after.data());
+    await (0, storageUsage_1.adjustStorageUsage)(db, afterSize - beforeSize);
 });
 // ユーザープロフィール更新時に各チャットルームのmemberDetailsを同期
 exports.syncMemberDetailsOnProfileUpdate = (0, firestore_1.onDocumentUpdated)('users/{userId}', async (event) => {
