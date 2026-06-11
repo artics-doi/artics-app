@@ -1,4 +1,5 @@
 // チャット関連コンポーネントのエクスポート
+export { default as ChatMessageList } from './ChatMessageList';
 export { default as TypingIndicator } from './TypingIndicator';
 export { default as MessageBubbleInteractive } from './MessageBubbleInteractive';
 export * from './modals';
