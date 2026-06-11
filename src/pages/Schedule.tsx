@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties, type DragEvent, type FormEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { FirebaseError } from 'firebase/app';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { useChatRooms } from '../hooks/useChatRooms';
@@ -14,16 +13,38 @@ import { SCHEDULE_CATEGORIES, SCHEDULE_CATEGORY_BY_ID, SCHEDULE_NOTIFICATION_TIM
 import type { User } from '../types';
 import type { ScheduleCategoryId, ScheduleEvent, ScheduleEventInput, ScheduleNotificationTiming } from '../types/schedule';
 import { getRoomAvatarLabel, getRoomAvatarUrl, getRoomDisplayName, getUnreadCount } from '../utils/room';
+import {
+  HOURS,
+  MINUTES,
+  WEEKDAYS,
+  addDays,
+  buildDate,
+  formatMonthLabel,
+  formatScheduleDateRangeLabel,
+  getCalendarWeeks,
+  getMonthCalendarDays,
+  getWeekDays,
+  isSameDay,
+  isValidDate,
+  startOfDay,
+  toDateInputValue,
+  toOrderDateKey,
+} from '../lib/schedule/calendar';
+import {
+  buildWeekEvents,
+  compareSchedules,
+  copyScheduleToDate,
+  eventIntersectsDay,
+  formatEventTime,
+  getDayMultiLaneCount,
+  getSingleDayEventsForOrder,
+  isMultiDayEvent,
+} from '../lib/schedule/events';
+import { createInitialForm, getScheduleErrorMessage, type ScheduleFormState } from '../lib/schedule/form';
 import styles from './Schedule.module.css';
 
 type ViewMode = 'today' | 'week' | 'month';
 type TimePickerField = 'startTime' | 'endTime' | 'customNotifyTime';
-type CalendarWeekEvent = {
-  event: ScheduleEvent;
-  startColumn: number;
-  endColumn: number;
-  lane: number;
-};
 type PendingScheduleMove = {
   eventId: string;
   title: string;
@@ -32,330 +53,6 @@ type PendingScheduleMove = {
   targetDate: Date;
   input: ScheduleEventInput;
 };
-
-type ScheduleFormState = {
-  title: string;
-  categoryId: ScheduleCategoryId;
-  targetUserIds: string[];
-  startDate: string;
-  startTime: string;
-  endDate: string;
-  endTime: string;
-  allDay: boolean;
-  memo: string;
-  notifyEnabled: boolean;
-  notifyTiming: ScheduleNotificationTiming;
-  customNotifyDate: string;
-  customNotifyTime: string;
-};
-
-const WEEKDAYS = ['月', '火', '水', '木', '金', '土', '日'];
-
-function pad2(value: number): string {
-  return String(value).padStart(2, '0');
-}
-
-const HOURS = Array.from({ length: 24 }, (_, index) => pad2(index));
-const MINUTES = Array.from({ length: 12 }, (_, index) => pad2(index * 5));
-const DAY_MS = 24 * 60 * 60 * 1000;
-const CATEGORY_SORT_PRIORITY: ScheduleCategoryId[] = [
-  'holiday',
-  'outing',
-  'fieldwork',
-  'businessTrip',
-  'vehicle',
-  'vehicleOuting',
-  'smallMeetingRoom',
-  'largeMeetingRoom',
-  'internalEvent',
-  'maintenance',
-  'other',
-  'vacation',
-];
-const CATEGORY_SORT_ORDER = new Map(
-  CATEGORY_SORT_PRIORITY.map((categoryId, index) => [categoryId, index]),
-);
-
-function toDateInputValue(date: Date): string {
-  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
-}
-
-function toOrderDateKey(date: Date): string {
-  return toDateInputValue(startOfDay(date));
-}
-
-function toTimeInputValue(date: Date): string {
-  return `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
-}
-
-function startOfDay(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
-}
-
-function endOfDay(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
-}
-
-function isSameDay(a: Date, b: Date): boolean {
-  return a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate();
-}
-
-function addDays(date: Date, days: number): Date {
-  const next = new Date(date);
-  next.setDate(next.getDate() + days);
-  return next;
-}
-
-function getMonthCalendarDays(monthDate: Date): Date[] {
-  const first = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
-  const firstGridDay = addDays(first, -((first.getDay() + 6) % 7));
-  return Array.from({ length: 42 }, (_, index) => addDays(firstGridDay, index));
-}
-
-function getWeekDays(date: Date): Date[] {
-  const start = addDays(startOfDay(date), -((date.getDay() + 6) % 7));
-  return Array.from({ length: 7 }, (_, index) => addDays(start, index));
-}
-
-function getCalendarWeeks(days: Date[]): Date[][] {
-  return Array.from({ length: Math.ceil(days.length / 7) }, (_, index) => days.slice(index * 7, index * 7 + 7));
-}
-
-function eventEndForComparison(event: ScheduleEvent): Date {
-  return event.endAt ?? event.startAt;
-}
-
-function getEventDurationDays(event: ScheduleEvent): number {
-  const start = startOfDay(event.startAt).getTime();
-  const end = startOfDay(eventEndForComparison(event)).getTime();
-  return Math.max(1, Math.floor((end - start) / DAY_MS) + 1);
-}
-
-function isMultiDayEvent(event: ScheduleEvent): boolean {
-  return getEventDurationDays(event) > 1;
-}
-
-function eventIntersectsDay(event: ScheduleEvent, day: Date): boolean {
-  return event.startAt <= endOfDay(day) && eventEndForComparison(event) >= startOfDay(day);
-}
-
-function eventIntersectsRange(event: ScheduleEvent, start: Date, end: Date): boolean {
-  return event.startAt <= endOfDay(end) && eventEndForComparison(event) >= startOfDay(start);
-}
-
-function formatMonthLabel(date: Date): string {
-  return `${date.getFullYear()}年${date.getMonth() + 1}月`;
-}
-
-function formatDayLabel(date: Date): string {
-  return `${date.getMonth() + 1}月${date.getDate()}日`;
-}
-
-function formatFullDayLabel(date: Date): string {
-  return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
-}
-
-function formatScheduleDateRangeLabel(startAt: Date, endAt: Date | null): string {
-  const end = endAt ?? startAt;
-  if (isSameDay(startAt, end)) {
-    return formatFullDayLabel(startAt);
-  }
-  return `${formatFullDayLabel(startAt)} - ${formatFullDayLabel(end)}`;
-}
-
-function formatEventTime(event: ScheduleEvent): string {
-  if (event.allDay) {
-    if (event.endAt && !isSameDay(event.startAt, event.endAt)) {
-      return `${formatDayLabel(event.startAt)} - ${formatDayLabel(event.endAt)}`;
-    }
-    return '終日';
-  }
-
-  const start = toTimeInputValue(event.startAt);
-  const end = event.endAt && !isSameDay(event.startAt, event.endAt)
-    ? `${formatDayLabel(event.endAt)} ${toTimeInputValue(event.endAt)}`
-    : event.endAt
-      ? toTimeInputValue(event.endAt)
-      : '';
-  return end ? `${start} - ${end}` : start;
-}
-
-function compareSchedules(a: ScheduleEvent, b: ScheduleEvent): number {
-  const multiDayDiff = Number(isMultiDayEvent(b)) - Number(isMultiDayEvent(a));
-  if (multiDayDiff !== 0) return multiDayDiff;
-
-  const durationDiff = getEventDurationDays(b) - getEventDurationDays(a);
-  if (durationDiff !== 0) return durationDiff;
-
-  const aOrderDate = toOrderDateKey(a.startAt);
-  const bOrderDate = toOrderDateKey(b.startAt);
-  const aHasManualOrder = a.manualOrderDate === aOrderDate && typeof a.manualOrder === 'number';
-  const bHasManualOrder = b.manualOrderDate === bOrderDate && typeof b.manualOrder === 'number';
-  if (aOrderDate === bOrderDate && (aHasManualOrder || bHasManualOrder)) {
-    const aManualOrder = a.manualOrder ?? 0;
-    const bManualOrder = b.manualOrder ?? 0;
-    if (aHasManualOrder && bHasManualOrder && aManualOrder !== bManualOrder) {
-      return aManualOrder - bManualOrder;
-    }
-    if (aHasManualOrder !== bHasManualOrder) return aHasManualOrder ? -1 : 1;
-  }
-
-  const allDayDiff = Number(b.allDay) - Number(a.allDay);
-  if (allDayDiff !== 0) return allDayDiff;
-
-  const startDiff = a.startAt.getTime() - b.startAt.getTime();
-  if (startDiff !== 0) return startDiff;
-
-  const categoryDiff = (CATEGORY_SORT_ORDER.get(a.categoryId) ?? 999) - (CATEGORY_SORT_ORDER.get(b.categoryId) ?? 999);
-  if (categoryDiff !== 0) return categoryDiff;
-
-  const titleDiff = a.title.localeCompare(b.title, 'ja');
-  if (titleDiff !== 0) return titleDiff;
-
-  const createdDiff = (a.createdAt?.getTime() ?? 0) - (b.createdAt?.getTime() ?? 0);
-  if (createdDiff !== 0) return createdDiff;
-
-  return a.id.localeCompare(b.id);
-}
-
-function buildWeekEvents(events: ScheduleEvent[], weekDays: Date[]): CalendarWeekEvent[] {
-  const weekStart = weekDays[0];
-  const weekEnd = weekDays[weekDays.length - 1];
-  const laneEndColumns: number[] = [];
-
-  return events
-    .filter((event) => eventIntersectsRange(event, weekStart, weekEnd))
-    .map((event) => {
-      const eventStart = startOfDay(event.startAt);
-      const eventEnd = startOfDay(eventEndForComparison(event));
-      const startColumn = Math.max(1, Math.min(7, Math.floor((eventStart.getTime() - weekStart.getTime()) / DAY_MS) + 1));
-      const endColumn = Math.max(1, Math.min(7, Math.floor((eventEnd.getTime() - weekStart.getTime()) / DAY_MS) + 1));
-      return { event, startColumn, endColumn };
-    })
-    .sort((a, b) => (
-      a.startColumn - b.startColumn ||
-      compareSchedules(a.event, b.event) ||
-      a.endColumn - b.endColumn
-    ))
-    .map(({ event, startColumn, endColumn }) => {
-      const lane = laneEndColumns.findIndex((endColumnInLane) => startColumn > endColumnInLane);
-      const resolvedLane = lane === -1 ? laneEndColumns.length : lane;
-      laneEndColumns[resolvedLane] = endColumn;
-      return { event, startColumn, endColumn, lane: resolvedLane };
-    });
-}
-
-function getDayMultiLaneCount(weekEvents: CalendarWeekEvent[], dayIndex: number): number {
-  const dayColumn = dayIndex + 1;
-  const intersectingLanes = weekEvents
-    .filter(({ startColumn, endColumn }) => startColumn <= dayColumn && endColumn >= dayColumn)
-    .map(({ lane }) => lane);
-  return intersectingLanes.length > 0 ? Math.max(...intersectingLanes) + 1 : 0;
-}
-
-function getSingleDayEventsForOrder(events: ScheduleEvent[], dateKey: string): ScheduleEvent[] {
-  return events
-    .filter((event) => !isMultiDayEvent(event) && toOrderDateKey(event.startAt) === dateKey)
-    .sort(compareSchedules);
-}
-
-function getScheduleErrorMessage(error: unknown, action: 'save' | 'delete' | 'load'): string {
-  const actionText = action === 'save' ? '保存' : action === 'delete' ? '削除' : '取得';
-
-  if (error instanceof FirebaseError) {
-    if (error.code === 'permission-denied') {
-      return `予定の${actionText}権限がありません。Firestoreルールに schedules の許可が反映されているか確認してください。`;
-    }
-    return `予定の${actionText}に失敗しました（${error.code}）`;
-  }
-
-  if (error instanceof Error && error.message) {
-    return `予定の${actionText}に失敗しました: ${error.message}`;
-  }
-
-  return `予定の${actionText}に失敗しました`;
-}
-
-function buildDate(dateValue: string, timeValue: string, allDay: boolean, isEnd = false): Date {
-  if (allDay) {
-    const [year, month, day] = dateValue.split('-').map(Number);
-    return isEnd
-      ? new Date(year, month - 1, day, 23, 59, 59, 999)
-      : new Date(year, month - 1, day);
-  }
-  return new Date(`${dateValue}T${timeValue || (isEnd ? '18:00' : '09:00')}`);
-}
-
-function isValidDate(value: Date): boolean {
-  return !Number.isNaN(value.getTime());
-}
-
-function getCalendarDayDiff(start: Date, end: Date): number {
-  return Math.max(0, Math.round((startOfDay(end).getTime() - startOfDay(start).getTime()) / DAY_MS));
-}
-
-function shiftDateByDayDiff(source: Date, targetDate: Date, dayDiff: number, allDay: boolean, isEnd = false): Date {
-  const shifted = addDays(startOfDay(targetDate), dayDiff);
-  if (allDay) {
-    return isEnd ? endOfDay(shifted) : shifted;
-  }
-  shifted.setHours(source.getHours(), source.getMinutes(), 0, 0);
-  return shifted;
-}
-
-function copyScheduleToDate(source: ScheduleEvent, targetDate: Date): ScheduleEventInput {
-  const startAt = shiftDateByDayDiff(source.startAt, targetDate, 0, source.allDay);
-  const endDayDiff = source.endAt ? getCalendarDayDiff(source.startAt, source.endAt) : 0;
-  const endAt = source.endAt
-    ? shiftDateByDayDiff(source.endAt, targetDate, endDayDiff, source.allDay, true)
-    : source.allDay
-      ? null
-      : shiftDateByDayDiff(source.startAt, targetDate, 0, false);
-  const customNotifyDayDiff = source.notification.customAt
-    ? getCalendarDayDiff(source.startAt, source.notification.customAt)
-    : 0;
-  const customAt = source.notification.customAt
-    ? shiftDateByDayDiff(source.notification.customAt, targetDate, customNotifyDayDiff, false)
-    : null;
-
-  return {
-    title: source.title,
-    categoryId: source.categoryId,
-    targetUserIds: source.targetUserIds,
-    targetUserNames: source.targetUserNames,
-    startAt,
-    endAt,
-    allDay: source.allDay,
-    memo: source.memo,
-    notification: {
-      enabled: source.notification.enabled,
-      timings: source.notification.enabled ? source.notification.timings : [],
-      customAt: source.notification.enabled ? customAt : null,
-    },
-  };
-}
-
-function createInitialForm(date: Date, event?: ScheduleEvent): ScheduleFormState {
-  const source = event ?? null;
-  const customAt = source?.notification.customAt ?? null;
-  return {
-    title: source?.title ?? '',
-    categoryId: source?.categoryId ?? 'vacation',
-    targetUserIds: source?.targetUserIds ?? [],
-    startDate: toDateInputValue(source?.startAt ?? date),
-    startTime: source && !source.allDay ? toTimeInputValue(source.startAt) : '09:00',
-    endDate: toDateInputValue(source?.endAt ?? source?.startAt ?? date),
-    endTime: source?.endAt && !source.allDay ? toTimeInputValue(source.endAt) : '18:00',
-    allDay: source?.allDay ?? true,
-    memo: source?.memo ?? '',
-    notifyEnabled: source?.notification.enabled ?? false,
-    notifyTiming: source?.notification.timings[0] ?? 'sameDayMorning',
-    customNotifyDate: customAt ? toDateInputValue(customAt) : toDateInputValue(date),
-    customNotifyTime: customAt ? toTimeInputValue(customAt) : '08:30',
-  };
-}
 
 export default function Schedule() {
   const navigate = useNavigate();
