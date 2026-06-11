@@ -1,6 +1,6 @@
 // ホーム画面（チャット一覧）
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   collection,
@@ -26,7 +26,7 @@ import { updateProfile } from 'firebase/auth';
 import { db, storage } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
-import { getStorageUsage, calculateUsagePercent, setStorageUsageValue } from '../lib/storageUsage';
+import { setStorageUsageValue } from '../lib/storageUsage';
 import { useElectronNotification, isElectronEnv } from '../hooks/useElectronNotification';
 import { useFCMToken } from '../hooks/useFCMToken';
 import { useNotificationDiagnostics } from '../hooks/useNotificationDiagnostics';
@@ -35,6 +35,11 @@ import { useUsers } from '../hooks/useUsers';
 import { useInviteMembers } from '../hooks/useInviteMembers';
 import { useHomeModals } from '../hooks/useHomeModals';
 import { useChatRooms } from '../hooks/useChatRooms';
+import { useTheme } from '../hooks/useTheme';
+import { useReleaseNotes } from '../hooks/useReleaseNotes';
+import { useStorageUsage } from '../hooks/useStorageUsage';
+import { useAppVersion } from '../hooks/useAppVersion';
+import { useAlwaysOnTop } from '../hooks/useAlwaysOnTop';
 import { ChatRoomList } from '../components/home';
 import type { User } from '../types';
 import { getDirectRoomId, getDirectRoomKey, getRoomDisplayName, getUnreadCount } from '../utils/room';
@@ -61,19 +66,15 @@ export default function Home() {
   const [profileName, setProfileName] = useState('');
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    const saved = localStorage.getItem('theme');
-    return (saved === 'dark') ? 'dark' : 'light';
-  });
-  const [releaseNotes, setReleaseNotes] = useState('');
+  const { theme, toggleTheme } = useTheme();
+  const { releaseNotes, setReleaseNotes } = useReleaseNotes();
+  const { setStorageUsage } = useStorageUsage();
+  const { appVersion, updateStatus, checkForUpdates } = useAppVersion();
+  const { alwaysOnTop, toggleAlwaysOnTop } = useAlwaysOnTop();
   const [releaseNotesEdit, setReleaseNotesEdit] = useState('');
   const [savingReleaseNotes, setSavingReleaseNotes] = useState(false);
   const [settingsTitleClickCount, setSettingsTitleClickCount] = useState(0);
-  const [storageUsage, setStorageUsage] = useState<number>(0);
   const [storageEditValue, setStorageEditValue] = useState('');
-  const [appVersion, setAppVersion] = useState<string>('');
-  const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'latest' | 'error'>('idle');
-  const [alwaysOnTop, setAlwaysOnTop] = useState(false);
 
   // ユーザー管理機能用
   const [usersTitleClickCount, setUsersTitleClickCount] = useState(0);
@@ -290,125 +291,6 @@ export default function Home() {
       console.error('お気に入り更新エラー:', error);
     }
   };
-
-  // テーマ切り替え
-  function toggleTheme(newTheme: 'light' | 'dark') {
-    setTheme(newTheme);
-    localStorage.setItem('theme', newTheme);
-    document.documentElement.setAttribute('data-theme', newTheme);
-    // Electron環境ではWindowsのタイトルバー（ネイティブ枠）の明暗も連動させる
-    window.electronAPI?.setTitleBarTheme?.(newTheme);
-  }
-
-  // 初期テーマ設定（マウント時に localStorage の値を一度だけ適用）
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // 更新ノートを取得
-  useEffect(() => {
-    async function fetchReleaseNotes() {
-      try {
-        const docRef = doc(db, 'settings', 'releaseNotes');
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          setReleaseNotes(docSnap.data().content || '');
-        }
-      } catch (error) {
-        console.error('更新ノート取得エラー:', error);
-      }
-    }
-    fetchReleaseNotes();
-  }, []);
-
-  // ストレージ使用量を取得
-  useEffect(() => {
-    async function fetchStorageUsage() {
-      const usage = await getStorageUsage();
-      setStorageUsage(usage);
-    }
-    fetchStorageUsage();
-  }, []);
-
-  // M-18: ストレージ 80% / 95% 警告（同一しきい値の連発を避けるため localStorage に最後の警告レベルを保存）
-  useEffect(() => {
-    if (storageUsage === 0) return;
-    const percent = calculateUsagePercent(storageUsage);
-    const STORAGE_KEY = 'artics:lastStorageWarnLevel';
-    const lastLevel = localStorage.getItem(STORAGE_KEY) || 'none';
-    let currentLevel: 'none' | 'warning' | 'danger' = 'none';
-    if (percent > 95) currentLevel = 'danger';
-    else if (percent > 80) currentLevel = 'warning';
-
-    if (currentLevel === 'danger' && lastLevel !== 'danger') {
-      showToast('error', `ストレージ使用量が ${Math.round(percent)}% です。古いファイルの削除をご検討ください。`);
-      localStorage.setItem(STORAGE_KEY, 'danger');
-    } else if (currentLevel === 'warning' && lastLevel === 'none') {
-      showToast('warning', `ストレージ使用量が ${Math.round(percent)}% を超えました。`);
-      localStorage.setItem(STORAGE_KEY, 'warning');
-    } else if (currentLevel === 'none' && lastLevel !== 'none') {
-      // 使用量が下がったらリセット
-      localStorage.setItem(STORAGE_KEY, 'none');
-    }
-  }, [storageUsage, showToast]);
-
-  // アプリバージョンを取得
-  useEffect(() => {
-    async function fetchAppVersion() {
-      if (isElectronEnv() && window.electronAPI?.getAppVersion) {
-        // Electron: IPCから取得
-        const version = await window.electronAPI.getAppVersion();
-        setAppVersion(version);
-      } else {
-        // PWA/ブラウザ: ビルド時にpackage.jsonのバージョンが埋め込まれる
-        // @ts-expect-error __APP_VERSION__ is defined in vite.config.ts
-        const version = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '';
-        if (version) {
-          setAppVersion(version);
-        }
-      }
-    }
-    fetchAppVersion();
-  }, []);
-
-  // 常に手前に表示の初期値を取得（Electron環境のみ）
-  useEffect(() => {
-    if (isElectronEnv() && window.electronAPI?.getAlwaysOnTop) {
-      window.electronAPI.getAlwaysOnTop().then(setAlwaysOnTop);
-    }
-  }, []);
-
-  // 常に手前に表示をトグル
-  async function toggleAlwaysOnTop() {
-    if (!isElectronEnv() || !window.electronAPI?.setAlwaysOnTop) return;
-    const newValue = !alwaysOnTop;
-    const success = await window.electronAPI.setAlwaysOnTop(newValue);
-    if (success) {
-      setAlwaysOnTop(newValue);
-    }
-  }
-
-  // アップデートを確認
-  async function checkForUpdates() {
-    if (!isElectronEnv() || !window.electronAPI?.checkForUpdates) return;
-
-    setUpdateStatus('checking');
-    try {
-      const result = await window.electronAPI.checkForUpdates();
-      if (result.isDev) {
-        setUpdateStatus('latest');
-      } else if (result.error) {
-        setUpdateStatus('error');
-      } else if (result.available) {
-        setUpdateStatus('available');
-      } else {
-        setUpdateStatus('latest');
-      }
-    } catch {
-      setUpdateStatus('error');
-    }
-  }
 
   // ストレージ使用量を保存
   async function saveStorageUsage() {
