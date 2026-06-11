@@ -35,7 +35,15 @@ import { getAppEntryPath } from '../utils/navigation';
 import { PRIMARY_REACTION_EMOJIS, SECONDARY_REACTION_EMOJIS, MAX_FILE_SIZE, HIGHLIGHT_DURATION, MAX_TEXTAREA_HEIGHT } from '../constants';
 import ImagePreviewModal from '../components/ImagePreviewModal';
 import ConfirmModal from '../components/modals/ConfirmModal';
-import { GroupEditModal, MemberListModal, TypingIndicator, MessageBubbleInteractive } from '../components/chat';
+import {
+  GroupEditModal,
+  InviteMembersModal,
+  MemberListModal,
+  MessageBubbleInteractive,
+  ReactionDetailModal,
+  ReadDetailModal,
+  TypingIndicator,
+} from '../components/chat';
 import { renderMessageText } from '../components/chat/messageText';
 import DesktopUtilityModals from '../components/desktop/DesktopUtilityModals';
 import DesktopNewChatModals from '../components/desktop/DesktopNewChatModals';
@@ -1784,49 +1792,13 @@ export default function Chat() {
 
       {/* メンバー招待モーダル */}
       {showInvite && chatRoom?.type === 'group' && (
-        <div className={styles.groupEditOverlay} onClick={() => setShowInvite(false)}>
-          <div className={styles.groupEditModal} onClick={(e) => e.stopPropagation()}>
-            <h2 className={styles.groupEditTitle}>メンバーを招待</h2>
-            <div className={styles.inviteUserList}>
-              {invitableUsers.length === 0 ? (
-                <p className={styles.noInvitableUsers}>招待可能なユーザーがいません</p>
-              ) : (
-                invitableUsers.map((user) => (
-                  <div
-                    key={user.uid}
-                    className={`${styles.inviteUserItem} ${inviteSelectedUsers.includes(user.uid) ? styles.selected : ''}`}
-                    onClick={() => {
-                      if (inviteSelectedUsers.includes(user.uid)) {
-                        setInviteSelectedUsers(inviteSelectedUsers.filter(id => id !== user.uid));
-                      } else {
-                        setInviteSelectedUsers([...inviteSelectedUsers, user.uid]);
-                      }
-                    }}
-                  >
-                    <span className={styles.inviteUserAvatar}></span>
-                    <span className={styles.inviteUserName}>{user.displayName}</span>
-                    {inviteSelectedUsers.includes(user.uid) && <span className={styles.checkmark}>✓</span>}
-                  </div>
-                ))
-              )}
-            </div>
-            <div className={styles.groupEditButtons}>
-              <button
-                className={styles.groupEditSaveButton}
-                onClick={handleInviteMembers}
-                disabled={inviteSelectedUsers.length === 0}
-              >
-                招待
-              </button>
-              <button
-                className={styles.groupEditCancelButton}
-                onClick={() => setShowInvite(false)}
-              >
-                キャンセル
-              </button>
-            </div>
-          </div>
-        </div>
+        <InviteMembersModal
+          invitableUsers={invitableUsers}
+          inviteSelectedUsers={inviteSelectedUsers}
+          setInviteSelectedUsers={setInviteSelectedUsers}
+          onInvite={handleInviteMembers}
+          onClose={() => setShowInvite(false)}
+        />
       )}
 
       {/* メンバー一覧モーダル */}
@@ -1848,77 +1820,24 @@ export default function Chat() {
 
       {/* リアクション詳細モーダル */}
       {showReactionDetail && (
-        <div className={styles.reactionDetailOverlay} onClick={() => setShowReactionDetail(null)}>
-          <div className={styles.reactionDetailModal} onClick={(e) => e.stopPropagation()}>
-            <div className={styles.reactionDetailHeader}>
-              <span className={styles.reactionDetailEmoji}>{showReactionDetail.emoji}</span>
-              <span className={styles.reactionDetailCount}>{showReactionDetail.users.length}人がリアクション</span>
-            </div>
-            <div className={styles.reactionDetailList}>
-              {showReactionDetail.users.map((userId) => (
-                <div key={userId} className={styles.reactionDetailItem}>
-                  <div className={styles.reactionDetailAvatar}>
-                    {chatRoom?.memberDetails[userId]?.photoURL ? (
-                      <img src={chatRoom.memberDetails[userId].photoURL!} alt="" />
-                    ) : null}
-                  </div>
-                  <span className={styles.reactionDetailName}>
-                    {getUserDisplayName(userId)}
-                    {userId === currentUser?.uid && <span className={styles.reactionDetailYou}>(あなた)</span>}
-                  </span>
-                </div>
-              ))}
-            </div>
-            <div className={styles.reactionDetailButtons}>
-              {showReactionDetail.users.includes(currentUser?.uid || '') && (
-                <button
-                  className={styles.reactionRemoveButton}
-                  onClick={() => removeReaction(showReactionDetail.messageId, showReactionDetail.emoji)}
-                >
-                  リアクションを取り消す
-                </button>
-              )}
-              <button
-                className={styles.reactionDetailCloseButton}
-                onClick={() => setShowReactionDetail(null)}
-              >
-                閉じる
-              </button>
-            </div>
-          </div>
-        </div>
+        <ReactionDetailModal
+          detail={showReactionDetail}
+          chatRoom={chatRoom}
+          currentUserId={currentUser?.uid}
+          getUserDisplayName={getUserDisplayName}
+          onRemoveReaction={removeReaction}
+          onClose={() => setShowReactionDetail(null)}
+        />
       )}
 
       {/* 既読詳細モーダル */}
       {showReadDetail && (
-        <div className={styles.readDetailOverlay} onClick={() => setShowReadDetail(null)}>
-          <div className={styles.readDetailModal} onClick={(e) => e.stopPropagation()}>
-            <div className={styles.readDetailHeader}>
-              <span className={styles.readDetailTitle}>既読</span>
-              <span className={styles.readDetailCount}>{showReadDetail.readBy.length}人が既読</span>
-            </div>
-            <div className={styles.readDetailList}>
-              {showReadDetail.readBy.map((userId) => (
-                <div key={userId} className={styles.readDetailItem}>
-                  <div className={styles.readDetailAvatar}>
-                    {chatRoom?.memberDetails[userId]?.photoURL ? (
-                      <img src={chatRoom.memberDetails[userId].photoURL!} alt="" />
-                    ) : null}
-                  </div>
-                  <span className={styles.readDetailName}>
-                    {getUserDisplayName(userId)}
-                  </span>
-                </div>
-              ))}
-            </div>
-            <button
-              className={styles.readDetailCloseButton}
-              onClick={() => setShowReadDetail(null)}
-            >
-              閉じる
-            </button>
-          </div>
-        </div>
+        <ReadDetailModal
+          detail={showReadDetail}
+          chatRoom={chatRoom}
+          getUserDisplayName={getUserDisplayName}
+          onClose={() => setShowReadDetail(null)}
+        />
       )}
 
       {/* メッセージ削除確認モーダル */}

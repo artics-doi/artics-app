@@ -1,45 +1,43 @@
-import styles from '../../pages/Chat.module.css';
-import useModal from '../../hooks/useModal';
+// リアクション詳細モーダル。Chat.tsx のインライン実装から機械的に移動（挙動変更なし）。
+// スタイルは親ページの Chat.module.css をそのまま使う。
+
+import type { ChatRoom } from '../../../types';
+import styles from '../../../pages/Chat.module.css';
 
 interface ReactionDetailModalProps {
-  emoji: string;
-  users: string[];
-  currentUserId?: string;
-  memberDetails: { [uid: string]: { displayName: string; photoURL?: string | null } };
+  detail: {
+    messageId: string;
+    emoji: string;
+    users: string[];
+  };
+  chatRoom: ChatRoom | null;
+  currentUserId: string | undefined;
   getUserDisplayName: (userId: string) => string;
-  onRemoveReaction: () => void;
+  onRemoveReaction: (messageId: string, emoji: string) => void;
   onClose: () => void;
 }
 
 export default function ReactionDetailModal({
-  emoji,
-  users,
+  detail,
+  chatRoom,
   currentUserId,
-  memberDetails,
   getUserDisplayName,
   onRemoveReaction,
-  onClose
+  onClose,
 }: ReactionDetailModalProps) {
-  const { modalProps } = useModal({ isOpen: true, onClose });
-
   return (
-    <div
-      {...modalProps}
-      className={styles.reactionDetailOverlay}
-      onClick={onClose}
-      aria-labelledby="reaction-detail-modal-title"
-    >
+    <div className={styles.reactionDetailOverlay} onClick={onClose}>
       <div className={styles.reactionDetailModal} onClick={(e) => e.stopPropagation()}>
         <div className={styles.reactionDetailHeader}>
-          <span id="reaction-detail-modal-title" className={styles.reactionDetailEmoji}>{emoji}</span>
-          <span className={styles.reactionDetailCount}>{users.length}人がリアクション</span>
+          <span className={styles.reactionDetailEmoji}>{detail.emoji}</span>
+          <span className={styles.reactionDetailCount}>{detail.users.length}人がリアクション</span>
         </div>
         <div className={styles.reactionDetailList}>
-          {users.map((userId) => (
+          {detail.users.map((userId) => (
             <div key={userId} className={styles.reactionDetailItem}>
               <div className={styles.reactionDetailAvatar}>
-                {memberDetails[userId]?.photoURL ? (
-                  <img src={memberDetails[userId].photoURL!} alt="" />
+                {chatRoom?.memberDetails[userId]?.photoURL ? (
+                  <img src={chatRoom.memberDetails[userId].photoURL!} alt="" />
                 ) : null}
               </div>
               <span className={styles.reactionDetailName}>
@@ -50,10 +48,10 @@ export default function ReactionDetailModal({
           ))}
         </div>
         <div className={styles.reactionDetailButtons}>
-          {users.includes(currentUserId || '') && (
+          {detail.users.includes(currentUserId || '') && (
             <button
               className={styles.reactionRemoveButton}
-              onClick={onRemoveReaction}
+              onClick={() => onRemoveReaction(detail.messageId, detail.emoji)}
             >
               リアクションを取り消す
             </button>

@@ -1,39 +1,38 @@
-import styles from '../../pages/Chat.module.css';
-import useModal from '../../hooks/useModal';
+// 既読詳細モーダル。Chat.tsx のインライン実装から機械的に移動（挙動変更なし）。
+// スタイルは親ページの Chat.module.css をそのまま使う。
+
+import type { ChatRoom } from '../../../types';
+import styles from '../../../pages/Chat.module.css';
 
 interface ReadDetailModalProps {
-  readBy: string[];
-  memberDetails: { [uid: string]: { displayName: string; photoURL?: string | null } };
+  detail: {
+    messageId: string;
+    readBy: string[];
+  };
+  chatRoom: ChatRoom | null;
   getUserDisplayName: (userId: string) => string;
   onClose: () => void;
 }
 
 export default function ReadDetailModal({
-  readBy,
-  memberDetails,
+  detail,
+  chatRoom,
   getUserDisplayName,
-  onClose
+  onClose,
 }: ReadDetailModalProps) {
-  const { modalProps } = useModal({ isOpen: true, onClose });
-
   return (
-    <div
-      {...modalProps}
-      className={styles.readDetailOverlay}
-      onClick={onClose}
-      aria-labelledby="read-detail-modal-title"
-    >
+    <div className={styles.readDetailOverlay} onClick={onClose}>
       <div className={styles.readDetailModal} onClick={(e) => e.stopPropagation()}>
         <div className={styles.readDetailHeader}>
-          <span id="read-detail-modal-title" className={styles.readDetailTitle}>既読</span>
-          <span className={styles.readDetailCount}>{readBy.length}人が既読</span>
+          <span className={styles.readDetailTitle}>既読</span>
+          <span className={styles.readDetailCount}>{detail.readBy.length}人が既読</span>
         </div>
         <div className={styles.readDetailList}>
-          {readBy.map((userId) => (
+          {detail.readBy.map((userId) => (
             <div key={userId} className={styles.readDetailItem}>
               <div className={styles.readDetailAvatar}>
-                {memberDetails[userId]?.photoURL ? (
-                  <img src={memberDetails[userId].photoURL!} alt="" />
+                {chatRoom?.memberDetails[userId]?.photoURL ? (
+                  <img src={chatRoom.memberDetails[userId].photoURL!} alt="" />
                 ) : null}
               </div>
               <span className={styles.readDetailName}>
