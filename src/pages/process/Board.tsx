@@ -64,6 +64,8 @@ import {
 import type { ProjectColumn, Task, TaskInput } from '../../types/process';
 import TaskPanel from '../../components/process/TaskPanel';
 import BoardColumn from '../../components/process/BoardColumn';
+import GanttViewMenu from '../../components/process/GanttViewMenu';
+import TaskFilterBar from '../../components/process/TaskFilterBar';
 import ConfirmModal from '../../components/modals/ConfirmModal';
 import { ChevronLeftIcon, PlusIcon } from '../../components/process/icons';
 import styles from './Board.module.css';
@@ -725,71 +727,21 @@ export default function Board() {
               表示・並び順
             </button>
             {ganttViewMenuOpen && (
-              <div className={styles.ganttViewMenu} role="dialog" aria-label="表示・並び順">
-                <div className={styles.ganttViewMenuHeader}>
-                  <h2>表示・並び順</h2>
-                  <span className={styles.visibilityChip}>
-                    表示中 {visibleGanttTasks.length}件 / 全{ganttData.tasks.length}件
-                  </span>
-                </div>
-                <section className={styles.ganttViewMenuSection}>
-                  <h3>表示するステータス</h3>
-                  <div className={styles.statusFilterList}>
-                    {GANTT_STATUS_OPTIONS.map((status) => (
-                      <label key={status.id} className={styles.statusFilterItem}>
-                        <input
-                          type="checkbox"
-                          checked={draftVisibleGanttStatuses.has(status.id)}
-                          onChange={() => toggleDraftStatus(status.id)}
-                        />
-                        <span
-                          className={`${styles.statusDot} ${styles[`statusDot_${status.id}`]}`}
-                          aria-hidden="true"
-                        />
-                        {status.label}
-                      </label>
-                    ))}
-                  </div>
-                </section>
-                <section className={styles.ganttViewMenuSection}>
-                  <h3>一括並び替え</h3>
-                  <div className={styles.sortOptionList}>
-                    {GANTT_SORT_OPTIONS.map((option) => (
-                      <label key={option.id} className={styles.sortOptionItem}>
-                        <input
-                          type="radio"
-                          name="ganttSortMode"
-                          checked={draftGanttSortMode === option.id}
-                          onChange={() => setDraftGanttSortMode(option.id)}
-                        />
-                        {option.label}
-                      </label>
-                    ))}
-                  </div>
-                </section>
-                <p className={styles.ganttViewHint}>
-                  ドラッグ操作も一括並び替えもガント順だけ変更します。
-                </p>
-                <div className={styles.ganttViewMenuActions}>
-                  <button
-                    type="button"
-                    className={styles.secondaryButton}
-                    onClick={() => {
-                      setDraftVisibleGanttStatuses(statusSetFromAll());
-                      setDraftGanttSortMode(null);
-                    }}
-                  >
-                    リセット
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.primaryButton}
-                    onClick={handleApplyGanttViewSettings}
-                  >
-                    適用
-                  </button>
-                </div>
-              </div>
+              <GanttViewMenu
+                statusOptions={GANTT_STATUS_OPTIONS}
+                sortOptions={GANTT_SORT_OPTIONS}
+                visibleCount={visibleGanttTasks.length}
+                totalCount={ganttData.tasks.length}
+                draftVisibleGanttStatuses={draftVisibleGanttStatuses}
+                toggleDraftStatus={toggleDraftStatus}
+                draftGanttSortMode={draftGanttSortMode}
+                setDraftGanttSortMode={setDraftGanttSortMode}
+                onReset={() => {
+                  setDraftVisibleGanttStatuses(statusSetFromAll());
+                  setDraftGanttSortMode(null);
+                }}
+                onApply={handleApplyGanttViewSettings}
+              />
             )}
           </div>
           <button type="button" className={styles.primaryButton} onClick={() => setCreatingTask(true)}>
@@ -798,82 +750,17 @@ export default function Board() {
         </div>
       </div>
 
-      <section className={styles.taskFilterBar} aria-label="タスク検索と絞り込み">
-        <div className={styles.searchFieldWrap}>
-          <label className={styles.filterLabel} htmlFor="process-task-search">
-            タスク検索
-          </label>
-          <input
-            id="process-task-search"
-            className={styles.searchInput}
-            type="search"
-            value={taskFilters.query}
-            onChange={(event) => updateTaskFilter('query', event.target.value)}
-            placeholder="タイトル・説明を検索"
-          />
-        </div>
-        <label className={styles.compactFilter}>
-          <span>担当者</span>
-          <select
-            value={taskFilters.assigneeId}
-            onChange={(event) => updateTaskFilter('assigneeId', event.target.value)}
-          >
-            <option value="all">すべて</option>
-            <option value="unassigned">未担当</option>
-            {members.map((member) => (
-              <option key={member.id} value={member.id}>
-                {member.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className={styles.compactFilter}>
-          <span>ステータス</span>
-          <select
-            value={taskFilters.columnId}
-            onChange={(event) => updateTaskFilter('columnId', event.target.value)}
-          >
-            <option value="all">すべて</option>
-            {columns.map((column) => (
-              <option key={column.id} value={column.id}>
-                {column.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className={styles.compactFilter}>
-          <span>日付</span>
-          <select
-            value={taskFilters.dateFilter}
-            onChange={(event) => updateTaskFilter('dateFilter', event.target.value as TaskFilterState['dateFilter'])}
-          >
-            <option value="all">すべて</option>
-            <option value="complete">開始・終了あり</option>
-            <option value="missing">日付未設定あり</option>
-          </select>
-        </label>
-        <label className={styles.missingToggle}>
-          <input
-            type="checkbox"
-            checked={taskFilters.missingOnly}
-            onChange={(event) => updateTaskFilter('missingOnly', event.target.checked)}
-          />
-          未設定のみ
-          <span className={styles.missingCount}>{missingTaskCount}</span>
-        </label>
-        {hasActiveFilters && (
-          <button
-            type="button"
-            className={styles.clearFiltersButton}
-            onClick={() => setTaskFilters(EMPTY_TASK_FILTERS)}
-          >
-            クリア
-          </button>
-        )}
-        <span className={styles.filterResultCount}>
-          表示 {filteredTasks.length} / 全{tasks.length}
-        </span>
-      </section>
+      <TaskFilterBar
+        taskFilters={taskFilters}
+        updateTaskFilter={updateTaskFilter}
+        members={members}
+        columns={columns}
+        missingTaskCount={missingTaskCount}
+        hasActiveFilters={hasActiveFilters}
+        onClear={() => setTaskFilters(EMPTY_TASK_FILTERS)}
+        filteredCount={filteredTasks.length}
+        totalCount={tasks.length}
+      />
 
       <main
         ref={workspaceRef}
