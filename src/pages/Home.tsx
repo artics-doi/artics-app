@@ -36,8 +36,8 @@ import { useInviteMembers } from '../hooks/useInviteMembers';
 import { useHomeModals } from '../hooks/useHomeModals';
 import { useChatRooms } from '../hooks/useChatRooms';
 import { ChatRoomList } from '../components/home';
-import type { ChatRoom, User } from '../types';
-import { getDirectRoomId, getDirectRoomKey, getRoomDisplayName } from '../utils/room';
+import type { User } from '../types';
+import { getDirectRoomId, getDirectRoomKey, getRoomDisplayName, getUnreadCount } from '../utils/room';
 import { handleGroupImageChange as convertGroupImageToBase64 } from '../utils/image';
 import { SEARCH_LIMIT_PER_ROOM, SEARCH_RESULTS_LIMIT, FIRESTORE_BATCH_LIMIT } from '../constants';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
@@ -115,11 +115,6 @@ export default function Home() {
     return users.map(u => u.uid);
   }, [modals.showUsers, users]);
   const allUsersOnlineStatusMap = useOnlineStatus(allUserIds);
-
-  // chatRoomsから直接未読数を取得（Cloud Functionsが管理するunreadCountsフィールドを参照）
-  const getUnreadCount = (room: ChatRoom): number => {
-    return room.unreadCounts?.[currentUser?.uid || ''] ?? 0;
-  };
 
   // 1対1チャットを作成または開く
   async function startDirectChat(otherUser: User) {
@@ -858,7 +853,7 @@ export default function Home() {
         currentUser={currentUser}
         onlineStatusMap={onlineStatusMap}
         isRoomMuted={isRoomMuted}
-        getUnreadCount={getUnreadCount}
+        getUnreadCount={(room) => getUnreadCount(room, currentUser?.uid)}
         onRoomClick={(roomId) => navigate(`/chat/${roomId}`)}
         onToggleFavorite={toggleFavorite}
         onInvite={openInviteModal}

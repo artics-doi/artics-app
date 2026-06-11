@@ -11,9 +11,9 @@ import DesktopNewChatModals from '../components/desktop/DesktopNewChatModals';
 import DesktopUtilityModals from '../components/desktop/DesktopUtilityModals';
 import ConfirmModal from '../components/modals/ConfirmModal';
 import { SCHEDULE_CATEGORIES, SCHEDULE_CATEGORY_BY_ID, SCHEDULE_NOTIFICATION_TIMINGS } from '../constants/schedule';
-import type { ChatRoom, User } from '../types';
+import type { User } from '../types';
 import type { ScheduleCategoryId, ScheduleEvent, ScheduleEventInput, ScheduleNotificationTiming } from '../types/schedule';
-import { getRoomAvatarLabel, getRoomAvatarUrl, getRoomDisplayName } from '../utils/room';
+import { getRoomAvatarLabel, getRoomAvatarUrl, getRoomDisplayName, getUnreadCount } from '../utils/room';
 import styles from './Schedule.module.css';
 
 type ViewMode = 'today' | 'week' | 'month';
@@ -355,11 +355,6 @@ function createInitialForm(date: Date, event?: ScheduleEvent): ScheduleFormState
     customNotifyDate: customAt ? toDateInputValue(customAt) : toDateInputValue(date),
     customNotifyTime: customAt ? toTimeInputValue(customAt) : '08:30',
   };
-}
-
-function getUnreadCount(room: ChatRoom, currentUserId: string | undefined): number {
-  if (!currentUserId) return 0;
-  return room.unreadCounts?.[currentUserId] ?? 0;
 }
 
 export default function Schedule() {

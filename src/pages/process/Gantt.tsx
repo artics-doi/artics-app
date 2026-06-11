@@ -19,6 +19,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useProject } from '../../hooks/process/useProject';
 import { useProjectTasks } from '../../hooks/process/useProjectTasks';
 import { useProcessMembers } from '../../hooks/process/useProcessMembers';
+import { useIsDarkTheme } from '../../hooks/process/useIsDarkTheme';
+import { toTaskInput } from '../../lib/process/converters';
 import {
   buildGanttTimelineBounds,
   formatProcessDate,
@@ -30,7 +32,7 @@ import {
 } from '../../lib/process/gantt';
 import { buildGanttInstanceKey, ganttStatusColorVariables } from '../../lib/process/ganttBarColors';
 import { startOfDay } from '../../lib/process/dashboard';
-import type { Task, TaskInput } from '../../types/process';
+import type { Task } from '../../types/process';
 import TaskPanel from '../../components/process/TaskPanel';
 import { BoardIcon, ChevronLeftIcon, PlusIcon } from '../../components/process/icons';
 import styles from './Gantt.module.css';
@@ -69,36 +71,6 @@ function GanttTaskBarTemplate({ data }: { data: ITask }) {
       <span className={styles.ganttTaskBarText}>{task.text}</span>
     </div>
   );
-}
-
-function useIsDarkTheme() {
-  const [isDark, setIsDark] = useState(
-    () => document.documentElement.getAttribute('data-theme') === 'dark',
-  );
-
-  useEffect(() => {
-    const observer = new MutationObserver(() => {
-      setIsDark(document.documentElement.getAttribute('data-theme') === 'dark');
-    });
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['data-theme'],
-    });
-    return () => observer.disconnect();
-  }, []);
-
-  return isDark;
-}
-
-function toTaskInput(task: Task, updates: Partial<Pick<TaskInput, 'startDate' | 'endDate'>> = {}): TaskInput {
-  return {
-    title: task.title,
-    columnId: task.columnId,
-    assigneeIds: task.assigneeIds,
-    startDate: updates.startDate ?? task.startDate,
-    endDate: updates.endDate ?? task.endDate,
-    description: task.description,
-  };
 }
 
 export default function Gantt() {

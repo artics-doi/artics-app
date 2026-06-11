@@ -25,6 +25,12 @@ export function getRoomDisplayName(room: ChatRoom, currentUserId?: string | null
   return 'Unknown';
 }
 
+// Cloud Functions が管理する unreadCounts フィールドから自分の未読数を取得
+export function getUnreadCount(room: ChatRoom, currentUserId?: string | null): number {
+  if (!currentUserId) return 0;
+  return room.unreadCounts?.[currentUserId] ?? 0;
+}
+
 export function getDirectRoomPeerId(room: ChatRoom, currentUserId?: string | null): string | null {
   if (room.type !== 'direct') return null;
   return room.members.find((id) => id !== currentUserId) ?? room.members[0] ?? null;

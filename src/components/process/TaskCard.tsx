@@ -3,7 +3,7 @@
 
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { PROCESS_COLORS, PROCESS_COLOR_COUNT } from '../../constants/process';
+import { accentOf } from '../../lib/process/colors';
 import type { ProcessMember, Task } from '../../types/process';
 import { dateToInputValue } from '../../lib/process/dateInput';
 import { getTaskMissingCheck } from '../../lib/process/taskFilters';
@@ -14,11 +14,6 @@ interface TaskCardProps {
   memberById: Map<string, ProcessMember>;
   datePreview?: Pick<Task, 'startDate' | 'endDate'>;
   onClick: () => void;
-}
-
-function accentOf(colorIndex: number): string {
-  const idx = ((colorIndex % PROCESS_COLOR_COUNT) + PROCESS_COLOR_COUNT) % PROCESS_COLOR_COUNT;
-  return PROCESS_COLORS[idx].accent;
 }
 
 function taskDateRangeText(dates: Pick<Task, 'startDate' | 'endDate'>): string | null {

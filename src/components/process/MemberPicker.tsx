@@ -1,7 +1,7 @@
 // 担当者（工程管理メンバー）を複数選択するピッカー。TaskPanel から使う。
 // メンバーが1人もいない場合はその旨を案内する。
 
-import { PROCESS_COLORS, PROCESS_COLOR_COUNT } from '../../constants/process';
+import { accentOf } from '../../lib/process/colors';
 import type { ProcessMember } from '../../types/process';
 import styles from './MemberPicker.module.css';
 
@@ -9,11 +9,6 @@ interface MemberPickerProps {
   members: ProcessMember[];
   selectedIds: string[];
   onChange: (ids: string[]) => void;
-}
-
-function accentOf(colorIndex: number): string {
-  const idx = ((colorIndex % PROCESS_COLOR_COUNT) + PROCESS_COLOR_COUNT) % PROCESS_COLOR_COUNT;
-  return PROCESS_COLORS[idx].accent;
 }
 
 export default function MemberPicker({ members, selectedIds, onChange }: MemberPickerProps) {

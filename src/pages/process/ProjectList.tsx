@@ -15,7 +15,8 @@ import { CSS } from '@dnd-kit/utilities';
 import { useAuth } from '../../contexts/AuthContext';
 import { useProjectTaskSummaries } from '../../hooks/process/useProjectTaskSummaries';
 import { useProjects } from '../../hooks/process/useProjects';
-import { PROCESS_COLOR_COUNT, PROCESS_COLORS, PROJECT_STATUS_SEGMENTS } from '../../constants/process';
+import { PROJECT_STATUS_SEGMENTS } from '../../constants/process';
+import { accentOf } from '../../lib/process/colors';
 import {
   EMPTY_PROJECT_TASK_SUMMARY,
   PROJECT_TASK_STATUS_LABELS,
@@ -31,11 +32,6 @@ import styles from './ProjectList.module.css';
 const PROJECT_LIST_DENSITY_STORAGE_KEY = 'artics.process.projectList.density';
 
 type ProjectListDensity = 'standard' | 'compact';
-
-function accentOf(colorIndex: number): string {
-  const idx = ((colorIndex % PROCESS_COLOR_COUNT) + PROCESS_COLOR_COUNT) % PROCESS_COLOR_COUNT;
-  return PROCESS_COLORS[idx].accent;
-}
 
 function readStoredDensity(): ProjectListDensity {
   if (typeof window === 'undefined') return 'standard';

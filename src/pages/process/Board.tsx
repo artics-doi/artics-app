@@ -39,6 +39,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useProject } from '../../hooks/process/useProject';
 import { useProjectTasks } from '../../hooks/process/useProjectTasks';
 import { useProcessMembers } from '../../hooks/process/useProcessMembers';
+import { useIsDarkTheme } from '../../hooks/process/useIsDarkTheme';
+import { toTaskInput } from '../../lib/process/converters';
 import {
   buildGanttTimelineBounds,
   buildReorderedGanttTaskIds,
@@ -126,36 +128,6 @@ type PendingGanttDateChange = {
   taskTitle: string;
   nextDates: Pick<TaskInput, 'startDate' | 'endDate'>;
 };
-
-function useIsDarkTheme() {
-  const [isDark, setIsDark] = useState(
-    () => document.documentElement.getAttribute('data-theme') === 'dark',
-  );
-
-  useEffect(() => {
-    const observer = new MutationObserver(() => {
-      setIsDark(document.documentElement.getAttribute('data-theme') === 'dark');
-    });
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['data-theme'],
-    });
-    return () => observer.disconnect();
-  }, []);
-
-  return isDark;
-}
-
-function toTaskInput(task: Task, updates: Partial<Pick<TaskInput, 'startDate' | 'endDate'>> = {}): TaskInput {
-  return {
-    title: task.title,
-    columnId: task.columnId,
-    assigneeIds: task.assigneeIds,
-    startDate: updates.startDate ?? task.startDate,
-    endDate: updates.endDate ?? task.endDate,
-    description: task.description,
-  };
-}
 
 function formatTaskDateChange(dates: Pick<TaskInput, 'startDate' | 'endDate'>): string {
   const start = dates.startDate ? dateToInputValue(dates.startDate) : '未設定';

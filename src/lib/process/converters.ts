@@ -97,6 +97,20 @@ export function toMember(id: string, data: DocumentData): ProcessMember {
   };
 }
 
+// ===== ドメイン → Input（既存タスクの部分更新用） =====
+
+// Task から TaskInput を組み立てる（日付のみ差し替え可能）。Board / Gantt の日付変更確定で使用。
+export function toTaskInput(task: Task, updates: Partial<Pick<TaskInput, 'startDate' | 'endDate'>> = {}): TaskInput {
+  return {
+    title: task.title,
+    columnId: task.columnId,
+    assigneeIds: task.assigneeIds,
+    startDate: updates.startDate ?? task.startDate,
+    endDate: updates.endDate ?? task.endDate,
+    description: task.description,
+  };
+}
+
 // ===== ドメイン（Input）→ Firestore 書き込みデータ =====
 // createdAt/updatedAt や createdBy などサーバー値・作成者情報は呼び出し側(hooks)で付与する。
 // ここでは「フォーム入力 → ドキュメントの素のフィールド」変換のみを担う。

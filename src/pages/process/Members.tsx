@@ -17,18 +17,13 @@ import { CSS } from '@dnd-kit/utilities';
 import { useAuth } from '../../contexts/AuthContext';
 import { useUsers } from '../../hooks/useUsers';
 import { useProcessMembers } from '../../hooks/process/useProcessMembers';
-import { PROCESS_COLOR_COUNT, PROCESS_COLORS } from '../../constants/process';
+import { accentOf } from '../../lib/process/colors';
 import { buildMemberReorderUpdates } from '../../lib/process/memberOrdering';
 import type { ProcessMember, ProcessMemberInput } from '../../types/process';
 import MemberFormModal from '../../components/process/MemberFormModal';
 import ConfirmModal from '../../components/modals/ConfirmModal';
 import { GripVerticalIcon, PlusIcon, MoreIcon } from '../../components/process/icons';
 import styles from './Members.module.css';
-
-function accentOf(colorIndex: number): string {
-  const idx = ((colorIndex % PROCESS_COLOR_COUNT) + PROCESS_COLOR_COUNT) % PROCESS_COLOR_COUNT;
-  return PROCESS_COLORS[idx].accent;
-}
 
 // 名前の先頭1文字をアバターに表示（空なら「？」）。
 function initialOf(name: string): string {

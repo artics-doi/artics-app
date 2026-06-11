@@ -6,6 +6,7 @@ import {
   getRoomAvatarLabel,
   getRoomAvatarUrl,
   getRoomDisplayName,
+  getUnreadCount,
 } from '../../../src/utils/room';
 import type { ChatRoom, User } from '../../../src/types';
 
@@ -107,6 +108,23 @@ describe('getRoomAvatarUrl', () => {
       },
     });
     expect(getRoomAvatarUrl(noPhoto, 'alice', [])).toBeNull();
+  });
+});
+
+describe('getUnreadCount', () => {
+  test('unreadCounts から自分の未読数を返す', () => {
+    expect(getUnreadCount(room({ unreadCounts: { alice: 3, bob: 1 } }), 'alice')).toBe(3);
+  });
+
+  test('未読エントリがなければ 0', () => {
+    expect(getUnreadCount(room({ unreadCounts: { bob: 1 } }), 'alice')).toBe(0);
+    expect(getUnreadCount(room(), 'alice')).toBe(0);
+  });
+
+  test('ユーザー未指定（undefined/null/空文字）は 0', () => {
+    expect(getUnreadCount(room({ unreadCounts: { alice: 3 } }), undefined)).toBe(0);
+    expect(getUnreadCount(room({ unreadCounts: { alice: 3 } }), null)).toBe(0);
+    expect(getUnreadCount(room({ unreadCounts: { alice: 3 } }), '')).toBe(0);
   });
 });
 

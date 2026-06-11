@@ -15,10 +15,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useDashboardTasks } from '../../hooks/process/useDashboardTasks';
 import { useProcessMembers } from '../../hooks/process/useProcessMembers';
 import { useProjects } from '../../hooks/process/useProjects';
-import {
-  PROCESS_COLOR_COUNT,
-  PROCESS_COLORS,
-} from '../../constants/process';
+import { accentOf } from '../../lib/process/colors';
 import {
   bucketContainsDate,
   buildDashboardLanes,
@@ -80,11 +77,6 @@ const PERIOD_MODE_LABELS: Array<{ mode: DashboardDisplayMode; label: string }> =
   { mode: 'month', label: '月' },
   { mode: 'year', label: '年' },
 ];
-
-function accentOf(colorIndex: number): string {
-  const idx = ((colorIndex % PROCESS_COLOR_COUNT) + PROCESS_COLOR_COUNT) % PROCESS_COLOR_COUNT;
-  return PROCESS_COLORS[idx].accent;
-}
 
 // 今日の0時（描画基準）。レンダリングごとに作るが、日付比較は startOfDay で吸収される。
 function useToday(): Date {

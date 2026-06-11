@@ -30,7 +30,7 @@ import { useVisualViewport } from '../hooks/useVisualViewport';
 import type { ChatRoom, ExtendedMessage } from '../types';
 import { compressImage, isImageFile } from '../utils/imageCompression';
 import { downloadFile } from '../utils/fileDownload';
-import { getRoomAvatarLabel, getRoomAvatarUrl, getRoomDisplayName } from '../utils/room';
+import { getRoomAvatarLabel, getRoomAvatarUrl, getRoomDisplayName, getUnreadCount } from '../utils/room';
 import { formatDateLabel, formatTimeSmart } from '../utils/dateUtils';
 import { getAppEntryPath } from '../utils/navigation';
 import { PRIMARY_REACTION_EMOJIS, SECONDARY_REACTION_EMOJIS, MAX_FILE_SIZE, HIGHLIGHT_DURATION, MAX_TEXTAREA_HEIGHT } from '../constants';
@@ -1097,10 +1097,6 @@ export default function Chat() {
       .reverse(),
     [messages],
   );
-  function getDesktopUnreadCount(room: ChatRoom): number {
-    return room.unreadCounts?.[currentUser?.uid || ''] ?? 0;
-  }
-
   function handleBackToRooms() {
     navigate(getAppEntryPath());
   }
@@ -1151,7 +1147,7 @@ export default function Chat() {
         </div>
         <div className={styles.desktopRoomList}>
           {desktopVisibleRooms.map((room) => {
-            const unread = getDesktopUnreadCount(room);
+            const unread = getUnreadCount(room, currentUser?.uid);
             const favorited = room.favorites?.includes(currentUser?.uid || '') ?? false;
             const avatarUrl = getRoomAvatarUrl(room, currentUser?.uid, users);
             return (
