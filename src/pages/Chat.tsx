@@ -48,12 +48,9 @@ const NAS_PATH_REGEX = /"(\\\\(?:Nas-1|Nas-3)\\[^"\r\n]+)"|(\\\\(?:Nas-1|Nas-3)\
 function getReactionEntries(message: ExtendedMessage): Array<[string, string[]]> {
   const reactionUsersByEmoji = new Map<string, Set<string>>();
 
-  Object.entries(message.reactions || {}).forEach(([emoji, userIds]) => {
-    const users = reactionUsersByEmoji.get(emoji) ?? new Set<string>();
-    userIds.forEach((uid) => users.add(uid));
-    reactionUsersByEmoji.set(emoji, users);
-  });
-
+  // 旧形式 message.reactions は読まない。表示だけして取り消しはできない
+  // 矛盾状態になるため（取り消しは reactionsByUser しか更新できず、
+  // セキュリティルール上も reactions の変更は許可されていない）
   Object.entries(message.reactionsByUser || {}).forEach(([uid, emojis]) => {
     emojis.forEach((emoji) => {
       const users = reactionUsersByEmoji.get(emoji) ?? new Set<string>();
