@@ -198,6 +198,53 @@ describe('Firestore rules', () => {
       isPinned: true,
     }));
   });
+
+  it('blocks message update/delete by senders removed from the room', async () => {
+    // bob が送信者のメッセージを用意する（room1 の members は alice のみ＝退出済み相当）
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await setDoc(doc(db, 'chatRooms/room1/messages/bobMessage'), {
+        chatRoomId: 'room1',
+        senderId: 'bob',
+        senderName: 'Bob',
+        text: 'from bob',
+        readBy: ['bob'],
+        reactionsByUser: {},
+        isPinned: false,
+        isDeleted: false,
+        createdAt: serverTimestamp(),
+      });
+    });
+
+    const bobDb = testEnv.authenticatedContext('bob').firestore();
+    const bobMessageRef = doc(bobDb, 'chatRooms/room1/messages/bobMessage');
+
+    await assertFails(updateDoc(bobMessageRef, { text: 'tampered' }));
+    await assertFails(updateDoc(bobMessageRef, { text: '', isDeleted: true }));
+    await assertFails(deleteDoc(bobMessageRef));
+  });
+
+  it('allows current members to update and delete their own messages', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+    const messageRef = doc(aliceDb, 'chatRooms/room1/messages/message1');
+
+    await assertSucceeds(updateDoc(messageRef, { text: 'edited', isEdited: true }));
+    await assertSucceeds(deleteDoc(messageRef));
+  });
+
+  it('blocks members from updating unreadCounts directly', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    // unreadCounts は Cloud Functions（Admin SDK）だけが書く
+    await assertFails(updateDoc(doc(aliceDb, 'chatRooms/room1'), {
+      'unreadCounts.alice': 0,
+    }));
+    // ホワイトリスト内の通常更新は引き続き許可される
+    await assertSucceeds(updateDoc(doc(aliceDb, 'chatRooms/room1'), {
+      name: 'Renamed',
+      updatedAt: serverTimestamp(),
+    }));
+  });
 });
 
 describe('Storage rules', () => {

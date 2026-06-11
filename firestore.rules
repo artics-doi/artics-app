@@ -70,8 +70,10 @@ service cloud.firestore {
       return isRoomMember(roomId) && changedOnly(['isPinned']);
     }
 
-    function senderUpdatesOwnMessage() {
-      return signedIn() &&
+    function senderUpdatesOwnMessage(roomId) {
+      // 退出済み（members から外れた）ユーザーが過去の自分のメッセージを
+      // 改ざんできないよう、送信者本人かつ現メンバーであることを要求する
+      return isRoomMember(roomId) &&
         resource.data.senderId == request.auth.uid &&
         changedOnly([
           'text',
@@ -180,7 +182,6 @@ service cloud.firestore {
             'memberDetails',
             'favorites',
             'lastMessage',
-            'unreadCounts',
             'updatedAt'
           ])
         );
@@ -201,12 +202,12 @@ service cloud.firestore {
         allow read: if isAdmin() || isRoomMember(roomId);
         allow create: if createsOwnMessage(roomId);
         allow update: if isAdmin() ||
-          senderUpdatesOwnMessage() ||
+          senderUpdatesOwnMessage(roomId) ||
           updatesOwnReadBy(roomId) ||
           updatesOwnReactions(roomId) ||
           updatesPin(roomId);
         allow delete: if isAdmin() ||
-          (signedIn() && resource.data.senderId == request.auth.uid);
+          (isRoomMember(roomId) && resource.data.senderId == request.auth.uid);
       }
     }
   }
