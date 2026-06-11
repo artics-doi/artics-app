@@ -128,6 +128,24 @@ self.addEventListener('push', (event) => {
     }
     await markProcessed(notificationId);
 
+    // 閲覧中ルームの抑制: フォーカス中のウィンドウがこのルームを開いているなら
+    // OS通知を出さない（メッセージは画面上に見えている）。
+    // バックグラウンドのタブしかない場合は通知を出す安全側の判定にする
+    if (pushData.chatRoomId) {
+      try {
+        const windowClients = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+        const viewingThisRoom = windowClients.some((client) =>
+          client.focused && client.url.includes(`#/chat/${pushData.chatRoomId}`)
+        );
+        if (viewingThisRoom) {
+          console.log('[firebase-messaging-sw.js] Room is focused, skipping notification:', pushData.chatRoomId);
+          return;
+        }
+      } catch (e) {
+        console.warn('[firebase-messaging-sw.js] Active room check failed:', e);
+      }
+    }
+
     // titleがない場合は通知を表示しない（不正なプッシュ）
     if (!pushData.title) {
       console.log('[firebase-messaging-sw.js] No title in pushData, ignoring');
