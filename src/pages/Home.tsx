@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   collection,
   query,
+  where,
   orderBy,
   limit,
   serverTimestamp,
@@ -14,6 +15,8 @@ import {
   setDoc,
   updateDoc,
   deleteDoc,
+  deleteField,
+  writeBatch,
   arrayUnion,
   arrayRemove
 } from 'firebase/firestore';
@@ -36,7 +39,7 @@ import { ChatRoomList } from '../components/home';
 import type { ChatRoom, User } from '../types';
 import { getDirectRoomId, getDirectRoomKey, getRoomDisplayName } from '../utils/room';
 import { handleGroupImageChange as convertGroupImageToBase64 } from '../utils/image';
-import { SEARCH_LIMIT_PER_ROOM, SEARCH_RESULTS_LIMIT } from '../constants';
+import { SEARCH_LIMIT_PER_ROOM, SEARCH_RESULTS_LIMIT, FIRESTORE_BATCH_LIMIT } from '../constants';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import styles from './Home.module.css';
 import { SettingsModal, ThemeModal, ProfileEditModal, NotificationSettingsModal, ReleaseNotesModal, ReleaseNotesEditModal, StorageEditModal, SearchModal, NewChatModal, NewGroupModal, InviteMemberModal, DeleteRoomConfirmModal, UsersListModal, UserManagementModal, UserEditModal, DeleteUserConfirmModal } from '../components/home/modals';
@@ -539,6 +542,24 @@ export default function Home() {
     }
 
     try {
+      // 参加していた全ルームから members / memberDetails / unreadCounts を取り除く。
+      // 放置すると削除済みユーザーがメンバーとして残り続ける
+      const joinedRoomsSnapshot = await getDocs(
+        query(collection(db, 'chatRooms'), where('members', 'array-contains', userToDelete.uid))
+      );
+      const roomDocs = joinedRoomsSnapshot.docs;
+      for (let i = 0; i < roomDocs.length; i += FIRESTORE_BATCH_LIMIT) {
+        const batch = writeBatch(db);
+        roomDocs.slice(i, i + FIRESTORE_BATCH_LIMIT).forEach((roomDoc) => {
+          batch.update(roomDoc.ref, {
+            members: arrayRemove(userToDelete.uid),
+            [`memberDetails.${userToDelete.uid}`]: deleteField(),
+            [`unreadCounts.${userToDelete.uid}`]: deleteField()
+          });
+        });
+        await batch.commit();
+      }
+
       // Firestoreからユーザードキュメントを削除
       await deleteDoc(doc(db, 'users', userToDelete.uid));
 
@@ -652,15 +673,19 @@ export default function Home() {
 
     setIsDeletingRoom(true);
     try {
-      // メッセージを全て削除（並列処理）
+      // メッセージを全て削除（500件ずつのバッチ。一括並列だと大量メッセージで
+      // 書き込みレート制限や部分失敗が起き、中途半端な状態で止まる）
       const messagesSnapshot = await getDocs(
         collection(db, 'chatRooms', deleteRoomId, 'messages')
       );
-
-      const deletePromises = messagesSnapshot.docs.map(msgDoc =>
-        deleteDoc(doc(db, 'chatRooms', deleteRoomId, 'messages', msgDoc.id))
-      );
-      await Promise.all(deletePromises);
+      const messageDocs = messagesSnapshot.docs;
+      for (let i = 0; i < messageDocs.length; i += FIRESTORE_BATCH_LIMIT) {
+        const batch = writeBatch(db);
+        messageDocs.slice(i, i + FIRESTORE_BATCH_LIMIT).forEach((msgDoc) => {
+          batch.delete(msgDoc.ref);
+        });
+        await batch.commit();
+      }
 
       // チャットルームを削除
       await deleteDoc(doc(db, 'chatRooms', deleteRoomId));

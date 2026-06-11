@@ -53,3 +53,6 @@ export const SEARCH_RESULTS_LIMIT = 50;
 
 // ハイライトアニメーション時間（ミリ秒）（L-7: 2000 → 3500 で見落としを減らす）
 export const HIGHLIGHT_DURATION = 3500;
+
+// Firestore の writeBatch は1コミット500件まで
+export const FIRESTORE_BATCH_LIMIT = 500;
