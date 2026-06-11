@@ -588,6 +588,11 @@ function createWindow() {
     }
   });
 
+  // 破棄済みウィンドウへの show/focus は例外になるため、参照を残さない
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
+
   // H-11: メインウィンドウが表示されたら通知パネルをクリア
   // （focus ではなく show を使う理由: 別ウィンドウから戻った瞬間に消えるのを防ぐ）
   mainWindow.on('show', () => {
@@ -743,8 +748,10 @@ function updateTrayMenu() {
 function setupIPC() {
   // 通知ウィンドウからメインウィンドウを開く
   ipcMain.on('open-main-window', () => {
-    mainWindow?.show();
-    mainWindow?.focus();
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
   });
 
   // 通知ウィンドウを閉じる（IPC経由で確実に閉じる）
@@ -757,10 +764,12 @@ function setupIPC() {
 
   // 特定のチャットルームを開く
   ipcMain.on('open-room', (_event, roomId: string) => {
-    mainWindow?.show();
-    mainWindow?.focus();
-    // レンダラープロセスにルーム遷移イベントを送信
-    mainWindow?.webContents.send('navigate-to-room', roomId);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show();
+      mainWindow.focus();
+      // レンダラープロセスにルーム遷移イベントを送信
+      mainWindow.webContents.send('navigate-to-room', roomId);
+    }
   });
 
   // 全ての通知をクリアしてウィンドウを閉じる
@@ -912,12 +921,23 @@ function setupAutoUpdater() {
     mainWindow?.setProgressBar(progress.percent / 100);
   });
 
+  // 「後で」の再促しタイマーと表示状態。update-downloaded が再発火しても
+  // タイマーとダイアログが多重にならないように一元管理する
+  let updatePromptTimer: ReturnType<typeof setTimeout> | null = null;
+  let updatePromptShowing = false;
+
   // ダウンロード完了
   autoUpdater.on('update-downloaded', (info) => {
     console.log('アップデートのダウンロード完了:', info.version);
     mainWindow?.setProgressBar(-1); // プログレスバーを消す
 
     const showUpdatePrompt = () => {
+      if (updatePromptShowing) return;
+      updatePromptShowing = true;
+      if (updatePromptTimer) {
+        clearTimeout(updatePromptTimer);
+        updatePromptTimer = null;
+      }
       showMessageBoxWithMainWindow({
         type: 'info',
         title: 'ArticsChat アップデート準備完了',
@@ -927,12 +947,13 @@ function setupAutoUpdater() {
         defaultId: 0,
       })
         .then((result) => {
+          updatePromptShowing = false;
           if (result.response === 0) {
             isQuitting = true;
             autoUpdater.quitAndInstall();
           } else {
             // M-34: 「後で」を選んだら 24 時間後に再度プロンプトを出す
-            setTimeout(showUpdatePrompt, 24 * 60 * 60 * 1000);
+            updatePromptTimer = setTimeout(showUpdatePrompt, 24 * 60 * 60 * 1000);
             console.log('[autoUpdater] 24 時間後に再促しします');
           }
         });
@@ -1010,4 +1031,7 @@ app.on('window-all-closed', () => {
 // アプリ終了前
 app.on('before-quit', () => {
   isQuitting = true;
+  // 通知ウィンドウとトレイを明示的に破棄してから終了する
+  notificationManager?.clearAll();
+  tray?.destroy();
 });
