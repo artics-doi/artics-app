@@ -19,7 +19,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { useActiveRoom } from '../contexts/ActiveRoomContext';
 import { useToast } from '../contexts/ToastContext';
 import { useRoomNotificationSettings } from '../hooks/useRoomNotificationSettings';
-import { isElectronEnv } from '../hooks/useElectronNotification';
 import { useUsers } from '../hooks/useUsers';
 import { useInviteMembers } from '../hooks/useInviteMembers';
 import { useTypingIndicator } from '../hooks/useTypingIndicator';
@@ -37,49 +36,13 @@ import { PRIMARY_REACTION_EMOJIS, SECONDARY_REACTION_EMOJIS, MAX_FILE_SIZE, HIGH
 import ImagePreviewModal from '../components/ImagePreviewModal';
 import ConfirmModal from '../components/modals/ConfirmModal';
 import { GroupEditModal, MemberListModal, TypingIndicator, MessageBubbleInteractive } from '../components/chat';
+import { renderMessageText } from '../components/chat/messageText';
 import DesktopUtilityModals from '../components/desktop/DesktopUtilityModals';
 import DesktopNewChatModals from '../components/desktop/DesktopNewChatModals';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import { getReactionEntries, hasUserReacted } from '../lib/chat/reactions';
+import { resolveMenuPosition } from '../lib/chat/menuPosition';
 import styles from './Chat.module.css';
-
-const HTTP_URL_REGEX = /(https?:\/\/[^\s]+)/g;
-const NAS_PATH_REGEX = /"(\\\\(?:Nas-1|Nas-3)\\[^"\r\n]+)"|(\\\\(?:Nas-1|Nas-3)\\[^\s\r\n]+)/g;
-
-function getReactionEntries(message: ExtendedMessage): Array<[string, string[]]> {
-  const reactionUsersByEmoji = new Map<string, Set<string>>();
-
-  // 旧形式 message.reactions は読まない。表示だけして取り消しはできない
-  // 矛盾状態になるため（取り消しは reactionsByUser しか更新できず、
-  // セキュリティルール上も reactions の変更は許可されていない）
-  Object.entries(message.reactionsByUser || {}).forEach(([uid, emojis]) => {
-    emojis.forEach((emoji) => {
-      const users = reactionUsersByEmoji.get(emoji) ?? new Set<string>();
-      users.add(uid);
-      reactionUsersByEmoji.set(emoji, users);
-    });
-  });
-
-  return Array.from(reactionUsersByEmoji.entries())
-    .map(([emoji, users]) => [emoji, Array.from(users)] as [string, string[]])
-    .filter(([, users]) => users.length > 0);
-}
-
-function hasUserReacted(message: ExtendedMessage, emoji: string, uid: string | undefined): boolean {
-  if (!uid) return false;
-  return getReactionEntries(message).some(
-    ([entryEmoji, userIds]) => entryEmoji === emoji && userIds.includes(uid),
-  );
-}
-
-function renderMentions(segment: string, keyPrefix: string): React.ReactNode[] {
-  const parts = segment.split(/(@\S+)/g);
-  return parts.map((part, index) => {
-    if (part.startsWith('@')) {
-      return <span key={`${keyPrefix}-mention-${index}`} className={styles.mention}>{part}</span>;
-    }
-    return <Fragment key={`${keyPrefix}-text-${index}`}>{part}</Fragment>;
-  });
-}
 
 export default function Chat() {
   const { roomId } = useParams<{ roomId: string }>();
@@ -985,85 +948,7 @@ export default function Chat() {
     return `${readCount}人が既読`;
   }
 
-  // メッセージテキストをレンダリング（URL・メンションをハイライト）
-  function renderMessageText(text: string): React.ReactNode {
-    if (!text) return null;
-
-    const urlSegments = text.split(HTTP_URL_REGEX);
-
-    return urlSegments.flatMap((urlSegment, i) => {
-      if (/^https?:\/\//.test(urlSegment)) {
-        return (
-          <a
-            key={`url-${i}`}
-            href={urlSegment}
-            className={styles.messageLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => {
-              if (isElectronEnv() && window.electronAPI?.openExternal) {
-                e.preventDefault();
-                window.electronAPI.openExternal(urlSegment);
-              }
-            }}
-          >
-            {urlSegment}
-          </a>
-        );
-      }
-
-      const matches = [...urlSegment.matchAll(NAS_PATH_REGEX)];
-      if (matches.length === 0) {
-        return renderMentions(urlSegment, `segment-${i}`);
-      }
-
-      const elements: React.ReactNode[] = [];
-      let lastIndex = 0;
-
-      matches.forEach((match, matchIndex) => {
-        const matchedPath = match[1] ?? match[2];
-        const matchStart = match.index ?? 0;
-        const matchEnd = matchStart + match[0].length;
-
-        if (matchStart > lastIndex) {
-          elements.push(...renderMentions(urlSegment.slice(lastIndex, matchStart), `segment-${i}-${matchIndex}`));
-        }
-
-        const electronClickable = isElectronEnv() && window.electronAPI?.openNasPath;
-        if (electronClickable) {
-          elements.push(
-            <button
-              key={`nas-${i}-${matchIndex}`}
-              type="button"
-              className={styles.messageLink}
-              onClick={async (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const opened = await window.electronAPI?.openNasPath(matchedPath);
-                if (!opened) {
-                  showToast('warning', 'リンク先が見つからないか、開けませんでした');
-                }
-              }}
-            >
-              {match[0]}
-            </button>
-          );
-        } else {
-          elements.push(<Fragment key={`nas-text-${i}-${matchIndex}`}>{match[0]}</Fragment>);
-        }
-
-        lastIndex = matchEnd;
-      });
-
-      if (lastIndex < urlSegment.length) {
-        elements.push(...renderMentions(urlSegment.slice(lastIndex), `segment-tail-${i}`));
-      }
-
-      return elements;
-    });
-  }
-
-  // メニュー表示位置を計算（上下 + 左右）
+  // メニュー表示位置を計算（上下 + 左右）。判定ロジックは lib/chat/menuPosition.ts
   function calculateMenuPosition(messageId: string): {
     vertical: 'above' | 'below';
     horizontal: 'left' | 'right';
@@ -1071,16 +956,7 @@ export default function Chat() {
     const element = document.getElementById(`message-${messageId}`);
     if (!element) return { vertical: 'above', horizontal: 'left' };
 
-    const rect = element.getBoundingClientRect();
-    const verticalThreshold = 150; // ヘッダー高さ + メニュー高さの余裕
-    const horizontalThreshold = 200; // メニュー幅の余裕
-
-    const vertical: 'above' | 'below' = rect.top < verticalThreshold ? 'below' : 'above';
-    // 画面右端に近い場合は右寄せにしてはみ出しを防ぐ
-    const horizontal: 'left' | 'right' =
-      rect.right > window.innerWidth - horizontalThreshold ? 'right' : 'left';
-
-    return { vertical, horizontal };
+    return resolveMenuPosition(element.getBoundingClientRect(), window.innerWidth);
   }
 
   // ピン留めされたメッセージを取得
@@ -1605,7 +1481,7 @@ export default function Chat() {
                               ) : (
                                 message.text && (
                                   <p className={styles.messageText}>
-                                    {renderMessageText(message.text)}
+                                    {renderMessageText(message.text, showToast)}
                                     {message.isEdited && (
                                       <span className={styles.editedLabel} title="このメッセージは編集されました">
                                         {/* L-3: 編集済みアイコン併用 */}
