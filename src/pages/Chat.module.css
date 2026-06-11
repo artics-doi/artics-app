@@ -699,20 +699,6 @@
   display: block;
 }
 
-.fileLink {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: #1a73e8;
-  text-decoration: none;
-  padding: 8px 0;
-  font-size: 14px;
-}
-
-.fileLink:hover {
-  text-decoration: underline;
-}
-
 .messageWrapper.own .fileLink {
   color: #fff;
 }
@@ -2036,76 +2022,23 @@
     display: flex;
   }
 
-  .desktopBrandBar {
-    height: 38px;
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    padding: 0 12px;
-    border-bottom: 1px solid #dfe5ec;
-    background: #ffffff;
-  }
+  
 
-  .desktopBrandMark {
-    width: 22px;
-    height: 22px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    background: #2f80ed;
-  }
+  
 
-  .desktopBrandMark span {
-    width: 13px;
-    height: 10px;
-    display: block;
-    border-radius: 999px;
-    background: #ffffff;
-  }
+  
 
-  .desktopBrandName {
-    font-size: 15px;
-    font-weight: 800;
-    color: #111827;
-  }
+  
 
-  .desktopStoragePanel {
-    display: flex;
-    flex-direction: column;
-    gap: 9px;
-    padding: 14px 16px 12px;
-    background: #fbfdff;
-  }
+  
 
-  .desktopStorageMeta {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 12px;
-    color: #334155;
-  }
+  
 
-  .desktopStorageMeta strong {
-    margin-left: auto;
-    font-size: 12px;
-    font-weight: 500;
-    color: #475569;
-  }
+  
 
-  .desktopStorageTrack {
-    height: 8px;
-    overflow: hidden;
-    border-radius: 999px;
-    background: #d7dde5;
-  }
+  
 
-  .desktopStorageTrack span {
-    display: block;
-    height: 100%;
-    border-radius: inherit;
-    background: linear-gradient(90deg, #1677ff, #0f6bdd);
-  }
+  
 
   .desktopPaneHeader {
     display: flex;
@@ -2116,11 +2049,7 @@
     border-bottom: 0;
   }
 
-  .desktopPaneTitle {
-    font-size: 18px;
-    font-weight: 800;
-    color: var(--accent-color-strong);
-  }
+  
 
   .desktopPaneAction,
   .desktopQuickButton,
@@ -2308,25 +2237,9 @@
     background: #1677ff;
   }
 
-  .desktopUtilityTabs {
-    height: 68px;
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    align-items: end;
-    border-bottom: 1px solid #dfe5ec;
-    background: #ffffff;
-  }
+  
 
-  .desktopUtilityTabs span {
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-bottom: 3px solid transparent;
-    color: #475569;
-    font-size: 14px;
-    font-weight: 700;
-  }
+  
 
   .desktopUtilityTabs .active {
     color: #1677ff;
@@ -2355,41 +2268,13 @@
     color: #475569;
   }
 
-  .desktopSearchBox {
-    min-height: 36px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 0 12px;
-    border: 1px solid #aeb7c2;
-    border-radius: 18px;
-    color: #64748b;
-    background: #ffffff;
-  }
+  
 
-  .desktopSearchBox input {
-    min-width: 0;
-    flex: 1;
-    border: 0;
-    background: transparent;
-    color: #111827;
-    font: inherit;
-    font-size: 13px;
-  }
+  
 
-  .desktopSearchBox input:focus {
-    outline: none;
-  }
+  
 
-  .desktopSearchBox button {
-    width: 24px;
-    height: 24px;
-    border: 0;
-    border-radius: 50%;
-    background: transparent;
-    color: #64748b;
-    cursor: pointer;
-  }
+  
 
   .desktopResultHeader,
   .desktopSectionHeader {
@@ -2402,10 +2287,7 @@
     font-size: 13px;
   }
 
-  .desktopResultHeader strong {
-    color: #475569;
-    font-weight: 600;
-  }
+  
 
   .desktopResultList {
     display: flex;
@@ -2514,47 +2396,19 @@
     cursor: pointer;
   }
 
-  .desktopNoticeItem {
-    margin-bottom: 8px;
-    background: #f8fbff;
-    border-color: #e4edf8;
-  }
+  
 
-  .desktopNoticeItem span:nth-child(2) {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    font-size: 12px;
-  }
+  
 
-  .desktopUtilityButton {
-    width: 100%;
-    min-height: 42px;
-  }
+  
 
-  .desktopUtilityRow {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    min-height: 36px;
-    margin-bottom: 8px;
-    font-size: 13px;
-    color: #475569;
-  }
+  
 
-  .desktopUtilityRow strong {
-    color: #111827;
-  }
+  
 
-  .desktopMiniButton {
-    min-width: 58px;
-    color: #1677ff;
-  }
+  
 
-  .desktopNasHint {
-    margin-top: 12px;
-  }
+  
 
   .header {
     gap: 10px;

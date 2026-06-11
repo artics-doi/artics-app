@@ -276,11 +276,6 @@
   color: #8fafc4;
 }
 
-.memoIcon {
-  font-size: 26px;
-  line-height: 1;
-}
-
 .chatInfo {
   flex: 1;
   min-width: 0;
@@ -319,12 +314,6 @@
 .mutedIndicator svg {
   width: 14px;
   height: 14px;
-}
-
-.chatTime {
-  font-size: 12px;
-  color: var(--text-muted);
-  flex-shrink: 0;
 }
 
 .chatFooter {
@@ -774,12 +763,6 @@
 }
 
 /* 設定メニュー */
-.settingsMenu {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 20px;
-}
 
 .settingsMenuItem {
   display: flex;
@@ -1099,20 +1082,6 @@
 }
 
 /* ユーザー一覧 */
-.userSection {
-  margin-bottom: 8px;
-}
-
-.userSectionHeader {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 16px 8px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  background: var(--bg-primary);
-}
 
 .userListItem {
   display: flex;
@@ -1143,28 +1112,6 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-}
-
-.onlineIndicatorLarge {
-  position: absolute;
-  bottom: 2px;
-  right: 2px;
-  width: 14px;
-  height: 14px;
-  background: #22c55e;
-  border-radius: 50%;
-  border: 2px solid var(--bg-secondary);
-}
-
-.offlineIndicatorLarge {
-  position: absolute;
-  bottom: 2px;
-  right: 2px;
-  width: 14px;
-  height: 14px;
-  background: #9ca3af;
-  border-radius: 50%;
-  border: 2px solid var(--bg-secondary);
 }
 
 .userListInfo {
@@ -1293,51 +1240,14 @@
 }
 
 /* ストレージ使用量表示 */
-.storageIndicator {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(255, 255, 255, 0.15);
-  padding: 5px 10px;
-  border-radius: 16px;
-  font-size: 11px;
-  flex-shrink: 0;
-}
-
-.storageText {
-  font-weight: 500;
-  font-size: 10px;
-  white-space: nowrap;
-}
-
-.storageBarContainer {
-  width: 50px;
-  height: 5px;
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 3px;
-  overflow: hidden;
-}
-
-.storageBar {
-  height: 100%;
-  background: #4ade80;
-  border-radius: 3px;
-  transition: width 0.3s ease;
-}
 
 .storageBar.warning {
   background: #fbbf24;
 }
 
-.storageBar.danger {
-  background: #ef4444;
-}
-
 /* モバイル対応 - ストレージ表示 */
 @media (max-width: 480px) {
-  .storageIndicator {
-    display: none;
-  }
+  
 }
 
 /* 通知設定 */
@@ -1427,34 +1337,8 @@
 }
 
 /* スタートアップ設定（Electron専用） */
-.startupOption {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 16px;
-  background: var(--bg-primary);
-  border-radius: 8px;
-  margin-top: 8px;
-  border: 1px solid #1a73e8;
-}
-
-.startupBadge {
-  display: inline-block;
-  font-size: 10px;
-  font-weight: 600;
-  background: #1a73e8;
-  color: white;
-  padding: 2px 6px;
-  border-radius: 4px;
-  margin-left: 8px;
-}
 
 /* 通知設定のセパレーター */
-.notificationSeparator {
-  height: 1px;
-  background: var(--border-color);
-  margin: 8px 0;
-}
 
 /* バージョン情報セクション */
 .versionSection {
@@ -1659,49 +1543,8 @@
   box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
 }
 
-.storageIndicator {
-  order: -1;
-  width: 100%;
-  min-height: 44px;
-  justify-content: space-between;
-  gap: 10px;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  color: var(--text-secondary);
-  padding: 8px 12px;
-  border-radius: var(--radius-md);
-}
-
-.storageIndicator::before {
-  content: "ストレージ";
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text-primary);
-  white-space: nowrap;
-}
-
-.storageBarContainer {
-  flex: 1;
-  width: auto;
-  height: 9px;
-  background: #dbeee1;
-}
-
-.storageBar {
-  background: var(--accent-color);
-}
-
 .storageBar.warning {
   background: var(--warning-color);
-}
-
-.storageBar.danger {
-  background: var(--danger-color);
-}
-
-.storageText {
-  font-size: 12px;
-  color: var(--text-secondary);
 }
 
 .headerButtons {
@@ -1974,10 +1817,6 @@
 .searchInput:focus {
   border-color: var(--accent-color);
   box-shadow: 0 0 0 3px var(--accent-color-soft);
-}
-
-.settingsMenu {
-  gap: 10px;
 }
 
 .settingsMenuItem,
@@ -2404,14 +2243,9 @@
     font-size: 11px;
   }
 
-  .storageIndicator {
-    display: flex;
-    min-height: 42px;
-  }
+  
 
-  .storageIndicator::before {
-    display: none;
-  }
+  
 
   .chatList {
     padding: 8px;
@@ -2446,87 +2280,6 @@
   background: #ffffff;
   border-bottom: 0;
   box-shadow: none;
-}
-
-.headerTop {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  gap: 24px;
-  padding-bottom: 18px;
-  border-bottom: 1px solid var(--border-light);
-}
-
-.brandBlock {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  min-width: max-content;
-}
-
-.brandMark {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(2, 9px);
-  grid-template-rows: repeat(2, 9px);
-  place-content: center;
-  gap: 5px;
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #0284c7, #38bdf8);
-  box-shadow: 0 10px 24px rgba(3, 105, 161, 0.18);
-}
-
-.brandMark span {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: #ffffff;
-}
-
-.brandName {
-  color: #0f172a;
-  font-size: clamp(28px, 3vw, 42px);
-  font-weight: 800;
-  line-height: 1;
-}
-
-.storageIndicator {
-  display: grid;
-  grid-template-columns: minmax(150px, 420px) auto;
-  align-items: center;
-  width: min(520px, 44vw);
-  min-height: auto;
-  gap: 12px;
-  padding: 0;
-  background: transparent;
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
-}
-
-.storageIndicator::before {
-  display: none;
-}
-
-.storageBarContainer {
-  width: 100%;
-  height: 12px;
-  background: #d8edf6;
-  border-radius: 999px;
-}
-
-.storageBar {
-  background: linear-gradient(90deg, #0369a1, #0ea5e9);
-}
-
-.storageText {
-  color: #334155;
-  font-size: 15px;
-  font-weight: 700;
-  white-space: nowrap;
 }
 
 .headerButtons {
@@ -2793,16 +2546,9 @@
 }
 
 @media (max-width: 900px) {
-  .headerTop {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 14px;
-  }
+  
 
-  .storageIndicator {
-    width: 100%;
-    grid-template-columns: 1fr auto;
-  }
+  
 }
 
 @media (max-width: 640px) {
@@ -2810,23 +2556,13 @@
     padding: 14px 14px 0;
   }
 
-  .headerTop {
-    padding-bottom: 14px;
-  }
+  
 
-  .brandMark {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
-  }
+  
 
-  .brandName {
-    font-size: 24px;
-  }
+  
 
-  .storageText {
-    font-size: 13px;
-  }
+  
 
   .headerButtons {
     padding: 14px 0;
