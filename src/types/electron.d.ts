@@ -3,6 +3,7 @@
 export interface NotificationSettings {
   enableNotifications: boolean;
   showMessageContent: boolean;
+  notifyActiveRoom: boolean;
 }
 
 export interface UpdateCheckResult {
@@ -25,20 +26,26 @@ export interface ElectronAPI {
   // 通知設定を更新
   setNotificationSettings: (settings: NotificationSettings) => Promise<boolean>;
 
-  // スタートアップ設定を取得
-  getStartupEnabled: () => Promise<boolean>;
-
-  // スタートアップ設定を更新
-  setStartupEnabled: (enabled: boolean) => Promise<boolean>;
-
   // 通知を表示
-  showNotification: (options: { title: string; body: string; roomId?: string }) => Promise<boolean>;
+  showNotification: (options: { title: string; body: string; roomId?: string; kind?: 'chat' | 'schedule' }) => Promise<boolean>;
+
+  // 常に手前に表示の状態を取得
+  getAlwaysOnTop: () => Promise<boolean>;
+
+  // 常に手前に表示を設定
+  setAlwaysOnTop: (value: boolean) => Promise<boolean>;
+
+  // タイトルバーのテーマ（明暗）を設定
+  setTitleBarTheme: (theme: 'light' | 'dark') => Promise<boolean>;
 
   // Electron環境かどうかを確認
   isElectron: () => Promise<boolean>;
 
   // 外部リンクを開く
   openExternal: (url: string) => Promise<boolean>;
+
+  // 許可されたNASパスをエクスプローラーで開く
+  openNasPath: (path: string) => Promise<boolean>;
 
   // 通知設定変更のリスナー
   onNotificationSettingsChanged: (callback: (settings: NotificationSettings) => void) => () => void;

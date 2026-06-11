@@ -1,0 +1,55 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn() &&
+        'admin' in request.auth.token &&
+        request.auth.token.admin == true;
+    }
+
+    function isSelf(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function roomPath(roomId) {
+      return /databases/(default)/documents/chatRooms/$(roomId);
+    }
+
+    function roomExists(roomId) {
+      return firestore.exists(roomPath(roomId));
+    }
+
+    function isRoomMember(roomId) {
+      return signedIn() &&
+        roomExists(roomId) &&
+        request.auth.uid in firestore.get(roomPath(roomId)).data.members;
+    }
+
+    match /chatFiles/{roomId}/{filePath=**} {
+      allow read, write, delete: if isAdmin() || isRoomMember(roomId);
+    }
+
+    match /chatImages/{roomId}/{filePath=**} {
+      allow read, write, delete: if isAdmin() || isRoomMember(roomId);
+    }
+
+    match /groupImages/{roomId}/{filePath=**} {
+      allow read, write, delete: if isAdmin() || isRoomMember(roomId);
+    }
+
+    match /profileImages/{userId} {
+      allow read: if signedIn();
+      allow write, delete: if isAdmin() || isSelf(userId);
+    }
+
+    match /profileImages/{userId}/{filePath=**} {
+      allow read: if signedIn();
+      allow write, delete: if isAdmin() || isSelf(userId);
+    }
+  }
+}

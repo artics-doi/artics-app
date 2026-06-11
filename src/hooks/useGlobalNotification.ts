@@ -16,6 +16,7 @@ import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useActiveRoom } from '../contexts/ActiveRoomContext';
 import { useElectronNotification } from './useElectronNotification';
+import { useRoomNotificationSettings } from './useRoomNotificationSettings';
 
 interface LastMessageInfo {
   id: string;
@@ -24,12 +25,18 @@ interface LastMessageInfo {
 
 export function useGlobalNotification() {
   const { currentUser } = useAuth();
-  const { showNotification, isElectron } = useElectronNotification();
+  const { showNotification, isElectron, settings: electronSettings } = useElectronNotification();
   const { activeRoomId } = useActiveRoom();
+  const { isRoomMuted } = useRoomNotificationSettings();
   const lastMessagesRef = useRef<Map<string, LastMessageInfo>>(new Map());
   const initializedRef = useRef(false);
   const showNotificationRef = useRef(showNotification);
   const activeRoomIdRef = useRef(activeRoomId);
+  const isRoomMutedRef = useRef(isRoomMuted);
+  const electronSettingsRef = useRef(electronSettings);
+  const messageUnsubscribersRef = useRef<Map<string, () => void>>(new Map());
+  const roomNamesRef = useRef<Map<string, string>>(new Map());
+  const initTimerRef = useRef<number | null>(null);
 
   // showNotificationの最新版を常に保持
   useEffect(() => {
@@ -41,8 +48,20 @@ export function useGlobalNotification() {
     activeRoomIdRef.current = activeRoomId;
   }, [activeRoomId]);
 
+  // isRoomMutedの最新版を常に保持
+  useEffect(() => {
+    isRoomMutedRef.current = isRoomMuted;
+  }, [isRoomMuted]);
+
+  // electronSettingsの最新版を常に保持
+  useEffect(() => {
+    electronSettingsRef.current = electronSettings;
+  }, [electronSettings]);
+
   useEffect(() => {
     if (!currentUser) return;
+    const messageUnsubscribers = messageUnsubscribersRef.current;
+    const lastMessages = lastMessagesRef.current;
 
     // PWA環境（非Electron）ではService Workerが通知を担当するため、
     // このフックでは通知を表示しない
@@ -76,11 +95,20 @@ export function useGlobalNotification() {
         }
         roomNames.set(doc.id, roomName);
       });
+      roomNamesRef.current = roomNames;
 
-      // 各チャットルームの最新メッセージを監視
-      const unsubscribeMessages: (() => void)[] = [];
+      const activeRoomIds = new Set(roomIds);
+      messageUnsubscribers.forEach((unsubscribe, roomId) => {
+        if (!activeRoomIds.has(roomId)) {
+          unsubscribe();
+          messageUnsubscribers.delete(roomId);
+          lastMessages.delete(roomId);
+        }
+      });
 
       roomIds.forEach((roomId) => {
+        if (messageUnsubscribers.has(roomId)) return;
+
         const messagesQuery = query(
           collection(db, 'chatRooms', roomId, 'messages'),
           orderBy('createdAt', 'desc'),
@@ -120,10 +148,13 @@ export function useGlobalNotification() {
             const messageAge = now.getTime() - createdAt.getTime();
             if (messageAge < 5000 && shouldShowNotification) {
               // 現在閲覧中のルームからのメッセージは通知しない
-              if (activeRoomIdRef.current === roomId) {
+              if (activeRoomIdRef.current === roomId && !electronSettingsRef.current.notifyActiveRoom) {
                 console.log('[useGlobalNotification] 閲覧中のルームのため通知をスキップ:', roomId);
+              } else if (isRoomMutedRef.current(roomId)) {
+                // ミュートされているルームからのメッセージは通知しない
+                console.log('[useGlobalNotification] ミュート中のルームのため通知をスキップ:', roomId);
               } else {
-                const roomName = roomNames.get(roomId) || 'チャット';
+                const roomName = roomNamesRef.current.get(roomId) || 'チャット';
                 console.log('[useGlobalNotification] Electron通知:', roomName, senderName, text);
                 // refを通じて最新のshowNotificationを呼び出す
                 showNotificationRef.current(
@@ -139,24 +170,28 @@ export function useGlobalNotification() {
           lastMessagesRef.current.set(roomId, { id: messageId, timestamp: createdAt });
         });
 
-        unsubscribeMessages.push(unsubscribe);
+        messageUnsubscribers.set(roomId, unsubscribe);
       });
 
       // 初期化完了フラグ（少し遅延させる）
-      setTimeout(() => {
+      if (initTimerRef.current !== null) {
+        window.clearTimeout(initTimerRef.current);
+      }
+      initTimerRef.current = window.setTimeout(() => {
         initializedRef.current = true;
       }, 2000);
-
-      // クリーンアップ
-      return () => {
-        unsubscribeMessages.forEach((unsub) => unsub());
-      };
     });
 
     return () => {
       unsubscribeRooms();
+      messageUnsubscribers.forEach((unsubscribe) => unsubscribe());
+      messageUnsubscribers.clear();
+      lastMessages.clear();
+      if (initTimerRef.current !== null) {
+        window.clearTimeout(initTimerRef.current);
+        initTimerRef.current = null;
+      }
       initializedRef.current = false;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser, isElectron]); // showNotificationはrefを通じて呼び出すため依存配列から削除
 }

@@ -3,15 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/favicon.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Artics</title>
-    <!-- PWA -->
-    <link rel="manifest" href="/manifest.json" />
+    <!-- viewport: interactive-widget=resizes-content で仮想キーボード表示時に
+         visualViewport の高さを縮めて入力欄が隠れないようにする（H-5） -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content" />
+    <title>Articsチャット</title>
+    <!-- PWA manifest is generated from vite.config.ts by VitePWA -->
     <meta name="theme-color" content="#1a73e8" />
-    <!-- iOS -->
+    <!-- iOS / Android -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="Artics" />
+    <meta name="apple-mobile-web-app-title" content="Articsチャット" />
     <link rel="apple-touch-icon" href="/icon-192x192.png" />
   </head>
   <body>

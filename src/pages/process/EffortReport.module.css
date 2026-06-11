@@ -1,0 +1,316 @@
+.page {
+  --effort-toolbar-bg: #fff;
+  --effort-control-bg: #fff;
+  --effort-control-hover-bg: #f7fcff;
+  --effort-error-bg: #fef2f2;
+  --effort-error-border: #fecaca;
+  --effort-warning-bg: #fffbeb;
+  --effort-warning-border: #fde68a;
+
+  padding: 18px 18px 32px;
+  max-width: 1480px;
+  margin: 0 auto;
+}
+
+:global([data-theme="dark"]) .page {
+  --effort-toolbar-bg: var(--bg-secondary);
+  --effort-control-bg: var(--bg-input);
+  --effort-control-hover-bg: #323247;
+  --effort-error-bg: rgba(239, 68, 68, 0.12);
+  --effort-error-border: rgba(248, 113, 113, 0.5);
+  --effort-warning-bg: rgba(245, 158, 11, 0.13);
+  --effort-warning-border: rgba(251, 191, 36, 0.55);
+}
+
+.headerRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.pageTitle {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.subTitle {
+  margin: 6px 0 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.fiscalToolbar {
+  display: grid;
+  grid-template-columns: auto minmax(280px, 1fr) auto minmax(120px, auto) auto;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--effort-toolbar-bg);
+}
+
+.yearNavButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--effort-control-bg);
+  color: var(--text-primary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 0 14px;
+  white-space: nowrap;
+}
+
+.yearNavButton:hover {
+  border-color: var(--accent-color);
+  background: var(--effort-control-hover-bg);
+  color: var(--accent-color);
+}
+
+.yearNavButton:focus-visible,
+.primaryButton:focus-visible,
+.yearInputWrap input:focus-visible,
+.hoursInputWrap input:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+.yearCenter,
+.hoursControl {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  min-width: 0;
+  padding: 7px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--effort-control-bg);
+}
+
+.yearCenter span,
+.hoursControl span {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.yearInputWrap,
+.hoursInputWrap {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+}
+
+.yearInputWrap input,
+.hoursInputWrap input {
+  width: 74px;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 22px;
+  font-weight: 800;
+  text-align: center;
+  outline: none;
+}
+
+.hoursInputWrap input {
+  width: 48px;
+  font-size: 18px;
+}
+
+.yearInputWrap strong,
+.hoursInputWrap strong {
+  color: var(--text-primary);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.yearCenter small {
+  color: var(--text-tertiary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.summaryBand {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.summaryCard {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+}
+
+.summaryBand span {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.summaryBand strong {
+  color: var(--text-primary);
+  font-size: 16px;
+}
+
+.validationSection,
+.reportSection {
+  margin-top: 14px;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.validationSection h2,
+.reportSection h2 {
+  margin: 0 0 8px;
+  color: var(--text-primary);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.sectionHeader h2 {
+  margin: 0;
+}
+
+.primaryButton {
+  min-height: 44px;
+  border: 1px solid var(--accent-color);
+  border-radius: var(--radius-md);
+  background: var(--accent-color);
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 0 16px;
+  white-space: nowrap;
+}
+
+.primaryButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.issueGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.issuePanel {
+  min-height: 58px;
+  padding: 10px 11px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+}
+
+.issuePanel strong {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.issuePanel p {
+  margin: 2px 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.issuePanelError {
+  border-color: var(--effort-error-border);
+  background: var(--effort-error-bg);
+}
+
+.issuePanelWarning {
+  border-color: var(--effort-warning-border);
+  background: var(--effort-warning-bg);
+}
+
+.tableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+}
+
+.table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-size: 13px;
+  text-align: left;
+}
+
+.table th {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.stateText {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+@media (max-width: 900px) {
+  .page {
+    padding: 18px 14px 36px;
+  }
+
+  .fiscalToolbar {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .yearCenter,
+  .hoursControl,
+  .primaryButton {
+    grid-column: 1 / -1;
+  }
+
+  .yearCenter {
+    order: -1;
+  }
+
+  .summaryBand,
+  .issueGrid {
+    grid-template-columns: 1fr;
+  }
+}

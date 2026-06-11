@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import styles from './ImagePreviewModal.module.css';
+import useModal from '../hooks/useModal';
 
 interface ImagePreviewModalProps {
   imageURL: string;
@@ -19,29 +20,27 @@ export default function ImagePreviewModal({ imageURL, fileName, onClose }: Image
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const imageContainerRef = useRef<HTMLDivElement>(null);
+  const { modalProps } = useModal({ isOpen: true, onClose });
 
-  // ESCキーで閉じる、+/-キーでズーム
+  // +/-キーでズーム
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      } else if (e.key === '+' || e.key === '=') {
-        handleZoomIn();
+      if (e.key === '+' || e.key === '=') {
+        setScale(prev => Math.min(prev + SCALE_STEP, MAX_SCALE));
       } else if (e.key === '-') {
-        handleZoomOut();
+        setScale(prev => Math.max(prev - SCALE_STEP, MIN_SCALE));
       } else if (e.key === '0') {
-        handleResetZoom();
+        setScale(1);
+        setPosition({ x: 0, y: 0 });
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
-    document.body.style.overflow = 'hidden';
 
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = '';
     };
-  }, [onClose, scale]);
+  }, []);
 
   // マウスホイールでズーム
   useEffect(() => {
@@ -123,11 +122,16 @@ export default function ImagePreviewModal({ imageURL, fileName, onClose }: Image
   const zoomPercent = Math.round(scale * 100);
 
   return (
-    <div className={styles.overlay} onClick={onClose}>
+    <div
+      {...modalProps}
+      className={styles.overlay}
+      onClick={onClose}
+      aria-labelledby="image-preview-modal-title"
+    >
       <div className={styles.container} onClick={(e) => e.stopPropagation()}>
         {/* ヘッダー */}
         <div className={styles.header}>
-          <span className={styles.fileName}>{fileName || '画像'}</span>
+          <span id="image-preview-modal-title" className={styles.fileName}>{fileName || '画像'}</span>
           <div className={styles.actions}>
             {/* ズームコントロール */}
             <div className={styles.zoomControls}>

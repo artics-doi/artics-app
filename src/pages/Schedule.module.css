@@ -1,0 +1,1552 @@
+.container {
+  height: 100vh;
+  height: 100dvh;
+  display: grid;
+  grid-template-columns: minmax(250px, 330px) minmax(0, 1fr);
+  overflow: hidden;
+  background: #ffffff;
+  color: #0f172a;
+}
+
+.sidebar {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #fbfdff;
+}
+
+.sidebar {
+  border-right: 1px solid #dfe5ec;
+}
+
+.sidebarActions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 10px 10px;
+}
+
+.sidebarPrimary,
+.sidebarSecondary,
+.sidebarQuickActions button {
+  min-height: 38px;
+  border-radius: 6px;
+  border: 1px solid #d9e1eb;
+  background: #ffffff;
+  color: #1f2937;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sidebarPrimary {
+  background: #1677ff;
+  border-color: transparent;
+  color: #ffffff;
+}
+
+.sidebarPrimary.active {
+  box-shadow: none;
+}
+
+.sidebarSecondary:hover,
+.sidebarQuickActions button:hover:not(:disabled) {
+  background: #eaf3ff;
+  border-color: #bcd7ff;
+  color: #0f6bdd;
+}
+
+.sidebarQuickActions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 10px 10px 12px;
+  border-bottom: 1px solid #dfe5ec;
+}
+
+.sidebarQuickActions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.roomHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px 6px;
+  font-size: 13px;
+  color: #475569;
+}
+
+.roomList {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 10px 14px;
+}
+
+.roomItem {
+  width: 100%;
+  min-height: 62px;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #111827;
+  text-align: left;
+  cursor: pointer;
+}
+
+.roomItem:hover {
+  background: #eaf3ff;
+  border-color: #d2e4ff;
+}
+
+.roomAvatar {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #3b82f6, #5f8ff5);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.roomAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.roomText {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.roomName {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.favorite {
+  color: #f5a400;
+}
+
+.roomLast {
+  overflow: hidden;
+  color: #475569;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.muted,
+.unread {
+  justify-self: end;
+  grid-column: 3;
+  border-radius: 999px;
+  padding: 3px 6px;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.muted {
+  background: #eef2f7;
+  color: #64748b;
+}
+
+.unread {
+  background: #1677ff;
+  color: #ffffff;
+}
+
+.main {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+}
+
+.header {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 18px;
+  border-bottom: 1px solid #dfe5ec;
+}
+
+.header h1 {
+  margin: 0;
+  color: #111827;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.headerControls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.iconButton,
+.todayButton,
+.addButton,
+.segmented button {
+  min-height: 36px;
+  border: 1px solid #d9e1eb;
+  background: #ffffff;
+  color: #1f2937;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.iconButton {
+  width: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+}
+
+.iconButton svg {
+  width: 18px;
+  height: 18px;
+}
+
+.todayButton,
+.addButton {
+  padding: 0 12px;
+  border-radius: 6px;
+}
+
+.addButton {
+  border-color: #1677ff;
+  background: #1677ff;
+  color: #ffffff;
+}
+
+.iconButton:hover,
+.todayButton:hover,
+.segmented button:hover {
+  background: #eaf3ff;
+  border-color: #bcd7ff;
+  color: #0f6bdd;
+}
+
+.addButton:hover {
+  background: #0f6bdd;
+}
+
+.segmented {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid #d9e1eb;
+  border-radius: 6px;
+}
+
+.segmented button {
+  min-width: 42px;
+  border: 0;
+  border-right: 1px solid #d9e1eb;
+  border-radius: 0;
+}
+
+.segmented button:last-child {
+  border-right: 0;
+}
+
+.segmented .selected {
+  background: #eaf3ff;
+  color: #0f6bdd;
+}
+
+.loading {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.calendar {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(100px, 1fr));
+  grid-template-rows: 34px repeat(6, minmax(86px, 1fr));
+  overflow: auto;
+  border-top: 1px solid #edf2f7;
+}
+
+.compactCalendar {
+  grid-template-rows: repeat(1, minmax(360px, 1fr));
+}
+
+.notionCalendar {
+  --schedule-card-height: 76px;
+  --schedule-card-gap: 4px;
+  --schedule-card-step: calc(var(--schedule-card-height) + var(--schedule-card-gap));
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  border-top: 1px solid #d3cec7;
+  background: #ffffff;
+}
+
+.notionWeekdays {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(100px, 1fr));
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(10px);
+}
+
+.weekday {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-right: 1px solid #d3cec7;
+  border-bottom: 1px solid #d3cec7;
+  color: #6b625c;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.weekday:nth-child(7) {
+  border-right: 0;
+}
+
+.notionWeek {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(100px, 1fr));
+  grid-template-rows: 30px repeat(var(--lane-count), var(--schedule-card-step)) minmax(calc(var(--max-single-count) * var(--schedule-card-step)), auto);
+  min-height: calc(34px + (var(--lane-count) * var(--schedule-card-step)) + (var(--max-single-count) * var(--schedule-card-step)));
+  border-bottom: 1px solid #d3cec7;
+}
+
+.notionDayCell {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 5px 0 0;
+  border: 0;
+  border-right: 1px solid #d3cec7;
+  background: #ffffff;
+  color: #111827;
+  text-align: left;
+  cursor: pointer;
+}
+
+.notionDayCell:nth-of-type(7n) {
+  border-right: 0;
+}
+
+.notionDayCell:hover {
+  background: #fbfaf8;
+}
+
+.singleDayEvents {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--schedule-card-gap);
+  margin-top: calc((var(--day-multi-lanes) * var(--schedule-card-step)) - 1px);
+  padding: 0 3px 5px;
+}
+
+.dayCell {
+  min-height: 104px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  overflow: hidden;
+  padding: 7px;
+  border: 0;
+  border-right: 1px solid #edf2f7;
+  border-bottom: 1px solid #edf2f7;
+  background: #ffffff;
+  color: #111827;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dayCell:hover {
+  background: #f8fbff;
+}
+
+.outsideMonth {
+  background:
+    repeating-linear-gradient(
+      135deg,
+      rgba(231, 226, 220, 0.52) 0,
+      rgba(231, 226, 220, 0.52) 1px,
+      transparent 1px,
+      transparent 9px
+    ),
+    #faf9f7;
+  color: #7c736b;
+}
+
+.holidayDay {
+  background: #fff7f5;
+}
+
+.outsideMonth.holidayDay {
+  background: #fff1ee;
+}
+
+.selectedDay {
+  box-shadow: inset 0 0 0 1.5px #2f6feb;
+}
+
+.dropTargetDay {
+  background: #eef7ff;
+  box-shadow: inset 0 0 0 2px #1677ff;
+}
+
+.dayNumber {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  min-width: 26px;
+  height: 26px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  box-shadow: none;
+  color: #4f4a45;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
+}
+
+.todayDay .dayNumber {
+  background: #1677ff;
+  color: #ffffff;
+  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.18);
+}
+
+.dayEvents {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  overflow-y: auto;
+  padding-right: 2px;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.dayEvents::-webkit-scrollbar {
+  width: 6px;
+}
+
+.dayEvents::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #cbd5e1;
+}
+
+.eventChip {
+  min-height: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px;
+  overflow: hidden;
+  border: 1px solid var(--schedule-border);
+  border-radius: 6px;
+  padding: 3px 7px;
+  color: #37352f;
+  font-size: 12px;
+  line-height: 1.3;
+  box-shadow: 0 1px 1px rgba(15, 23, 42, 0.025);
+}
+
+.eventChip strong,
+.eventChip small,
+.eventChip em {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.eventChip strong {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.01em;
+}
+
+.eventChip small {
+  width: fit-content;
+  max-width: 100%;
+  border-radius: 4px;
+  padding: 1px 6px;
+  background: var(--schedule-tag-bg);
+  color: var(--schedule-tag-text);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.eventChip em {
+  color: #8a817a;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+.notionEventBar {
+  z-index: 2;
+  min-width: 0;
+  height: var(--schedule-card-height);
+  min-height: var(--schedule-card-height);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 3px;
+  margin: 0 3px var(--schedule-card-gap);
+  padding: 6px 9px;
+  border: 1px solid var(--schedule-border);
+  border-radius: 6px;
+  box-sizing: border-box;
+  color: #37352f;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 1px 1px rgba(15, 23, 42, 0.035);
+  transition: box-shadow 0.14s ease, transform 0.14s ease;
+}
+
+.notionEventBar:hover {
+  filter: none;
+  box-shadow: 0 2px 5px rgba(15, 23, 42, 0.055);
+  transform: translateY(-1px);
+}
+
+.singleDayEventBar {
+  width: 100%;
+  margin: 0;
+}
+
+.notionEventBar[draggable="true"] {
+  cursor: grab;
+}
+
+.eventChip[draggable="true"] {
+  cursor: grab;
+}
+
+.notionEventBar[draggable="true"]:active,
+.eventChip[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.draggingEvent {
+  opacity: 0.58;
+  outline: 2px dashed #2f6feb;
+  outline-offset: 2px;
+}
+
+.notionEventBar strong,
+.notionEventBar small,
+.notionEventBar em {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notionEventBar strong {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.01em;
+}
+
+.notionEventBar small {
+  width: fit-content;
+  max-width: 100%;
+  border-radius: 4px;
+  padding: 1px 6px;
+  background: var(--schedule-tag-bg);
+  color: var(--schedule-tag-text);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.notionEventBar em {
+  width: 100%;
+  color: #8a817a;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+.errorPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 14px;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fff5f5;
+  color: #991b1b;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.errorPanel strong {
+  color: #7f1d1d;
+  font-size: 13px;
+}
+
+.green {
+  --schedule-border: #d6e6dc;
+  --schedule-tag-bg: #d4eadc;
+  --schedule-tag-text: #3f6b4c;
+  background: #edf6ef;
+}
+
+.red {
+  --schedule-border: #f0d6d2;
+  --schedule-tag-bg: #f3d6d1;
+  --schedule-tag-text: #8a4a42;
+  background: #faece9;
+}
+
+.blue {
+  --schedule-border: #d4e3ef;
+  --schedule-tag-bg: #d4e4f3;
+  --schedule-tag-text: #3f6686;
+  background: #edf5fb;
+}
+
+.orange {
+  --schedule-border: #f2c79b;
+  --schedule-tag-bg: #f8d7b0;
+  --schedule-tag-text: #8a4a12;
+  background: #fff0df;
+}
+
+.olive {
+  --schedule-border: #dfdfca;
+  --schedule-tag-bg: #e1e2c7;
+  --schedule-tag-text: #68683e;
+  background: #f3f3e7;
+}
+
+.yellow {
+  --schedule-border: #eadfb9;
+  --schedule-tag-bg: #efe4ba;
+  --schedule-tag-text: #7a6830;
+  background: #faf4dc;
+}
+
+.navy {
+  --schedule-border: #d3dfed;
+  --schedule-tag-bg: #d5e2f0;
+  --schedule-tag-text: #405d7f;
+  background: #edf4fb;
+}
+
+.indigo {
+  --schedule-border: #d8ddec;
+  --schedule-tag-bg: #dbe1f1;
+  --schedule-tag-text: #4a5f88;
+  background: #f0f2fa;
+}
+
+.gray {
+  --schedule-border: #dedbd6;
+  --schedule-tag-bg: #e4e1dc;
+  --schedule-tag-text: #6b625c;
+  background: #f4f2ef;
+}
+
+.brown {
+  --schedule-border: #e8d8ca;
+  --schedule-tag-bg: #ead9cb;
+  --schedule-tag-text: #775a43;
+  background: #f7eee8;
+}
+
+.pink {
+  --schedule-border: #ecd4df;
+  --schedule-tag-bg: #efd6e2;
+  --schedule-tag-text: #835069;
+  background: #faedf3;
+}
+
+.rose {
+  --schedule-border: #efd5d5;
+  --schedule-tag-bg: #f1d8d8;
+  --schedule-tag-text: #895150;
+  background: #faeeee;
+}
+
+.slate {
+  --schedule-border: #dbdee3;
+  --schedule-tag-bg: #e1e4e8;
+  --schedule-tag-text: #5f6670;
+  background: #f3f4f6;
+}
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.42);
+}
+
+.modal {
+  width: min(720px, 100%);
+  max-height: min(860px, calc(100vh - 48px));
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  padding: 18px;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.22);
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.modalHeader h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.modalHeader button {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  background: #f1f5f9;
+  color: #334155;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.field input,
+.field select,
+.field textarea {
+  min-height: 38px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: #ffffff;
+  color: #111827;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.field textarea {
+  resize: vertical;
+}
+
+.fieldHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.fieldHeader em {
+  color: #0f6bdd;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.selectedUsers {
+  min-height: 34px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 8px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
+.selectedUsers button {
+  max-width: 150px;
+  min-height: 26px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  background: #eaf3ff;
+  color: #0f172a;
+  padding: 0 8px 0 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.selectedUsers button:hover {
+  border-color: #93c5fd;
+  background: #dbeafe;
+}
+
+.selectedUsers button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selectedUsers button strong {
+  color: #2563eb;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.selectedUsers > span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.userPickerToolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.userPickerToolbar input {
+  min-height: 34px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #0f172a;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 13px;
+}
+
+.userPickerActions {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.userPickerActions button {
+  min-height: 34px;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  background: #eff6ff;
+  color: #0f6bdd;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.userPickerActions button:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+
+.dateGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.timePickerRoot {
+  position: relative;
+}
+
+.timeTrigger {
+  width: 100%;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #111827;
+  padding: 8px 10px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.timeTrigger:hover,
+.timeTrigger[aria-expanded='true'] {
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.12);
+}
+
+.timeTrigger strong {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.timeTrigger span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.timePopover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  width: min(320px, calc(100vw - 64px));
+  padding: 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.18);
+}
+
+.timePickerActions button {
+  min-height: 30px;
+  border: 1px solid #dbeafe;
+  border-radius: 6px;
+  background: #f8fbff;
+  color: #1e3a8a;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.timeDrums {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 16px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.timeDrum {
+  max-height: 134px;
+  overflow-y: auto;
+  display: grid;
+  gap: 4px;
+  padding: 4px;
+}
+
+.timeDrum button {
+  min-height: 30px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #0f172a;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.timeDrum button:hover {
+  background: #eef6ff;
+}
+
+.selectedTimePart {
+  border-color: #1677ff !important;
+  background: #1677ff !important;
+  color: #ffffff !important;
+}
+
+.timeSeparator {
+  color: #64748b;
+  font-size: 18px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.timePickerActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 10px;
+}
+
+.timePickerActions button:last-child {
+  border-color: #1677ff;
+  background: #1677ff;
+  color: #ffffff;
+}
+
+.inlineCheck {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #334155;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.inlineCheck input {
+  width: 16px;
+  height: 16px;
+  accent-color: #1677ff;
+}
+
+.userChecks {
+  max-height: 104px;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 5px;
+  overflow-y: auto;
+  padding: 7px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.userChecks button {
+  max-width: 148px;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 9px;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #111827;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.userChecks button:hover {
+  border-color: #bfdbfe;
+  background: #ffffff;
+}
+
+.userChecked {
+  border-color: #8bbcff !important;
+  background: #eaf3ff !important;
+  color: #0f5ec7 !important;
+}
+
+.userName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.noUsers {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 12px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.modalActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.modalLeftActions,
+.modalRightActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.saveButton,
+.cancelButton,
+.deleteButton,
+.copyButton {
+  min-height: 38px;
+  border-radius: 6px;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.saveButton {
+  border: 1px solid #1677ff;
+  background: #1677ff;
+  color: #ffffff;
+}
+
+.cancelButton {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+}
+
+.deleteButton {
+  border: 1px solid #fecaca;
+  background: #fff1f2;
+  color: #b91c1c;
+}
+
+.copyButton {
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #0f5ec7;
+}
+
+.copyButton:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+
+.saveButton:disabled,
+.cancelButton:disabled,
+.deleteButton:disabled,
+.copyButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.copyModal {
+  width: min(440px, 100%);
+  gap: 16px;
+}
+
+.copySummary {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
+.copySummary strong {
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.copySummary span,
+.copyHint {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+:global([data-theme="dark"]) .container,
+:global([data-theme="dark"]) .main,
+:global([data-theme="dark"]) .notionCalendar,
+:global([data-theme="dark"]) .notionDayCell,
+:global([data-theme="dark"]) .dayCell {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+:global([data-theme="dark"]) .sidebar {
+  background: var(--bg-primary);
+  border-right-color: var(--border-color);
+}
+
+:global([data-theme="dark"]) .sidebarQuickActions {
+  border-bottom-color: var(--border-color);
+}
+
+:global([data-theme="dark"]) .sidebarPrimary,
+:global([data-theme="dark"]) .sidebarSecondary,
+:global([data-theme="dark"]) .sidebarQuickActions button,
+:global([data-theme="dark"]) .iconButton,
+:global([data-theme="dark"]) .todayButton,
+:global([data-theme="dark"]) .segmented button {
+  border-color: var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+:global([data-theme="dark"]) .sidebarPrimary,
+:global([data-theme="dark"]) .addButton {
+  border-color: transparent;
+  background: var(--accent-color);
+  color: #052536;
+}
+
+:global([data-theme="dark"]) .sidebarSecondary:hover,
+:global([data-theme="dark"]) .sidebarQuickActions button:hover:not(:disabled),
+:global([data-theme="dark"]) .roomItem:hover,
+:global([data-theme="dark"]) .iconButton:hover,
+:global([data-theme="dark"]) .todayButton:hover,
+:global([data-theme="dark"]) .segmented button:hover,
+:global([data-theme="dark"]) .segmented .selected {
+  border-color: rgba(125, 211, 252, 0.36);
+  background: var(--accent-color-soft);
+  color: var(--accent-color-strong);
+}
+
+:global([data-theme="dark"]) .roomHeader,
+:global([data-theme="dark"]) .roomLast,
+:global([data-theme="dark"]) .loading,
+:global([data-theme="dark"]) .weekday,
+:global([data-theme="dark"]) .eventChip em,
+:global([data-theme="dark"]) .notionEventBar em,
+:global([data-theme="dark"]) .selectedUsers > span,
+:global([data-theme="dark"]) .timeTrigger span,
+:global([data-theme="dark"]) .noUsers,
+:global([data-theme="dark"]) .copySummary span,
+:global([data-theme="dark"]) .copyHint {
+  color: var(--text-secondary);
+}
+
+:global([data-theme="dark"]) .roomItem,
+:global([data-theme="dark"]) .header h1,
+:global([data-theme="dark"]) .dayNumber,
+:global([data-theme="dark"]) .copySummary strong {
+  color: var(--text-primary);
+}
+
+:global([data-theme="dark"]) .muted {
+  background: var(--bg-tertiary);
+  color: var(--text-tertiary);
+}
+
+:global([data-theme="dark"]) .header,
+:global([data-theme="dark"]) .calendar,
+:global([data-theme="dark"]) .notionCalendar,
+:global([data-theme="dark"]) .notionWeek,
+:global([data-theme="dark"]) .weekday,
+:global([data-theme="dark"]) .notionDayCell,
+:global([data-theme="dark"]) .dayCell {
+  border-color: var(--border-color);
+}
+
+:global([data-theme="dark"]) .notionWeekdays {
+  background: rgba(42, 42, 62, 0.96);
+}
+
+:global([data-theme="dark"]) .notionDayCell:hover,
+:global([data-theme="dark"]) .dayCell:hover {
+  background: var(--bg-hover);
+}
+
+:global([data-theme="dark"]) .outsideMonth {
+  background:
+    repeating-linear-gradient(
+      135deg,
+      rgba(148, 163, 184, 0.16) 0,
+      rgba(148, 163, 184, 0.16) 1px,
+      transparent 1px,
+      transparent 9px
+    ),
+    #252536;
+  color: var(--text-tertiary);
+}
+
+:global([data-theme="dark"]) .holidayDay {
+  background: rgba(127, 29, 29, 0.28);
+}
+
+:global([data-theme="dark"]) .outsideMonth.holidayDay {
+  background: rgba(127, 29, 29, 0.22);
+}
+
+:global([data-theme="dark"]) .selectedDay {
+  box-shadow: inset 0 0 0 1.5px var(--accent-color);
+}
+
+:global([data-theme="dark"]) .dropTargetDay {
+  background: rgba(56, 189, 248, 0.14);
+  box-shadow: inset 0 0 0 2px var(--accent-color);
+}
+
+:global([data-theme="dark"]) .todayDay .dayNumber {
+  background: #38bdf8;
+  color: #08111f;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.24);
+}
+
+:global([data-theme="dark"]) .eventChip,
+:global([data-theme="dark"]) .notionEventBar {
+  color: var(--text-primary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.28);
+}
+
+:global([data-theme="dark"]) .green {
+  --schedule-border: #31533f;
+  --schedule-tag-bg: #31533f;
+  --schedule-tag-text: #bbf7d0;
+  background: #1f3a2d;
+}
+
+:global([data-theme="dark"]) .red {
+  --schedule-border: #6f3834;
+  --schedule-tag-bg: #6f3834;
+  --schedule-tag-text: #fecaca;
+  background: #4a2b2a;
+}
+
+:global([data-theme="dark"]) .blue,
+:global([data-theme="dark"]) .navy {
+  --schedule-border: #315070;
+  --schedule-tag-bg: #315070;
+  --schedule-tag-text: #bfdbfe;
+  background: #24394f;
+}
+
+:global([data-theme="dark"]) .orange {
+  --schedule-border: #7c4318;
+  --schedule-tag-bg: #7c4318;
+  --schedule-tag-text: #fed7aa;
+  background: #4a2f1d;
+}
+
+:global([data-theme="dark"]) .olive,
+:global([data-theme="dark"]) .yellow {
+  --schedule-border: #635b2c;
+  --schedule-tag-bg: #635b2c;
+  --schedule-tag-text: #fde68a;
+  background: #413d24;
+}
+
+:global([data-theme="dark"]) .indigo {
+  --schedule-border: #3f4f78;
+  --schedule-tag-bg: #3f4f78;
+  --schedule-tag-text: #c7d2fe;
+  background: #2f3658;
+}
+
+:global([data-theme="dark"]) .gray,
+:global([data-theme="dark"]) .slate {
+  --schedule-border: #4b5563;
+  --schedule-tag-bg: #4b5563;
+  --schedule-tag-text: #d1d5db;
+  background: #32323a;
+}
+
+:global([data-theme="dark"]) .brown {
+  --schedule-border: #6b4b35;
+  --schedule-tag-bg: #6b4b35;
+  --schedule-tag-text: #fed7aa;
+  background: #463526;
+}
+
+:global([data-theme="dark"]) .pink,
+:global([data-theme="dark"]) .rose {
+  --schedule-border: #6b3750;
+  --schedule-tag-bg: #6b3750;
+  --schedule-tag-text: #fbcfe8;
+  background: #4a2c3b;
+}
+
+:global([data-theme="dark"]) .modal,
+:global([data-theme="dark"]) .timePopover {
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+:global([data-theme="dark"]) .modalHeader button,
+:global([data-theme="dark"]) .cancelButton,
+:global([data-theme="dark"]) .field input,
+:global([data-theme="dark"]) .field select,
+:global([data-theme="dark"]) .field textarea,
+:global([data-theme="dark"]) .userPickerToolbar input,
+:global([data-theme="dark"]) .timeTrigger,
+:global([data-theme="dark"]) .userChecks button {
+  border-color: var(--border-color);
+  background: var(--bg-input);
+  color: var(--text-primary);
+}
+
+:global([data-theme="dark"]) .field,
+:global([data-theme="dark"]) .inlineCheck,
+:global([data-theme="dark"]) .modalHeader button {
+  color: var(--text-secondary);
+}
+
+:global([data-theme="dark"]) .selectedUsers,
+:global([data-theme="dark"]) .userChecks,
+:global([data-theme="dark"]) .timeDrums,
+:global([data-theme="dark"]) .copySummary {
+  border-color: var(--border-color);
+  background: var(--bg-tertiary);
+}
+
+:global([data-theme="dark"]) .selectedUsers button,
+:global([data-theme="dark"]) .userPickerActions button,
+:global([data-theme="dark"]) .timePickerActions button,
+:global([data-theme="dark"]) .copyButton {
+  border-color: rgba(125, 211, 252, 0.34);
+  background: var(--accent-color-soft);
+  color: var(--accent-color-strong);
+}
+
+:global([data-theme="dark"]) .selectedUsers button:hover,
+:global([data-theme="dark"]) .userPickerActions button:hover,
+:global([data-theme="dark"]) .timeDrum button:hover,
+:global([data-theme="dark"]) .copyButton:hover {
+  background: rgba(56, 189, 248, 0.24);
+}
+
+:global([data-theme="dark"]) .userChecked {
+  border-color: var(--accent-color) !important;
+  background: rgba(56, 189, 248, 0.22) !important;
+  color: var(--accent-color-strong) !important;
+}
+
+:global([data-theme="dark"]) .timeDrum button {
+  color: var(--text-primary);
+}
+
+:global([data-theme="dark"]) .deleteButton,
+:global([data-theme="dark"]) .errorPanel {
+  border-color: rgba(248, 113, 113, 0.34);
+  background: var(--danger-soft);
+  color: var(--danger-color);
+}
+
+:global([data-theme="dark"]) .errorPanel strong {
+  color: #fecaca;
+}
+
+@media (max-width: 1100px) {
+  .container {
+    grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
+  }
+
+  .sidebar {
+    grid-row: 1;
+  }
+}
+
+@media (max-width: 760px) {
+  .container {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sidebar {
+    display: none;
+  }
+
+  .header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .headerControls {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .calendar {
+    grid-template-columns: repeat(7, minmax(80px, 1fr));
+  }
+
+  .notionWeekdays,
+  .notionWeek {
+    grid-template-columns: repeat(7, minmax(92px, 1fr));
+  }
+
+  .notionEventBar {
+    min-height: 44px;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "title"
+      "category"
+      "time";
+  }
+
+  .notionEventBar em {
+    justify-self: start;
+    max-width: 100%;
+  }
+
+  .dateGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .selectedUsers button {
+    max-width: 100%;
+  }
+
+  .userPickerToolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .userPickerActions {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+  }
+}

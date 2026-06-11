@@ -5,6 +5,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 interface NotificationSettings {
   enableNotifications: boolean;
   showMessageContent: boolean;
+  notifyActiveRoom: boolean;
 }
 
 // アップデート確認結果の型
@@ -37,19 +38,24 @@ const electronAPI = {
     return ipcRenderer.invoke('set-notification-settings', settings);
   },
 
-  // スタートアップ設定を取得
-  getStartupEnabled: (): Promise<boolean> => {
-    return ipcRenderer.invoke('get-startup-enabled');
-  },
-
-  // スタートアップ設定を更新
-  setStartupEnabled: (enabled: boolean): Promise<boolean> => {
-    return ipcRenderer.invoke('set-startup-enabled', enabled);
-  },
-
   // 通知を表示（roomIdを含む）
-  showNotification: (options: { title: string; body: string; roomId?: string }): Promise<boolean> => {
+  showNotification: (options: { title: string; body: string; roomId?: string; kind?: 'chat' | 'schedule' }): Promise<boolean> => {
     return ipcRenderer.invoke('show-notification', options);
+  },
+
+  // 常に手前に表示の状態を取得
+  getAlwaysOnTop: (): Promise<boolean> => {
+    return ipcRenderer.invoke('get-always-on-top');
+  },
+
+  // 常に手前に表示を設定
+  setAlwaysOnTop: (value: boolean): Promise<boolean> => {
+    return ipcRenderer.invoke('set-always-on-top', value);
+  },
+
+  // タイトルバーのテーマ（明暗）を設定（アプリのライト/ダーク切替に追従）
+  setTitleBarTheme: (theme: 'light' | 'dark'): Promise<boolean> => {
+    return ipcRenderer.invoke('set-titlebar-theme', theme);
   },
 
   // Electron環境かどうかを確認
@@ -60,6 +66,11 @@ const electronAPI = {
   // 外部リンクを開く
   openExternal: (url: string): Promise<boolean> => {
     return ipcRenderer.invoke('open-external', url);
+  },
+
+  // 許可されたNASパスを開く
+  openNasPath: (path: string): Promise<boolean> => {
+    return ipcRenderer.invoke('open-nas-path', path);
   },
 
   // 通知設定変更のリスナー

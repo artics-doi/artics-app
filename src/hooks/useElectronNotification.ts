@@ -10,7 +10,8 @@ export function isElectronEnv(): boolean {
 // デフォルトの通知設定
 const defaultSettings: NotificationSettings = {
   enableNotifications: true,
-  showMessageContent: true
+  showMessageContent: true,
+  notifyActiveRoom: false
 };
 
 export function useElectronNotification() {
@@ -37,10 +38,8 @@ export function useElectronNotification() {
         return cleanup;
       } else {
         setIsElectron(false);
-        // ブラウザ環境では通知許可をリクエスト
-        if ('Notification' in window && Notification.permission === 'default') {
-          Notification.requestPermission();
-        }
+        // H-9: 起動時の自動 Notification.requestPermission() を撤去。
+        // ユーザー意思（設定モーダルの「通知を有効にする」ボタン）から useFCMToken.requestPermissionAndRegister() 経由で発火する。
       }
     };
 
@@ -51,10 +50,16 @@ export function useElectronNotification() {
   }, []);
 
   // 通知を表示
-  const showNotification = useCallback(async (title: string, body: string, messageId?: string, roomId?: string) => {
+  const showNotification = useCallback(async (
+    title: string,
+    body: string,
+    messageId?: string,
+    roomId?: string,
+    kind: 'chat' | 'schedule' = 'chat',
+  ) => {
     if (isElectron && window.electronAPI) {
       // Electron環境（roomIdを渡して通知から直接ルームに遷移できるようにする）
-      return await window.electronAPI.showNotification({ title, body, roomId });
+      return await window.electronAPI.showNotification({ title, body, roomId, kind });
     } else {
       // ブラウザ環境
       if ('Notification' in window && Notification.permission === 'granted') {
@@ -97,41 +102,3 @@ export function useElectronNotification() {
   };
 }
 
-// スタートアップ設定用フック
-export function useStartupSettings() {
-  const [enabled, setEnabled] = useState(false);
-  const [isElectron, setIsElectron] = useState(false);
-
-  useEffect(() => {
-    const init = async () => {
-      if (isElectronEnv() && window.electronAPI) {
-        setIsElectron(true);
-        try {
-          const startupEnabled = await window.electronAPI.getStartupEnabled();
-          setEnabled(startupEnabled);
-        } catch (error) {
-          console.error('スタートアップ設定の取得に失敗:', error);
-        }
-      }
-    };
-
-    init();
-  }, []);
-
-  const setStartupEnabled = useCallback(async (value: boolean) => {
-    if (isElectron && window.electronAPI) {
-      const success = await window.electronAPI.setStartupEnabled(value);
-      if (success) {
-        setEnabled(value);
-      }
-      return success;
-    }
-    return false;
-  }, [isElectron]);
-
-  return {
-    enabled,
-    isElectron,
-    setStartupEnabled
-  };
-}

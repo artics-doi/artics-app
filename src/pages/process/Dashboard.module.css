@@ -1,0 +1,393 @@
+/* 工程管理ダッシュボード（担当者×期間レーン）。 */
+
+.page {
+  padding: 18px 18px 28px;
+  max-width: 1480px;
+  margin: 0 auto;
+}
+
+/* ===== ヘッダー ===== */
+.headerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.pageTitle {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.subTitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0 0 12px;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.periodSwitch {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+}
+
+.periodModeButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 38px;
+  height: 28px;
+  padding: 0 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.periodModeButton:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.periodModeButtonActive {
+  background: var(--accent-color);
+  color: #fff;
+}
+
+.periodModeButtonActive:hover {
+  background: var(--accent-color);
+  color: #fff;
+}
+
+/* 週ナビ（前週/今週/翌週） */
+.weekNav {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.weekNavButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.weekNavButton:hover {
+  background: var(--bg-hover);
+}
+
+.weekRangeLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: 0 8px;
+  white-space: nowrap;
+}
+
+/* ===== ツールバー（フィルタ） ===== */
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.filterGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filterLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.filterChip {
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.filterChip:hover {
+  background: var(--bg-hover);
+}
+
+.filterChipActive {
+  border-color: var(--accent-color);
+  background: var(--accent-color-soft);
+  color: var(--accent-color);
+}
+
+.filterDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ===== グリッド ===== */
+/* 横スクロール枠（Electron 小窓でも崩れず横スクロールできる） */
+.gridScroll {
+  overflow-x: auto;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
+}
+
+.grid {
+  display: grid;
+  /* 左：担当者列 + 期間列。CSS 変数は TSX 側から渡す */
+  grid-template-columns: var(--lane-col-width, 180px) repeat(var(--day-count, 7), minmax(var(--bucket-min, 110px), 1fr));
+  min-width: 820px;
+}
+
+/* ヘッダー行（曜日・日付） */
+.headerCellLane {
+  position: sticky;
+  left: 0;
+  top: 0;
+  z-index: 3;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
+  border-right: 1px solid var(--border-color);
+  padding: 9px 11px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.headerCellDay {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
+  border-right: 1px solid var(--border-color);
+  padding: 7px 6px;
+  text-align: center;
+}
+
+.headerCellWeekend {
+  background: var(--bg-primary);
+}
+
+.headerCellToday {
+  background: var(--accent-color-soft);
+}
+
+.dayWeekday {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+}
+
+.dayWeekdaySun {
+  color: var(--danger-color);
+}
+
+.dayWeekdaySat {
+  color: var(--process-doing);
+}
+
+.dayDate {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-top: 2px;
+}
+
+.dayTodayMark {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--process-today-line);
+  border-radius: 999px;
+  padding: 1px 7px;
+  margin-top: 3px;
+}
+
+/* レーン（担当者）行 */
+.laneLabel {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  border-right: 1px solid var(--border-color);
+  padding: 10px 11px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 50px;
+}
+
+.laneDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.laneName {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.laneNameUnassigned {
+  color: var(--text-tertiary);
+  font-weight: 600;
+}
+
+.laneCount {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* レーンのタスク描画領域（7日ぶんを内部グリッドで再分割） */
+.laneTrack {
+  position: relative;
+  grid-column: 2 / -1;
+  border-bottom: 1px solid var(--border-color);
+  display: grid;
+  grid-template-columns: repeat(var(--day-count, 7), minmax(var(--bucket-min, 110px), 1fr));
+  grid-auto-rows: 28px;
+  gap: 4px;
+  padding: 7px 0;
+  align-content: start;
+}
+
+/* 週末・今日列の背景帯（track の裏に敷く） */
+.laneTrackBg {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(var(--day-count, 7), minmax(var(--bucket-min, 110px), 1fr));
+  pointer-events: none;
+}
+
+.laneTrackBgCell {
+  border-right: 1px solid var(--border-color-subtle, rgba(148, 163, 184, 0.18));
+}
+
+.laneTrackBgWeekend {
+  background: var(--bg-primary);
+}
+
+.laneTrackBgToday {
+  background: var(--accent-color-soft);
+}
+
+/* タスクバー */
+.bar {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  background: var(--bar-color, var(--process-doing));
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  overflow: hidden;
+  white-space: nowrap;
+  border: none;
+  text-align: left;
+  min-width: 0;
+}
+
+.bar:hover {
+  filter: brightness(1.05);
+}
+
+.barTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 「+N件」オーバーフローチップ */
+.overflowChip {
+  grid-column: 1 / -1;
+  justify-self: start;
+  margin-left: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  border: none;
+  border-radius: 999px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+
+.overflowChip:hover {
+  background: var(--bg-hover);
+}
+
+/* ===== 状態表示 ===== */
+.stateBox {
+  padding: 48px 20px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.stateTitle {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 6px;
+  color: var(--text-primary);
+}
+
+.stateText {
+  font-size: 13px;
+  margin: 0;
+}

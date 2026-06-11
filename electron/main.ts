@@ -8,7 +8,8 @@ import {
   ipcMain,
   shell,
   dialog,
-  screen
+  screen,
+  nativeTheme
 } from 'electron';
 import path from 'path';
 import fs from 'fs';
@@ -19,8 +20,11 @@ interface StoreSchema {
   notificationSettings: {
     enableNotifications: boolean;
     showMessageContent: boolean;
+    notifyActiveRoom: boolean;
   };
-  startupEnabled: boolean;
+  alwaysOnTop: boolean;
+  // アプリのテーマ（タイトルバーの明暗をOSに連動させるために保持）
+  theme: 'light' | 'dark';
 }
 
 // 通知アイテムの型
@@ -29,6 +33,7 @@ interface NotificationItem {
   title: string;
   body: string;
   roomId?: string;
+  kind?: 'chat' | 'schedule';
   timestamp: Date;
 }
 
@@ -39,9 +44,11 @@ class SimpleStore {
   private defaults: StoreSchema = {
     notificationSettings: {
       enableNotifications: true,
-      showMessageContent: true
+      showMessageContent: true,
+      notifyActiveRoom: false
     },
-    startupEnabled: false
+    alwaysOnTop: false,
+    theme: 'light'
   };
 
   constructor() {
@@ -54,7 +61,15 @@ class SimpleStore {
     try {
       if (fs.existsSync(this.filePath)) {
         const content = fs.readFileSync(this.filePath, 'utf-8');
-        return { ...this.defaults, ...JSON.parse(content) };
+        const parsed = JSON.parse(content);
+        return {
+          ...this.defaults,
+          ...parsed,
+          notificationSettings: {
+            ...this.defaults.notificationSettings,
+            ...parsed.notificationSettings
+          }
+        };
       }
     } catch (error) {
       console.error('設定ファイル読み込みエラー:', error);
@@ -88,17 +103,22 @@ class NotificationManager {
   private readonly MAX_NOTIFICATIONS = 10;
   private readonly NOTIF_WIDTH = 350;
   private readonly HEADER_HEIGHT = 50; // ヘッダー部分
-  private readonly FOOTER_HEIGHT = 60; // OKボタン部分
+  private readonly FOOTER_HEIGHT = 68; // OKボタン部分
   private readonly ITEM_HEIGHT = 55; // 各メッセージの高さ
+  private readonly SCHEDULE_ITEM_HEIGHT = 84; // 予定通知は種別バッジ分だけ高くする
   private readonly MAX_HEIGHT = 500;
   private readonly PADDING = 10;
 
-  addNotification(title: string, body: string, roomId?: string): void {
+  addNotification(title: string, body: string, roomId?: string, kind: 'chat' | 'schedule' = 'chat'): void {
+    // H-11: 古い通知（5 分超過）を自動的に間引く
+    this.pruneOldNotifications(5 * 60 * 1000);
+
     const notification: NotificationItem = {
       id: this.nextId++,
       title,
       body,
       roomId,
+      kind,
       timestamp: new Date()
     };
 
@@ -109,6 +129,25 @@ class NotificationManager {
 
     this.notifications.push(notification);
     this.updateUI();
+  }
+
+  /**
+   * H-11: 指定時間より古い通知を破棄する。
+   * UI 更新は呼び出し側に任せる（addNotification や明示的な復元時に使う）。
+   */
+  pruneOldNotifications(maxAgeMs: number): void {
+    const now = Date.now();
+    const before = this.notifications.length;
+    this.notifications = this.notifications.filter(
+      (n) => now - n.timestamp.getTime() <= maxAgeMs
+    );
+    if (this.notifications.length !== before) {
+      if (this.notifications.length === 0) {
+        this.closeWindow();
+      } else {
+        this.updateUI();
+      }
+    }
   }
 
   clearAll(): void {
@@ -127,7 +166,11 @@ class NotificationManager {
   private calculateWindowHeight(): number {
     if (this.notifications.length === 0) return 0;
     // ヘッダー + メッセージリスト + フッター（OKボタン）
-    const contentHeight = this.HEADER_HEIGHT + this.notifications.length * this.ITEM_HEIGHT + this.FOOTER_HEIGHT;
+    const itemsHeight = this.notifications.reduce(
+      (sum, notification) => sum + (notification.kind === 'schedule' ? this.SCHEDULE_ITEM_HEIGHT : this.ITEM_HEIGHT),
+      0
+    );
+    const contentHeight = this.HEADER_HEIGHT + itemsHeight + this.FOOTER_HEIGHT;
     return Math.min(contentHeight, this.MAX_HEIGHT);
   }
 
@@ -138,7 +181,7 @@ class NotificationManager {
     }
 
     const primaryDisplay = screen.getPrimaryDisplay();
-    const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+    const { workArea } = primaryDisplay;
     const windowHeight = this.calculateWindowHeight();
 
     // ウィンドウが存在しない場合は作成
@@ -146,8 +189,8 @@ class NotificationManager {
       this.containerWindow = new BrowserWindow({
         width: this.NOTIF_WIDTH,
         height: windowHeight,
-        x: screenWidth - this.NOTIF_WIDTH - this.PADDING,
-        y: screenHeight - windowHeight - this.PADDING,
+        x: workArea.x + workArea.width - this.NOTIF_WIDTH - this.PADDING,
+        y: workArea.y + workArea.height - windowHeight - this.PADDING,
         frame: false,
         alwaysOnTop: true,
         skipTaskbar: true,
@@ -174,8 +217,8 @@ class NotificationManager {
     } else {
       // ウィンドウサイズと位置を更新
       this.containerWindow.setBounds({
-        x: screenWidth - this.NOTIF_WIDTH - this.PADDING,
-        y: screenHeight - windowHeight - this.PADDING,
+        x: workArea.x + workArea.width - this.NOTIF_WIDTH - this.PADDING,
+        y: workArea.y + workArea.height - windowHeight - this.PADDING,
         width: this.NOTIF_WIDTH,
         height: windowHeight
       });
@@ -191,8 +234,9 @@ class NotificationManager {
       id: n.id,
       title: n.title,
       body: n.body,
-      roomId: n.roomId || ''
-    })));
+      roomId: n.roomId || '',
+      kind: n.kind || 'chat'
+    }))).replace(/</g, '\\u003c');
 
     return `
     <!DOCTYPE html>
@@ -209,10 +253,11 @@ class NotificationManager {
         .notification-panel {
           width: 100%;
           height: 100%;
-          background: linear-gradient(135deg, #1a73e8 0%, #1557b0 100%);
+          background: #ffffff;
           border-radius: 12px;
-          color: white;
-          box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+          color: #1f2937;
+          border: 1px solid rgba(15, 23, 42, 0.12);
+          box-shadow: 0 12px 30px rgba(15, 23, 42, 0.24);
           display: flex;
           flex-direction: column;
           animation: slideIn 0.3s ease-out;
@@ -223,7 +268,7 @@ class NotificationManager {
         }
         .panel-header {
           padding: 12px 16px;
-          border-bottom: 1px solid rgba(255,255,255,0.2);
+          border-bottom: 1px solid #e5e7eb;
           display: flex;
           justify-content: space-between;
           align-items: center;
@@ -231,9 +276,11 @@ class NotificationManager {
         .panel-title {
           font-size: 13px;
           font-weight: 600;
+          color: #111827;
         }
         .panel-badge {
-          background: #ff4444;
+          background: #2563eb;
+          color: #ffffff;
           font-size: 11px;
           font-weight: 600;
           padding: 2px 8px;
@@ -248,22 +295,48 @@ class NotificationManager {
           width: 4px;
         }
         .message-list::-webkit-scrollbar-thumb {
-          background: rgba(255,255,255,0.3);
+          background: rgba(148, 163, 184, 0.7);
           border-radius: 2px;
         }
         .message-item {
           padding: 8px 10px;
-          background: rgba(255,255,255,0.1);
+          background: #eef5ff;
+          color: #17325f;
+          border: 1px solid rgba(47, 125, 225, 0.18);
+          border-left: 4px solid #2f7de1;
           border-radius: 8px;
           margin-bottom: 6px;
           cursor: pointer;
-          transition: background 0.2s;
+          transition: background 0.2s, border-color 0.2s;
         }
         .message-item:hover {
-          background: rgba(255,255,255,0.2);
+          background: #e3efff;
+          border-color: rgba(47, 125, 225, 0.28);
+        }
+        .message-item.schedule {
+          background: #fff4df;
+          color: #4f3421;
+          border: 1px solid rgba(115, 83, 42, 0.16);
+          border-left: 4px solid #b9822f;
+        }
+        .message-item.schedule:hover {
+          background: #ffeed1;
         }
         .message-item:last-child {
           margin-bottom: 0;
+        }
+        .message-kind {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          width: fit-content;
+          margin-bottom: 4px;
+          padding: 2px 6px;
+          border-radius: 999px;
+          background: rgba(126, 87, 34, 0.12);
+          color: #7a5323;
+          font-size: 10px;
+          font-weight: 700;
         }
         .message-sender {
           font-size: 12px;
@@ -281,30 +354,31 @@ class NotificationManager {
           text-overflow: ellipsis;
         }
         .panel-footer {
-          padding: 10px 16px;
-          border-top: 1px solid rgba(255,255,255,0.2);
+          flex: 0 0 auto;
+          padding: 10px 16px 12px;
+          border-top: 1px solid #e5e7eb;
         }
         .btn {
           width: 100%;
           padding: 10px;
-          border: none;
+          border: 1px solid #d8d6d0;
           border-radius: 6px;
           font-size: 13px;
           font-weight: 600;
           cursor: pointer;
-          background: white;
-          color: #1a73e8;
+          background: #f7f7f5;
+          color: #37352f;
           transition: background 0.2s;
         }
         .btn:hover {
-          background: #f0f0f0;
+          background: #efeeeb;
         }
       </style>
     </head>
     <body>
       <div class="notification-panel">
         <div class="panel-header">
-          <span class="panel-title">Artics</span>
+          <span class="panel-title">ArticsChat</span>
           <span class="panel-badge">${this.notifications.length}件</span>
         </div>
         <div class="message-list" id="messageList"></div>
@@ -312,24 +386,29 @@ class NotificationManager {
           <button class="btn" id="okBtn">OK</button>
         </div>
       </div>
+      <script type="application/json" id="notificationData">${notificationsJson}</script>
       <script>
-        const notifications = ${notificationsJson};
-
-        function escapeHtml(str) {
-          const div = document.createElement('div');
-          div.textContent = str;
-          return div.innerHTML;
-        }
+        const notifications = JSON.parse(document.getElementById('notificationData').textContent || '[]');
 
         // メッセージリストを描画
         const messageList = document.getElementById('messageList');
         notifications.forEach(notif => {
           const item = document.createElement('div');
-          item.className = 'message-item';
-          item.innerHTML = \`
-            <div class="message-sender">\${escapeHtml(notif.title)}</div>
-            <div class="message-text">\${escapeHtml(notif.body)}</div>
-          \`;
+          item.className = notif.kind === 'schedule' ? 'message-item schedule' : 'message-item';
+          if (notif.kind === 'schedule') {
+            const kind = document.createElement('div');
+            kind.className = 'message-kind';
+            kind.textContent = '📅 行動予定表';
+            item.appendChild(kind);
+          }
+          const sender = document.createElement('div');
+          sender.className = 'message-sender';
+          sender.textContent = notif.title;
+          const body = document.createElement('div');
+          body.className = 'message-text';
+          body.textContent = notif.body;
+          item.appendChild(sender);
+          item.appendChild(body);
           item.onclick = () => {
             if (notif.roomId && window.notificationAPI) {
               window.notificationAPI.openRoom(notif.roomId);
@@ -347,6 +426,14 @@ class NotificationManager {
             window.notificationAPI.clearAll();
           }
         };
+
+        // M-32: Esc キーで通知パネルを閉じる
+        window.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape' && window.notificationAPI) {
+            e.preventDefault();
+            window.notificationAPI.clearAll();
+          }
+        });
       </script>
     </body>
     </html>
@@ -360,20 +447,89 @@ let tray: Tray | null = null;
 let isQuitting = false;
 let notificationManager: NotificationManager;
 
+const ALLOWED_NAS_PREFIXES = ['\\\\Nas-1\\', '\\\\Nas-3\\'];
+
+function isAllowedNasPath(targetPath: string): boolean {
+  return ALLOWED_NAS_PREFIXES.some((prefix) =>
+    targetPath.toLowerCase().startsWith(prefix.toLowerCase())
+  );
+}
+
 // 開発モードかどうか
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
+const ALLOWED_EXTERNAL_PROTOCOLS = ['https:', 'http:', 'mailto:'];
+
+async function openExternalUrl(url: string): Promise<boolean> {
+  try {
+    const parsed = new URL(url);
+    if (!ALLOWED_EXTERNAL_PROTOCOLS.includes(parsed.protocol)) {
+      console.warn('ブロックされたURL:', url);
+      return false;
+    }
+
+    await shell.openExternal(url);
+    return true;
+  } catch (error) {
+    console.error('外部URLを開けませんでした:', url, error);
+    return false;
+  }
+}
+
+function isAppNavigationUrl(url: string, devServerUrl: string): boolean {
+  if (url === 'about:blank') return true;
+  if (isDev) {
+    return url.startsWith(devServerUrl);
+  }
+  return url.startsWith('file://');
+}
+
+const ELECTRON_ENTRY_HASH = '/schedule';
+
+function getDevServerEntryUrl(devServerUrl: string): string {
+  try {
+    const url = new URL(devServerUrl);
+    url.hash = ELECTRON_ENTRY_HASH;
+    return url.toString();
+  } catch {
+    const baseUrl = devServerUrl.replace(/[#?].*$/, '').replace(/\/$/, '');
+    return `${baseUrl}/#${ELECTRON_ENTRY_HASH}`;
+  }
+}
+
+async function showMessageBoxWithMainWindow(options: Electron.MessageBoxOptions): Promise<Electron.MessageBoxReturnValue> {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (!mainWindow.isVisible()) {
+      mainWindow.show();
+    }
+    return dialog.showMessageBox(mainWindow, options);
+  }
+
+  return dialog.showMessageBox(options);
+}
+
+// 保存されたテーマを Windows のタイトルバー（ネイティブ枠）に反映する。
+// nativeTheme.themeSource を 'dark' にすると、OS 標準のタイトルバーが
+// ダーク描画（黒系）になる。レイアウトには影響しない。
+function applyTitleBarTheme(theme: 'light' | 'dark') {
+  nativeTheme.themeSource = theme;
+}
+
 function createWindow() {
+  // 起動時、保存済みテーマをタイトルバーへ即時反映（ウィンドウ生成前に行う）
+  applyTitleBarTheme(store.get('theme'));
+
   // アイコンパスの設定
   const iconPath = isDev
     ? path.join(__dirname, '../public/favicon.png')
     : path.join(process.resourcesPath, 'favicon.png');
 
   mainWindow = new BrowserWindow({
-    width: 580,
-    height: 800,
-    minWidth: 350,
-    minHeight: 400,
+    width: 1600,
+    height: 950,
+    minWidth: 580,
+    minHeight: 500,
+    resizable: true,
     icon: iconPath,
     autoHideMenuBar: true, // メニューバーを自動で隠す
     webPreferences: {
@@ -389,22 +545,38 @@ function createWindow() {
   Menu.setApplicationMenu(null);
 
   // 開発モードではdevサーバー、本番ではビルドされたファイルを読み込む
+  const devServerUrl = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173';
   if (isDev) {
     // 開発サーバーのポートを動的に取得
-    const devServerUrl = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173';
-    mainWindow.loadURL(devServerUrl);
-    // 開発者ツールを開く
-    mainWindow.webContents.openDevTools();
+    mainWindow.loadURL(getDevServerEntryUrl(devServerUrl));
+    if (process.env.ARTICS_OPEN_DEVTOOLS === '1') {
+      mainWindow.webContents.openDevTools({ mode: 'detach' });
+    }
   } else {
     // 本番ビルド: app.asar内のdist/index.html読み込む
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'), { hash: ELECTRON_ENTRY_HASH });
   }
+
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    void openExternalUrl(url);
+    return { action: 'deny' };
+  });
+
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (isAppNavigationUrl(url, devServerUrl)) return;
+    event.preventDefault();
+    void openExternalUrl(url);
+  });
 
   // ウィンドウの準備ができたら表示
   mainWindow.once('ready-to-show', () => {
     // --hidden引数がある場合は非表示のまま
     if (!process.argv.includes('--hidden')) {
       mainWindow?.show();
+    }
+    // 保存された「常に手前に表示」設定を反映
+    if (store.get('alwaysOnTop')) {
+      mainWindow?.setAlwaysOnTop(true);
     }
   });
 
@@ -416,10 +588,12 @@ function createWindow() {
     }
   });
 
-  // 最小化ボタンをクリックした時、トレイに常駐
-  mainWindow.on('minimize', () => {
-    mainWindow?.hide();
+  // H-11: メインウィンドウが表示されたら通知パネルをクリア
+  // （focus ではなく show を使う理由: 別ウィンドウから戻った瞬間に消えるのを防ぐ）
+  mainWindow.on('show', () => {
+    notificationManager?.clearAll();
   });
+
 }
 
 function createTray() {
@@ -443,7 +617,7 @@ function createTray() {
 
   updateTrayMenu();
 
-  tray.setToolTip('Artics');
+  tray.setToolTip('ArticsChat');
 
   // ダブルクリックでウィンドウを表示
   tray.on('double-click', () => {
@@ -456,12 +630,11 @@ function updateTrayMenu() {
   if (!tray) return;
 
   const notificationSettings = store.get('notificationSettings');
-  const startupEnabled = store.get('startupEnabled');
 
   // 右クリックメニュー
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: 'Artics を開く',
+      label: 'ArticsChat を開く',
       click: () => {
         mainWindow?.show();
         mainWindow?.focus();
@@ -478,7 +651,7 @@ function updateTrayMenu() {
         if (!isDev) {
           autoUpdater.checkForUpdates().then((result) => {
             if (!result || !result.updateInfo) {
-              dialog.showMessageBox(mainWindow!, {
+              void showMessageBoxWithMainWindow({
                 type: 'info',
                 title: 'アップデート確認',
                 message: '最新版を使用しています',
@@ -487,7 +660,7 @@ function updateTrayMenu() {
             }
           }).catch((error) => {
             console.error('アップデート確認エラー:', error);
-            dialog.showMessageBox(mainWindow!, {
+            void showMessageBoxWithMainWindow({
               type: 'error',
               title: 'エラー',
               message: 'アップデートの確認に失敗しました',
@@ -495,7 +668,7 @@ function updateTrayMenu() {
             });
           });
         } else {
-          dialog.showMessageBox(mainWindow!, {
+          void showMessageBoxWithMainWindow({
             type: 'info',
             title: '開発モード',
             message: '開発モードではアップデート確認は無効です',
@@ -535,19 +708,23 @@ function updateTrayMenu() {
             mainWindow?.webContents.send('notification-settings-changed', newSettings);
             updateTrayMenu();
           }
+        },
+        {
+          label: 'すべてのメッセージを通知',
+          type: 'checkbox',
+          checked: notificationSettings.notifyActiveRoom,
+          enabled: notificationSettings.enableNotifications,
+          click: (menuItem) => {
+            const newSettings = {
+              ...store.get('notificationSettings'),
+              notifyActiveRoom: menuItem.checked
+            };
+            store.set('notificationSettings', newSettings);
+            mainWindow?.webContents.send('notification-settings-changed', newSettings);
+            updateTrayMenu();
+          }
         }
       ]
-    },
-    { type: 'separator' },
-    {
-      label: 'スタートアップに登録',
-      type: 'checkbox',
-      checked: startupEnabled,
-      click: (menuItem) => {
-        store.set('startupEnabled', menuItem.checked);
-        setStartup(menuItem.checked);
-        updateTrayMenu();
-      }
     },
     { type: 'separator' },
     {
@@ -560,14 +737,6 @@ function updateTrayMenu() {
   ]);
 
   tray.setContextMenu(contextMenu);
-}
-
-function setStartup(enable: boolean) {
-  app.setLoginItemSettings({
-    openAtLogin: enable,
-    openAsHidden: true,
-    args: ['--hidden']
-  });
 }
 
 // IPC ハンドラー
@@ -636,24 +805,12 @@ function setupIPC() {
   ipcMain.handle('set-notification-settings', (_event, settings: StoreSchema['notificationSettings']) => {
     store.set('notificationSettings', settings);
     updateTrayMenu();
-    return true;
-  });
-
-  // スタートアップ設定を取得
-  ipcMain.handle('get-startup-enabled', () => {
-    return store.get('startupEnabled');
-  });
-
-  // スタートアップ設定を更新
-  ipcMain.handle('set-startup-enabled', (_event, enabled: boolean) => {
-    store.set('startupEnabled', enabled);
-    setStartup(enabled);
-    updateTrayMenu();
+    mainWindow?.webContents.send('notification-settings-changed', settings);
     return true;
   });
 
   // 通知を表示（NotificationManagerを使用）
-  ipcMain.handle('show-notification', (_event, options: { title: string; body: string; roomId?: string }) => {
+  ipcMain.handle('show-notification', (_event, options: { title: string; body: string; roomId?: string; kind?: 'chat' | 'schedule' }) => {
     const settings = store.get('notificationSettings');
 
     if (!settings.enableNotifications) {
@@ -661,7 +818,29 @@ function setupIPC() {
     }
 
     const body = settings.showMessageContent ? options.body : 'メッセージが届きました';
-    notificationManager.addNotification(options.title, body, options.roomId);
+    notificationManager.addNotification(options.title, body, options.roomId, options.kind);
+    return true;
+  });
+
+  // 常に手前に表示の状態を取得
+  ipcMain.handle('get-always-on-top', () => {
+    return store.get('alwaysOnTop');
+  });
+
+  // 常に手前に表示を設定
+  ipcMain.handle('set-always-on-top', (_event, value: boolean) => {
+    store.set('alwaysOnTop', value);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.setAlwaysOnTop(value);
+    }
+    return true;
+  });
+
+  // タイトルバーのテーマ（明暗）を設定。アプリ側のライト/ダーク切替に追従する
+  ipcMain.handle('set-titlebar-theme', (_event, theme: 'light' | 'dark') => {
+    const normalized: 'light' | 'dark' = theme === 'dark' ? 'dark' : 'light';
+    store.set('theme', normalized);
+    applyTitleBarTheme(normalized);
     return true;
   });
 
@@ -670,10 +849,32 @@ function setupIPC() {
     return true;
   });
 
-  // 外部リンクをデフォルトブラウザで開く
-  ipcMain.handle('open-external', (_event, url: string) => {
-    shell.openExternal(url);
-    return true;
+  // 外部リンクをデフォルトブラウザで開く（URL検証付き）
+  ipcMain.handle('open-external', async (_event, url: string) => {
+    return openExternalUrl(url);
+  });
+
+  // 許可済みNASパスをエクスプローラー/関連アプリで開く
+  ipcMain.handle('open-nas-path', async (_event, targetPath: string) => {
+    try {
+      const normalizedPath = targetPath.trim().replace(/\//g, '\\');
+
+      if (!isAllowedNasPath(normalizedPath)) {
+        console.warn('ブロックされたNASパス:', targetPath);
+        return false;
+      }
+
+      const errorMessage = await shell.openPath(normalizedPath);
+      if (errorMessage) {
+        console.error('NASパスを開けませんでした:', normalizedPath, errorMessage);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('NASパスを開く処理でエラー:', targetPath, error);
+      return false;
+    }
   });
 }
 
@@ -691,10 +892,10 @@ function setupAutoUpdater() {
   // アップデートが利用可能な場合
   autoUpdater.on('update-available', (info) => {
     console.log('アップデートが利用可能:', info.version);
-    dialog.showMessageBox(mainWindow!, {
+    void showMessageBoxWithMainWindow({
       type: 'info',
-      title: 'アップデートのお知らせ',
-      message: `新しいバージョン (${info.version}) が利用可能です`,
+      title: 'ArticsChat アップデートのお知らせ',
+      message: `ArticsChat の新しいバージョン (${info.version}) が利用可能です`,
       detail: 'バックグラウンドでダウンロードを開始します。完了後にお知らせします。',
       buttons: ['OK']
     });
@@ -716,19 +917,28 @@ function setupAutoUpdater() {
     console.log('アップデートのダウンロード完了:', info.version);
     mainWindow?.setProgressBar(-1); // プログレスバーを消す
 
-    dialog.showMessageBox(mainWindow!, {
-      type: 'info',
-      title: 'アップデート準備完了',
-      message: `バージョン ${info.version} のインストール準備ができました`,
-      detail: '今すぐ再起動してアップデートを適用しますか？',
-      buttons: ['今すぐ再起動', '後で'],
-      defaultId: 0
-    }).then((result) => {
-      if (result.response === 0) {
-        isQuitting = true;
-        autoUpdater.quitAndInstall();
-      }
-    });
+    const showUpdatePrompt = () => {
+      showMessageBoxWithMainWindow({
+        type: 'info',
+        title: 'ArticsChat アップデート準備完了',
+        message: `ArticsChat バージョン ${info.version} のインストール準備ができました`,
+        detail: '今すぐ再起動してアップデートを適用しますか？',
+        buttons: ['今すぐ再起動', '後で'],
+        defaultId: 0,
+      })
+        .then((result) => {
+          if (result.response === 0) {
+            isQuitting = true;
+            autoUpdater.quitAndInstall();
+          } else {
+            // M-34: 「後で」を選んだら 24 時間後に再度プロンプトを出す
+            setTimeout(showUpdatePrompt, 24 * 60 * 60 * 1000);
+            console.log('[autoUpdater] 24 時間後に再促しします');
+          }
+        });
+    };
+
+    showUpdatePrompt();
   });
 
   // エラー発生時
@@ -742,31 +952,53 @@ function setupAutoUpdater() {
   });
 }
 
-// アプリ起動時
-app.whenReady().then(() => {
-  // ストアを初期化
-  store = new SimpleStore();
+// 単一インスタンス制御
+const gotTheLock = app.requestSingleInstanceLock();
 
-  // 通知マネージャーを初期化
-  notificationManager = new NotificationManager();
-
-  createWindow();
-  createTray();
-  setupIPC();
-  setupAutoUpdater(); // 自動アップデートをセットアップ
-
-  // 起動時にスタートアップ設定を適用
-  const startupEnabled = store.get('startupEnabled');
-  setStartup(startupEnabled);
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    } else {
-      mainWindow?.show();
+if (!gotTheLock) {
+  // 既に別のインスタンスが起動している場合は終了
+  app.quit();
+} else {
+  // 2番目のインスタンスが起動しようとした時
+  app.on('second-instance', () => {
+    // 既存のウィンドウをフォーカス
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) {
+        mainWindow.restore();
+      }
+      mainWindow.show();
+      mainWindow.focus();
     }
   });
-});
+
+  // アプリ起動時
+  app.whenReady().then(() => {
+    // ストアを初期化
+    store = new SimpleStore();
+
+    // 通知マネージャーを初期化
+    notificationManager = new NotificationManager();
+
+    // 起動時に現在のログイン設定をログ出力
+    if (app.isPackaged) {
+      const loginSettings = app.getLoginItemSettings();
+      console.log('[起動時] ログイン設定:', loginSettings);
+    }
+
+    createWindow();
+    createTray();
+    setupIPC();
+    setupAutoUpdater(); // 自動アップデートをセットアップ
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow();
+      } else {
+        mainWindow?.show();
+      }
+    });
+  });
+}
 
 // 全ウィンドウが閉じられた時（macOS以外）
 app.on('window-all-closed', () => {

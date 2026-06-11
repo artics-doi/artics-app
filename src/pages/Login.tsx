@@ -5,6 +5,10 @@ import { useNavigate, Link } from 'react-router-dom';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
+import useModal from '../hooks/useModal';
+import PasswordInput from '../components/PasswordInput';
+import { translateFirebaseAuthError } from '../utils/firebaseErrorMap';
+import { getAppEntryPath } from '../utils/navigation';
 import styles from './Login.module.css';
 
 export default function Login() {
@@ -37,16 +41,15 @@ export default function Login() {
       await sendPasswordResetEmail(auth, resetEmail);
       setResetMessage('パスワードリセット用のメールを送信しました。メールをご確認ください。');
       setResetEmail('');
+      // L-32: 成功メッセージ表示後、3 秒で自動閉じ
+      setTimeout(() => {
+        setShowResetModal(false);
+        setResetMessage('');
+      }, 3000);
     } catch (err: unknown) {
       console.error(err);
-      const errorCode = (err as { code?: string })?.code;
-      if (errorCode === 'auth/user-not-found') {
-        setResetError('このメールアドレスは登録されていません');
-      } else if (errorCode === 'auth/invalid-email') {
-        setResetError('メールアドレスの形式が正しくありません');
-      } else {
-        setResetError('メール送信に失敗しました。もう一度お試しください。');
-      }
+      // L-33: 集約マッピングで翻訳
+      setResetError(translateFirebaseAuthError(err, 'メール送信に失敗しました。もう一度お試しください。'));
     } finally {
       setResetLoading(false);
     }
@@ -68,6 +71,9 @@ export default function Login() {
     setResetMessage('');
   }
 
+  // M-5: Esc キーで閉じられるよう useModal を適用
+  const { modalProps: resetModalProps } = useModal({ isOpen: showResetModal, onClose: closeResetModal });
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
@@ -80,10 +86,11 @@ export default function Login() {
       setError('');
       setLoading(true);
       await login(email, password);
-      navigate('/');
+      navigate(getAppEntryPath());
     } catch (err) {
       console.error(err);
-      setError('ログインに失敗しました。メールアドレスとパスワードを確認してください。');
+      // L-33/L-34: 集約マッピングで翻訳（auth/too-many-requests 含む）
+      setError(translateFirebaseAuthError(err, 'ログインに失敗しました。メールアドレスとパスワードを確認してください。'));
     } finally {
       setLoading(false);
     }
@@ -112,13 +119,13 @@ export default function Login() {
 
           <div className={styles.inputGroup}>
             <label htmlFor="password">パスワード</label>
-            <input
-              type="password"
+            <PasswordInput
               id="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={setPassword}
               placeholder="パスワード"
               disabled={loading}
+              autoComplete="current-password"
             />
           </div>
 
@@ -141,7 +148,7 @@ export default function Login() {
 
       {/* パスワードリセットモーダル */}
       {showResetModal && (
-        <div className={styles.modalOverlay} onClick={closeResetModal}>
+        <div {...resetModalProps} className={styles.modalOverlay} onClick={closeResetModal}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <h2 className={styles.modalTitle}>パスワードリセット</h2>
             <p className={styles.modalDescription}>

@@ -7,15 +7,18 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
-  updateProfile
+  updateProfile,
+  getIdTokenResult
 } from 'firebase/auth';
 import type { User as FirebaseUser } from 'firebase/auth';
-import { doc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from '../lib/firebase';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { ref, set, serverTimestamp as rtdbServerTimestamp } from 'firebase/database';
+import { auth, db, rtdb } from '../lib/firebase';
 
 // Contextの型定義
 interface AuthContextType {
   currentUser: FirebaseUser | null;  // 現在のログインユーザー
+  isAdmin: boolean;                   // Firebase Auth custom claims admin === true
   loading: boolean;                   // 読み込み中かどうか
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, displayName: string) => Promise<void>;
@@ -26,6 +29,8 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Contextを使用するためのカスタムフック
+// TODO: split into Provider/hook files to enable Fast Refresh fully
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
@@ -41,17 +46,12 @@ interface AuthProviderProps {
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // ログイン処理
   async function login(email: string, password: string) {
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
-
-    // オンライン状態を更新
-    await updateDoc(doc(db, 'users', userCredential.user.uid), {
-      isOnline: true,
-      lastSeen: serverTimestamp()
-    });
+    await signInWithEmailAndPassword(auth, email, password);
   }
 
   // 新規登録処理
@@ -67,19 +67,33 @@ export function AuthProvider({ children }: AuthProviderProps) {
       email: email,
       displayName: displayName,
       photoURL: null,
+      createdAt: serverTimestamp()
+    });
+
+    // メモ用チャットルームを自動作成
+    await setDoc(doc(db, 'chatRooms', `memo_${userCredential.user.uid}`), {
+      name: 'メモ',
+      type: 'memo',
+      members: [userCredential.user.uid],
+      memberDetails: {
+        [userCredential.user.uid]: {
+          displayName: displayName,
+          photoURL: null
+        }
+      },
+      lastMessage: null,
+      unreadCounts: {},
       createdAt: serverTimestamp(),
-      lastSeen: serverTimestamp(),
-      isOnline: true
+      updatedAt: serverTimestamp()
     });
   }
 
   // ログアウト処理
   async function logout() {
     if (currentUser) {
-      // オフライン状態に更新
-      await updateDoc(doc(db, 'users', currentUser.uid), {
-        isOnline: false,
-        lastSeen: serverTimestamp()
+      await set(ref(rtdb, `/status/${currentUser.uid}`), {
+        online: false,
+        lastSeen: rtdbServerTimestamp()
       });
     }
     await signOut(auth);
@@ -87,17 +101,42 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // 認証状態の監視
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    let active = true;
+
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!active) return;
+
       setCurrentUser(user);
-      setLoading(false);
+
+      if (!user) {
+        setIsAdmin(false);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const tokenResult = await getIdTokenResult(user);
+        if (!active) return;
+        setIsAdmin(tokenResult.claims.admin === true);
+      } catch (error) {
+        console.error('管理者権限の取得に失敗しました:', error);
+        if (!active) return;
+        setIsAdmin(false);
+      } finally {
+        if (active) setLoading(false);
+      }
     });
 
     // クリーンアップ
-    return unsubscribe;
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, []);
 
   const value: AuthContextType = {
     currentUser,
+    isAdmin,
     loading,
     login,
     register,

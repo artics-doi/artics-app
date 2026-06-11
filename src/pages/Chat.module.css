@@ -3,6 +3,8 @@
 .container {
   height: 100vh;
   height: 100dvh;
+  /* useVisualViewport（H-5）が --keyboard-height を設定したら layout を縮める */
+  height: calc(100dvh - var(--keyboard-height, 0px));
   display: flex;
   flex-direction: column;
   background: var(--bg-secondary);
@@ -21,6 +23,13 @@
   font-size: 16px;
   color: var(--text-secondary);
   background: var(--bg-secondary);
+}
+
+.loadingMore {
+  text-align: center;
+  padding: 12px;
+  color: var(--text-secondary);
+  font-size: 13px;
 }
 
 /* ヘッダー */
@@ -68,35 +77,20 @@
   margin: 0;
 }
 
-.headerOnlineIndicator {
-  width: 10px;
-  height: 10px;
-  background: #22c55e;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.headerOfflineIndicator {
-  width: 10px;
-  height: 10px;
-  background: #9ca3af;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.onlineStatus {
-  font-size: 12px;
-  color: #22c55e;
-}
-
-.offlineStatus {
-  font-size: 12px;
-  opacity: 0.7;
-}
-
 .memberCount {
   font-size: 12px;
   opacity: 0.85;
+}
+
+.statusOnline {
+  font-size: 12px;
+  color: #4caf50;
+  opacity: 0.9;
+}
+
+.statusOffline {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
 }
 
 /* グループ編集ボタン */
@@ -172,6 +166,61 @@
   justify-content: center;
 }
 
+/* 通知トグルボタン */
+.notificationToggle {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, opacity 0.2s;
+}
+
+.notificationToggle:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.notificationToggle.muted {
+  opacity: 0.6;
+}
+
+.notificationToggle.muted svg {
+  color: #ffcdd2;
+}
+
+/* 個人メモボタン */
+.personalMemoButton,
+.desktopPanelToggle {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 12px;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+
+.personalMemoButton:hover,
+.desktopPanelToggle:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.desktopPanelToggle.active {
+  background: rgba(255, 255, 255, 0.34);
+}
+
 /* ピン留めメッセージセクション */
 .pinnedSection {
   background: var(--bg-secondary);
@@ -236,6 +285,54 @@
   background: var(--bg-chat);
 }
 
+.dateDivider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 8px 0;
+  user-select: none;
+}
+
+.dateDivider::before,
+.dateDivider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border-color, #e0e0e0);
+}
+
+.dateDividerText {
+  padding: 0 12px;
+  font-size: 12px;
+  color: var(--text-secondary, #888);
+  white-space: nowrap;
+}
+
+.unreadDivider {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 4px 0;
+  user-select: none;
+}
+
+.unreadDivider::before,
+.unreadDivider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #e53935;
+}
+
+.unreadDividerText {
+  padding: 0 12px;
+  font-size: 12px;
+  color: #e53935;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .empty {
   flex: 1;
   display: flex;
@@ -254,13 +351,25 @@
 /* メッセージ */
 .messageWrapper {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: flex-start;
   max-width: 75%;
+  gap: 8px;
 }
 
 .messageWrapper.own {
   align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+.messageBody {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.messageWrapper.own .messageBody {
   align-items: flex-end;
 }
 
@@ -280,11 +389,60 @@
   100% { background: transparent; }
 }
 
+/* 楽観的更新: 送信中（H-2） */
+.messageWrapper.pending .messageBody {
+  opacity: 0.65;
+}
+
+.messageWrapper.pending .message::after {
+  content: "送信中…";
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+  vertical-align: middle;
+}
+
+/* 楽観的更新: 失敗（H-2） */
+.messageWrapper.failed .messageBody {
+  opacity: 0.65;
+}
+
+.pendingActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.pendingActions button {
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 2px 8px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.pendingActions button:hover {
+  background: var(--bg-primary);
+}
+
+.pendingActions .retry {
+  color: #1a73e8;
+  border-color: #1a73e8;
+}
+
+.pendingActions .dismiss {
+  color: #dc2626;
+  border-color: #dc2626;
+}
+
 .senderName {
   font-size: 12px;
   color: var(--text-secondary);
   margin-bottom: 4px;
-  margin-left: 12px;
   font-weight: 500;
 }
 
@@ -320,6 +478,31 @@
   gap: 8px;
 }
 
+.messageAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #d0e4f7;
+  flex-shrink: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-start;
+}
+
+.messageAvatarImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.messageAvatarSilhouette {
+  width: 60%;
+  height: 60%;
+  color: #8fafc4;
+}
+
 .messageInfo {
   display: flex;
   flex-direction: column;
@@ -351,7 +534,7 @@
 
 .messageMenu {
   position: absolute;
-  top: calc(100% + 4px);
+  bottom: calc(100% + 4px);
   left: 0;
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
@@ -362,9 +545,28 @@
   overflow: hidden;
 }
 
+/* 自分のメッセージは右寄せが既定（旧挙動の保存） */
 .messageWrapper.own .messageMenu {
   left: auto;
   right: 0;
+}
+
+/* 画面右端に近いと判定された場合は明示的に右寄せ（自他問わず） */
+.messageMenu[data-menu-horizontal="right"] {
+  left: auto;
+  right: 0;
+}
+
+/* 明示的に左寄せ（自分のメッセージで例外的に左を選んだ場合） */
+.messageMenu[data-menu-horizontal="left"] {
+  left: 0;
+  right: auto;
+}
+
+/* メニューを下に表示 */
+.messageMenu.menuBelow {
+  bottom: auto;
+  top: calc(100% + 4px);
 }
 
 .messageMenu button {
@@ -391,16 +593,18 @@
 /* リアクションピッカー */
 .reactionPicker {
   position: absolute;
-  top: calc(100% + 4px);
+  bottom: calc(100% + 4px);
   left: 0;
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: 24px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   z-index: 100;
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  width: min(240px, calc(100vw - 48px));
   padding: 6px;
-  gap: 2px;
+  gap: 4px;
 }
 
 .messageWrapper.own .reactionPicker {
@@ -408,13 +612,34 @@
   right: 0;
 }
 
+/* 画面右端に近いと判定された場合は明示的に右寄せ */
+.reactionPicker[data-menu-horizontal="right"] {
+  left: auto;
+  right: 0;
+}
+
+/* 明示的に左寄せ */
+.reactionPicker[data-menu-horizontal="left"] {
+  left: 0;
+  right: auto;
+}
+
+/* リアクションピッカーを下に表示 */
+.reactionPicker.pickerBelow {
+  bottom: auto;
+  top: calc(100% + 4px);
+}
+
 .reactionPicker button {
   background: none;
   border: none;
   font-size: 20px;
   cursor: pointer;
-  padding: 4px 6px;
-  border-radius: 4px;
+  /* M-40: タッチターゲット 44x44 統一 */
+  min-height: 44px;
+  min-width: 44px;
+  padding: 6px;
+  border-radius: 10px;
   transition: background 0.15s;
 }
 
@@ -423,6 +648,18 @@
 }
 
 .reactionPicker button.reacted {
+  background: rgba(26, 115, 232, 0.2);
+}
+
+/* M-7: もっと見るボタン */
+.reactionPicker .reactionMore {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1a73e8;
+  background: rgba(26, 115, 232, 0.08);
+}
+
+.reactionPicker .reactionMore:hover {
   background: rgba(26, 115, 232, 0.2);
 }
 
@@ -480,6 +717,27 @@
   color: #fff;
 }
 
+.fileDownloadBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #1a73e8;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px 0;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.fileDownloadBtn:hover {
+  text-decoration: underline;
+}
+
+.messageWrapper.own .fileDownloadBtn {
+  color: #fff;
+}
+
 .messageText {
   margin: 0;
   word-break: break-word;
@@ -508,6 +766,25 @@
   margin-left: 6px;
 }
 
+/* URLリンク */
+.messageLink {
+  color: #1a73e8;
+  text-decoration: underline;
+  /* M-3: 長 URL を確実に折り返して画面外にはみ出させない */
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.messageLink:hover {
+  opacity: 0.8;
+}
+
 /* メンションハイライト */
 .mention {
   color: #1a73e8;
@@ -519,15 +796,41 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  width: 100%;
 }
 
-.editInput {
-  padding: 8px 12px;
-  border: 1px solid #1a73e8;
+.editTextarea {
+  padding: 10px 12px;
+  border: 2px solid #1a73e8;
   border-radius: 8px;
   font-size: 14px;
   background: var(--bg-secondary);
   color: var(--text-primary);
+  resize: none;
+  min-height: 40px;
+  max-height: 150px;
+  line-height: 1.4;
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.editTextarea:focus {
+  outline: none;
+  border-color: #1557b0;
+}
+
+.editFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.editHint {
+  font-size: 11px;
+  color: var(--text-muted);
 }
 
 .editButtons {
@@ -541,6 +844,7 @@
   border-radius: 6px;
   font-size: 12px;
   cursor: pointer;
+  transition: background 0.2s;
 }
 
 .editButtons button:first-child {
@@ -548,9 +852,17 @@
   color: white;
 }
 
+.editButtons button:first-child:hover {
+  background: #1557b0;
+}
+
 .editButtons button:last-child {
   background: var(--bg-primary);
   color: var(--text-secondary);
+}
+
+.editButtons button:last-child:hover {
+  background: var(--border-light);
 }
 
 .readStatus {
@@ -601,7 +913,8 @@
   padding: 4px 8px;
 }
 
-/* メンションリスト */
+/* メンションリスト
+   M-11: 画面上端を超えないよう max-height を viewport 連動で制限する */
 .mentionList {
   position: absolute;
   bottom: 100%;
@@ -612,7 +925,8 @@
   border: 1px solid var(--border-color);
   border-radius: 8px;
   box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.15);
-  max-height: 200px;
+  /* textarea の高さや上部の他要素を考慮し、画面下端から最大 viewport の 50% まで */
+  max-height: min(200px, 50vh);
   overflow-y: auto;
   z-index: 1000;
 }
@@ -639,7 +953,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 12px;
+  /* iOS のホームバー領域を避けるための safe-area padding（H-5） */
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px)) 12px;
   background: var(--bg-secondary);
   border-top: 1px solid var(--border-color);
   position: relative;
@@ -668,9 +983,49 @@
   opacity: 0.3;
 }
 
-.uploadingSpinner {
-  font-size: 14px;
+/* M-1: 送信/アップロードボタンのスピナー（くるくる回る） */
+.uploadingSpinner,
+.sendButtonSpinner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  animation: spin 0.8s linear infinite;
+  color: currentColor;
+}
+
+/* M-10: アップロード進捗を「N / total」で添える */
+.uploadingWrapper {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  line-height: 1;
+}
+
+.uploadingProgress {
+  font-size: 10px;
   color: var(--text-muted);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.sendButtonSpinner {
+  width: 18px;
+  height: 18px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .uploadingSpinner,
+  .sendButtonSpinner {
+    animation-duration: 2s;
+  }
 }
 
 .messageInput {
@@ -685,7 +1040,8 @@
   transition: border-color 0.2s, background 0.2s;
   resize: none;
   min-height: 44px;
-  max-height: 120px;
+  /* M-2: 長文も見やすいよう max-height を 200px に拡張 */
+  max-height: 200px;
   line-height: 1.4;
   font-family: inherit;
   overflow-y: auto;
@@ -725,15 +1081,51 @@
   cursor: not-allowed;
 }
 
-/* ドラッグ&ドロップオーバーレイ */
+/* M-8: 新着メッセージフローティングボタン */
+.newMessagesButton {
+  position: absolute;
+  left: 50%;
+  bottom: 100px;
+  transform: translateX(-50%);
+  background: #1a73e8;
+  color: white;
+  border: none;
+  border-radius: 20px;
+  padding: 8px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(26, 115, 232, 0.4);
+  cursor: pointer;
+  z-index: 60;
+  transition: background 0.15s, transform 0.15s;
+  min-height: 44px;
+}
+
+.newMessagesButton:hover {
+  background: #1557b0;
+  transform: translateX(-50%) translateY(-2px);
+}
+
+.newMessagesButton:focus-visible {
+  outline: 2px solid white;
+  outline-offset: 2px;
+}
+
+/* ドラッグ&ドロップオーバーレイ（M-9: inputArea 内に絶対配置、上方向に拡張して視認性確保） */
 .dragOverlay {
   position: absolute;
-  inset: 0;
+  /* 上端は入力欄の上 160px まで広げて視認性を確保（メッセージ閲覧領域の下端のみカバー） */
+  top: -160px;
+  right: 0;
+  bottom: 0;
+  left: 0;
   background: rgba(26, 115, 232, 0.9);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  pointer-events: none;
+  border-top: 2px dashed rgba(255, 255, 255, 0.6);
 }
 
 .dragContent {
@@ -1006,28 +1398,6 @@
   position: relative;
 }
 
-.onlineIndicator {
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  width: 12px;
-  height: 12px;
-  background: #22c55e;
-  border-radius: 50%;
-  border: 2px solid var(--bg-secondary);
-}
-
-.offlineIndicator {
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  width: 12px;
-  height: 12px;
-  background: #9ca3af;
-  border-radius: 50%;
-  border: 2px solid var(--bg-secondary);
-}
-
 .inviteUserName {
   flex: 1;
   font-size: 14px;
@@ -1105,28 +1475,6 @@
   object-fit: cover;
 }
 
-.memberOnlineIndicator {
-  position: absolute;
-  bottom: 2px;
-  right: 2px;
-  width: 12px;
-  height: 12px;
-  background: #22c55e;
-  border-radius: 50%;
-  border: 2px solid var(--bg-secondary);
-}
-
-.memberOfflineIndicator {
-  position: absolute;
-  bottom: 2px;
-  right: 2px;
-  width: 12px;
-  height: 12px;
-  background: #9ca3af;
-  border-radius: 50%;
-  border: 2px solid var(--bg-secondary);
-}
-
 .memberListInfo {
   flex: 1;
   display: flex;
@@ -1147,12 +1495,1310 @@
   margin-left: 6px;
 }
 
-.memberListStatusOnline {
-  font-size: 13px;
-  color: #22c55e;
+/* リアクション詳細モーダル */
+.reactionDetailOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
 }
 
-.memberListStatusOffline {
-  font-size: 13px;
+.reactionDetailModal {
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  padding: 20px;
+  width: 100%;
+  max-width: 300px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.reactionDetailHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 12px;
+}
+
+.reactionDetailEmoji {
+  font-size: 32px;
+}
+
+.reactionDetailCount {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.reactionDetailList {
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.reactionDetailItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.reactionDetailItem:last-child {
+  border-bottom: none;
+}
+
+.reactionDetailAvatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #d0e4f7;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.reactionDetailAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.reactionDetailName {
+  font-size: 14px;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.reactionDetailYou {
+  font-size: 12px;
   color: var(--text-muted);
+  margin-left: 6px;
+}
+
+.reactionDetailButtons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.reactionRemoveButton {
+  width: 100%;
+  padding: 12px;
+  background: #fee2e2;
+  color: #dc2626;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.reactionRemoveButton:hover {
+  background: #fecaca;
+}
+
+.reactionDetailCloseButton {
+  width: 100%;
+  padding: 12px;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.reactionDetailCloseButton:hover {
+  background: var(--border-light);
+}
+
+/* 既読ステータス クリック可能 */
+.readStatus.clickable {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+}
+
+.readStatus.clickable:hover {
+  color: #1a73e8;
+}
+
+/* 既読詳細モーダル */
+.readDetailOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.readDetailModal {
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  padding: 20px;
+  width: 100%;
+  max-width: 300px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.readDetailHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 12px;
+}
+
+.readDetailTitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.readDetailCount {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.readDetailList {
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.readDetailItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.readDetailItem:last-child {
+  border-bottom: none;
+}
+
+.readDetailAvatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #d0e4f7;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.readDetailAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.readDetailName {
+  font-size: 14px;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.readDetailCloseButton {
+  width: 100%;
+  padding: 12px;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-top: 16px;
+}
+
+.readDetailCloseButton:hover {
+  background: var(--border-light);
+}
+
+/* 2026-05-26 UI/UX mockup implementation: readable chat workspace */
+.chatMainPane {
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary);
+}
+
+.desktopRoomPane,
+.desktopUtilityPane {
+  display: none;
+}
+
+.header {
+  background: linear-gradient(180deg, #ffffff 0%, #f7fbf8 100%);
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color);
+  box-shadow: 0 3px 14px rgba(15, 23, 42, 0.06);
+}
+
+.backButton,
+.memberListButton,
+.editGroupButton,
+.inviteButton,
+.pinButton,
+.notificationToggle,
+.personalMemoButton,
+.desktopPanelToggle {
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 999px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.backButton:hover,
+.memberListButton:hover,
+.editGroupButton:hover,
+.inviteButton:hover,
+.pinButton:hover,
+.notificationToggle:hover,
+.personalMemoButton:hover,
+.desktopPanelToggle:hover,
+.desktopPanelToggle.active {
+  background: var(--accent-color-soft);
+  color: var(--accent-color-strong);
+}
+
+.headerActionLabel {
+  display: none;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.roomName {
+  font-size: 18px;
+  color: var(--text-primary);
+}
+
+.statusOnline {
+  color: var(--accent-color-strong);
+  font-weight: 700;
+}
+
+.statusOffline,
+.memberCount {
+  color: var(--text-secondary);
+}
+
+.pinnedHeader {
+  background: var(--warning-soft);
+  color: #9a6700;
+}
+
+.pinnedSender,
+.replyLabel,
+.replyingLabel,
+.mention,
+.fileLink,
+.fileDownloadBtn,
+.messageLink,
+.reactionPicker .reactionMore {
+  color: var(--utility-blue);
+}
+
+.messageList {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.36), transparent 160px),
+    var(--bg-chat);
+  padding: 18px;
+  gap: 10px;
+}
+
+.messageWrapper {
+  max-width: min(75%, 640px);
+}
+
+.messageWrapper.pinned {
+  background: var(--warning-soft);
+  border: 1px solid rgba(245, 158, 11, 0.28);
+}
+
+.message {
+  border-radius: 18px;
+  padding: 11px 15px;
+  border: 1px solid rgba(15, 23, 42, 0.04);
+}
+
+.messageWrapper.own .message {
+  background: var(--bg-message-own);
+  color: var(--text-message-own);
+}
+
+.replyPreview {
+  background: var(--bg-tertiary);
+  border-left-color: var(--utility-blue);
+  border-radius: var(--radius-sm);
+}
+
+.messageMenu {
+  min-width: 168px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-panel);
+}
+
+.messageMenu button {
+  min-height: 44px;
+  font-weight: 600;
+}
+
+.messageMenu .deleteOption,
+.deletedFile,
+.deletedMessage {
+  color: var(--danger-color);
+}
+
+.reactionPicker {
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-panel);
+  border-color: var(--border-color);
+}
+
+.reactionPicker button.reacted,
+.reactionBadge.myReaction {
+  background: var(--accent-color-soft);
+  border-color: var(--accent-color);
+}
+
+.reactionBadge {
+  min-height: 30px;
+  border-radius: 999px;
+  background: var(--bg-secondary);
+}
+
+.readStatus.clickable,
+.readStatus.clickable:hover {
+  color: var(--utility-blue);
+  cursor: pointer;
+}
+
+.replyingBar {
+  background: var(--utility-blue-soft);
+  border-top-color: rgba(37, 99, 235, 0.18);
+}
+
+.inputArea {
+  background: rgba(255, 255, 255, 0.96);
+  border-top-color: var(--border-color);
+  box-shadow: 0 -4px 18px rgba(15, 23, 42, 0.06);
+}
+
+.attachButton {
+  min-width: 44px;
+  min-height: 44px;
+  background: var(--bg-tertiary);
+}
+
+.attachButton:hover:not(:disabled) {
+  color: var(--utility-blue);
+  background: var(--utility-blue-soft);
+}
+
+.messageInput {
+  border-radius: 22px;
+  border-color: var(--border-color);
+  background: var(--bg-input);
+}
+
+.messageInput:focus,
+.editTextarea:focus {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px var(--accent-color-soft);
+}
+
+.sendButton,
+.newMessagesButton,
+.editButtons button:first-child,
+.groupEditSaveButton {
+  background: var(--accent-color);
+}
+
+.sendButton:hover:not(:disabled),
+.newMessagesButton:hover,
+.editButtons button:first-child:hover,
+.groupEditSaveButton:hover:not(:disabled) {
+  background: var(--accent-color-strong);
+}
+
+.sendButton:disabled,
+.groupEditSaveButton:disabled {
+  background: #a7e6bf;
+}
+
+.dragOverlay {
+  background: rgba(3, 105, 161, 0.9);
+}
+
+.groupEditModal,
+.reactionDetailModal,
+.readDetailModal {
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-panel);
+}
+
+@media (max-width: 640px) {
+  .header {
+    gap: 7px;
+    padding: 8px 10px;
+  }
+
+  .backButton,
+  .memberListButton,
+  .editGroupButton,
+  .inviteButton,
+  .pinButton,
+  .notificationToggle,
+  .personalMemoButton,
+  .desktopPanelToggle {
+    width: 42px;
+    min-width: 42px;
+    height: 42px;
+    min-height: 42px;
+    padding: 0;
+  }
+
+  .personalMemoButton,
+  .desktopPanelToggle {
+    width: 42px;
+  }
+
+  .roomName {
+    font-size: 16px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .container {
+    display: grid;
+    grid-template-columns: minmax(250px, 330px) minmax(0, 1fr);
+    background: #ffffff;
+  }
+
+  .container.withDesktopSidePanel {
+    grid-template-columns: minmax(250px, 330px) minmax(0, 1fr) minmax(280px, 392px);
+  }
+
+  .chatMainPane {
+    min-width: 0;
+    border-left: 1px solid #dfe5ec;
+    border-right: 1px solid #dfe5ec;
+    background: #ffffff;
+  }
+
+  .desktopRoomPane {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    background: #fbfdff;
+  }
+
+  .desktopRoomPane {
+    border-right: 1px solid #dfe5ec;
+  }
+
+  .desktopUtilityPane {
+    min-height: 0;
+    display: none;
+    flex-direction: column;
+    gap: 0;
+    padding: 0;
+    overflow-y: auto;
+    background: #ffffff;
+  }
+
+  .desktopUtilityPane.open {
+    display: flex;
+  }
+
+  .desktopBrandBar {
+    height: 38px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 0 12px;
+    border-bottom: 1px solid #dfe5ec;
+    background: #ffffff;
+  }
+
+  .desktopBrandMark {
+    width: 22px;
+    height: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: #2f80ed;
+  }
+
+  .desktopBrandMark span {
+    width: 13px;
+    height: 10px;
+    display: block;
+    border-radius: 999px;
+    background: #ffffff;
+  }
+
+  .desktopBrandName {
+    font-size: 15px;
+    font-weight: 800;
+    color: #111827;
+  }
+
+  .desktopStoragePanel {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    padding: 14px 16px 12px;
+    background: #fbfdff;
+  }
+
+  .desktopStorageMeta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    color: #334155;
+  }
+
+  .desktopStorageMeta strong {
+    margin-left: auto;
+    font-size: 12px;
+    font-weight: 500;
+    color: #475569;
+  }
+
+  .desktopStorageTrack {
+    height: 8px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #d7dde5;
+  }
+
+  .desktopStorageTrack span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #1677ff, #0f6bdd);
+  }
+
+  .desktopPaneHeader {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 10px 10px;
+    border-bottom: 0;
+  }
+
+  .desktopPaneTitle {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--accent-color-strong);
+  }
+
+  .desktopPaneAction,
+  .desktopQuickButton,
+  .desktopUtilityButton,
+  .desktopMiniButton {
+    min-height: 38px;
+    border-radius: 6px;
+    border: 1px solid #d9e1eb;
+    background: #ffffff;
+    color: #1f2937;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .desktopPrimaryAction,
+  .desktopScheduleAction {
+    width: 100%;
+    min-height: 38px;
+    border-radius: 6px;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: none;
+  }
+
+  .desktopPrimaryAction {
+    border: 1px solid #d9e1eb;
+    background: #ffffff;
+    color: #1f2937;
+  }
+
+  .desktopScheduleAction {
+    border: 1px solid transparent;
+    background: #1677ff;
+    color: #ffffff;
+  }
+
+  .desktopPrimaryAction:hover {
+    background: #eaf3ff;
+    border-color: #bcd7ff;
+    color: #0f6bdd;
+  }
+
+  .desktopScheduleAction:hover {
+    background: #0f6bdd;
+  }
+
+  .desktopPaneAction:hover,
+  .desktopQuickButton:hover:not(:disabled),
+  .desktopUtilityButton:hover:not(:disabled),
+  .desktopMiniButton:hover {
+    background: var(--accent-color-soft);
+    color: var(--accent-color-strong);
+    border-color: rgba(3, 105, 161, 0.36);
+  }
+
+  .desktopQuickActions {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    padding: 10px 10px 12px;
+    border-bottom: 1px solid #dfe5ec;
+  }
+
+  .desktopQuickButton {
+    min-height: 38px;
+    background: #ffffff;
+  }
+
+  .desktopRoomSectionTitle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 18px 6px;
+    font-size: 13px;
+    color: #475569;
+  }
+
+  .desktopRoomList {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 0 10px 14px;
+  }
+
+  .desktopRoomItem {
+    width: 100%;
+    min-height: 62px;
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    margin-bottom: 4px;
+    text-align: left;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: #111827;
+    cursor: pointer;
+  }
+
+  .desktopRoomItem:hover,
+  .desktopRoomItem.active {
+    background: #eaf3ff;
+    border-color: #d2e4ff;
+  }
+
+  .desktopRoomItem.active {
+    box-shadow: inset 3px 0 0 #1677ff;
+  }
+
+  .desktopRoomAvatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: linear-gradient(135deg, #3b82f6, #5f8ff5);
+    color: #ffffff;
+    font-size: 19px;
+    font-weight: 800;
+  }
+
+  .desktopRoomAvatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .desktopRoomText {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .desktopRoomName {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    font-size: 14px;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .desktopRoomLast {
+    font-size: 12px;
+    color: #475569;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .desktopFavorite {
+    color: #f5a400;
+    flex-shrink: 0;
+  }
+
+  .desktopMuted,
+  .desktopUnread {
+    justify-self: end;
+    grid-column: 3;
+    font-size: 10px;
+    font-weight: 800;
+    border-radius: 999px;
+    padding: 3px 6px;
+  }
+
+  .desktopMuted {
+    color: #64748b;
+    background: #eef2f7;
+  }
+
+  .desktopUnread {
+    color: white;
+    background: #1677ff;
+  }
+
+  .desktopUtilityTabs {
+    height: 68px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    align-items: end;
+    border-bottom: 1px solid #dfe5ec;
+    background: #ffffff;
+  }
+
+  .desktopUtilityTabs span {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-bottom: 3px solid transparent;
+    color: #475569;
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .desktopUtilityTabs .active {
+    color: #1677ff;
+    border-bottom-color: #1677ff;
+  }
+
+  .desktopUtilityCard {
+    padding: 12px 16px;
+    border-radius: 0;
+    background: #ffffff;
+    border: 0;
+    border-bottom: 1px solid #dfe5ec;
+    box-shadow: none;
+  }
+
+  .desktopUtilityCard h2 {
+    margin: 0 0 10px;
+    font-size: 14px;
+    color: #111827;
+  }
+
+  .desktopUtilityCard p {
+    margin: 0 0 12px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #475569;
+  }
+
+  .desktopSearchBox {
+    min-height: 36px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px;
+    border: 1px solid #aeb7c2;
+    border-radius: 18px;
+    color: #64748b;
+    background: #ffffff;
+  }
+
+  .desktopSearchBox input {
+    min-width: 0;
+    flex: 1;
+    border: 0;
+    background: transparent;
+    color: #111827;
+    font: inherit;
+    font-size: 13px;
+  }
+
+  .desktopSearchBox input:focus {
+    outline: none;
+  }
+
+  .desktopSearchBox button {
+    width: 24px;
+    height: 24px;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: #64748b;
+    cursor: pointer;
+  }
+
+  .desktopResultHeader,
+  .desktopSectionHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 12px;
+    color: #111827;
+    font-size: 13px;
+  }
+
+  .desktopResultHeader strong {
+    color: #475569;
+    font-weight: 600;
+  }
+
+  .desktopResultList {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 8px;
+  }
+
+  .desktopResultItem,
+  .desktopNoticeItem {
+    width: 100%;
+    min-height: 58px;
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 9px;
+    padding: 8px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    background: transparent;
+    color: #111827;
+    text-align: left;
+  }
+
+  .desktopResultItem {
+    cursor: pointer;
+  }
+
+  .desktopResultItem:hover,
+  .desktopResultItem:focus-visible {
+    background: #f5f9ff;
+    border-color: #bcd7ff;
+  }
+
+  .desktopResultAvatar {
+    width: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: #5f8ff5;
+    color: #ffffff;
+    font-size: 16px;
+  }
+
+  .desktopResultBody {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 12px;
+  }
+
+  .desktopResultBody span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .desktopResultBody strong {
+    margin-right: 8px;
+    font-size: 12px;
+  }
+
+  .desktopResultBody em,
+  .desktopNoticeItem em {
+    color: #64748b;
+    font-style: normal;
+  }
+
+  .desktopResultItem small {
+    align-self: start;
+    color: #64748b;
+    font-size: 11px;
+  }
+
+  .desktopEmptyPanel {
+    margin: 6px 0 0;
+    padding: 12px;
+    border-radius: 8px;
+    background: #f8fafc;
+    color: #64748b;
+    font-size: 12px;
+  }
+
+  .desktopSectionHeader {
+    margin-top: 0;
+    margin-bottom: 8px;
+  }
+
+  .desktopSectionHeader h2 {
+    margin: 0;
+  }
+
+  .desktopSubtleButton {
+    min-height: 30px;
+    padding: 0 10px;
+    border: 1px solid #d9e1eb;
+    border-radius: 5px;
+    background: #ffffff;
+    color: #475569;
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  .desktopNoticeItem {
+    margin-bottom: 8px;
+    background: #f8fbff;
+    border-color: #e4edf8;
+  }
+
+  .desktopNoticeItem span:nth-child(2) {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 12px;
+  }
+
+  .desktopUtilityButton {
+    width: 100%;
+    min-height: 42px;
+  }
+
+  .desktopUtilityRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-height: 36px;
+    margin-bottom: 8px;
+    font-size: 13px;
+    color: #475569;
+  }
+
+  .desktopUtilityRow strong {
+    color: #111827;
+  }
+
+  .desktopMiniButton {
+    min-width: 58px;
+    color: #1677ff;
+  }
+
+  .desktopNasHint {
+    margin-top: 12px;
+  }
+
+  .header {
+    gap: 10px;
+    min-height: 68px;
+    padding: 9px 16px;
+    background: #ffffff;
+    border-bottom: 1px solid #dfe5ec;
+    box-shadow: none;
+  }
+
+  .chatMainPane > .header .backButton {
+    display: none;
+  }
+
+  .backButton,
+  .memberListButton,
+  .editGroupButton,
+  .inviteButton,
+  .pinButton,
+  .notificationToggle,
+  .personalMemoButton,
+  .desktopPanelToggle {
+    width: auto;
+    padding: 6px 9px;
+    flex-direction: column;
+    gap: 2px;
+    background: transparent;
+    border: 0;
+    color: #374151;
+  }
+
+  .headerActionLabel {
+    display: inline;
+  }
+
+  .pinCount {
+    top: 0;
+    right: 2px;
+  }
+
+  .messageList {
+    padding: 16px clamp(22px, 3vw, 40px);
+    background: #ffffff;
+  }
+
+  .messageWrapper {
+    max-width: min(70%, 720px);
+  }
+
+  .inputArea {
+    padding: 10px 18px 12px;
+    background: #ffffff;
+    border-top: 1px solid #dfe5ec;
+    box-shadow: none;
+  }
+
+  .message {
+    border-radius: 8px;
+    box-shadow: none;
+    border: 1px solid #d9e1eb;
+  }
+
+  .messageWrapper.own .message {
+    background: #eef6ff;
+    color: #111827;
+  }
+
+  .dateDividerText {
+    padding: 4px 12px;
+    border-radius: 14px;
+    background: #f1f5f9;
+    color: #475569;
+  }
+
+  .unreadDivider::before,
+  .unreadDivider::after {
+    background: #1677ff;
+  }
+
+  .unreadDividerText {
+    color: #1677ff;
+    font-weight: 700;
+  }
+
+  .messageInput {
+    border-radius: 8px;
+    background: #ffffff;
+  }
+
+  .attachButton {
+    border-radius: 8px;
+    background: #ffffff;
+    border: 1px solid #d9e1eb;
+  }
+
+  .sendButton {
+    min-width: 48px;
+    border-radius: 8px;
+    padding: 11px 15px;
+    font-size: 0;
+  }
+
+  .sendButton::before {
+    content: "➤";
+    font-size: 18px;
+    line-height: 1;
+  }
+}
+
+:global([data-theme="dark"]) .container,
+:global([data-theme="dark"]) .chatMainPane,
+:global([data-theme="dark"]) .desktopRoomPane,
+:global([data-theme="dark"]) .desktopUtilityPane,
+:global([data-theme="dark"]) .desktopBrandBar,
+:global([data-theme="dark"]) .desktopStoragePanel,
+:global([data-theme="dark"]) .desktopUtilityTabs,
+:global([data-theme="dark"]) .desktopUtilityCard,
+:global([data-theme="dark"]) .header,
+:global([data-theme="dark"]) .messageList,
+:global([data-theme="dark"]) .inputArea {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+:global([data-theme="dark"]) .chatMainPane,
+:global([data-theme="dark"]) .desktopRoomPane,
+:global([data-theme="dark"]) .desktopBrandBar,
+:global([data-theme="dark"]) .desktopQuickActions,
+:global([data-theme="dark"]) .desktopUtilityTabs,
+:global([data-theme="dark"]) .desktopUtilityCard,
+:global([data-theme="dark"]) .header,
+:global([data-theme="dark"]) .inputArea {
+  border-color: var(--border-color);
+}
+
+:global([data-theme="dark"]) .desktopBrandName,
+:global([data-theme="dark"]) .desktopRoomItem,
+:global([data-theme="dark"]) .desktopUtilityCard h2,
+:global([data-theme="dark"]) .desktopResultHeader,
+:global([data-theme="dark"]) .desktopSectionHeader,
+:global([data-theme="dark"]) .desktopUtilityRow strong,
+:global([data-theme="dark"]) .desktopSearchBox input,
+:global([data-theme="dark"]) .desktopResultItem,
+:global([data-theme="dark"]) .desktopNoticeItem {
+  color: var(--text-primary);
+}
+
+:global([data-theme="dark"]) .desktopStorageMeta,
+:global([data-theme="dark"]) .desktopStorageMeta strong,
+:global([data-theme="dark"]) .desktopRoomSectionTitle,
+:global([data-theme="dark"]) .desktopRoomLast,
+:global([data-theme="dark"]) .desktopUtilityTabs span,
+:global([data-theme="dark"]) .desktopUtilityCard p,
+:global([data-theme="dark"]) .desktopSearchBox,
+:global([data-theme="dark"]) .desktopResultHeader strong,
+:global([data-theme="dark"]) .desktopResultBody em,
+:global([data-theme="dark"]) .desktopNoticeItem em,
+:global([data-theme="dark"]) .desktopResultItem small,
+:global([data-theme="dark"]) .desktopEmptyPanel,
+:global([data-theme="dark"]) .desktopUtilityRow,
+:global([data-theme="dark"]) .backButton,
+:global([data-theme="dark"]) .memberListButton,
+:global([data-theme="dark"]) .editGroupButton,
+:global([data-theme="dark"]) .inviteButton,
+:global([data-theme="dark"]) .pinButton,
+:global([data-theme="dark"]) .notificationToggle,
+:global([data-theme="dark"]) .personalMemoButton,
+:global([data-theme="dark"]) .desktopPanelToggle {
+  color: var(--text-secondary);
+}
+
+:global([data-theme="dark"]) .desktopPaneAction,
+:global([data-theme="dark"]) .desktopQuickButton,
+:global([data-theme="dark"]) .desktopUtilityButton,
+:global([data-theme="dark"]) .desktopMiniButton,
+:global([data-theme="dark"]) .desktopSubtleButton,
+:global([data-theme="dark"]) .desktopSearchBox,
+:global([data-theme="dark"]) .messageInput,
+:global([data-theme="dark"]) .attachButton {
+  border-color: var(--border-color);
+  background: var(--bg-input);
+  color: var(--text-primary);
+}
+
+:global([data-theme="dark"]) .desktopStorageTrack,
+:global([data-theme="dark"]) .desktopEmptyPanel,
+:global([data-theme="dark"]) .dateDividerText {
+  background: var(--bg-tertiary);
+}
+
+:global([data-theme="dark"]) .desktopRoomItem:hover,
+:global([data-theme="dark"]) .desktopRoomItem.active,
+:global([data-theme="dark"]) .desktopResultItem:hover,
+:global([data-theme="dark"]) .desktopResultItem:focus-visible,
+:global([data-theme="dark"]) .desktopNoticeItem,
+:global([data-theme="dark"]) .messageWrapper.own .message {
+  border-color: rgba(125, 211, 252, 0.32);
+  background: var(--accent-color-soft);
+}
+
+:global([data-theme="dark"]) .desktopRoomItem.active {
+  box-shadow: inset 3px 0 0 var(--accent-color);
+}
+
+:global([data-theme="dark"]) .desktopRoomPane {
+  background: var(--bg-primary);
+}
+
+:global([data-theme="dark"]) .desktopPrimaryAction,
+:global([data-theme="dark"]) .desktopQuickButton {
+  border-color: var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+:global([data-theme="dark"]) .desktopScheduleAction {
+  border-color: transparent;
+  background: var(--accent-color);
+  color: #052536;
+}
+
+:global([data-theme="dark"]) .desktopPrimaryAction:hover,
+:global([data-theme="dark"]) .desktopQuickButton:hover:not(:disabled) {
+  border-color: rgba(125, 211, 252, 0.36);
+  background: var(--accent-color-soft);
+  color: var(--accent-color-strong);
+}
+
+:global([data-theme="dark"]) .desktopScheduleAction:hover {
+  background: var(--accent-color);
+  color: #052536;
+}
+
+:global([data-theme="dark"]) .desktopMuted {
+  background: var(--bg-tertiary);
+  color: var(--text-tertiary);
+}
+
+:global([data-theme="dark"]) .desktopUtilityTabs .active,
+:global([data-theme="dark"]) .desktopMiniButton {
+  color: var(--accent-color-strong);
+  border-bottom-color: var(--accent-color);
+}
+
+:global([data-theme="dark"]) .message {
+  border-color: var(--border-color);
 }

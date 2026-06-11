@@ -1,4 +1,4 @@
-// 30日経過したファイルを自動削除するユーティリティ
+// 7日経過したファイルを自動削除するユーティリティ
 
 import { collection, getDocs, updateDoc, doc } from 'firebase/firestore';
 import { ref, deleteObject } from 'firebase/storage';
@@ -6,7 +6,7 @@ import { db, storage } from './firebase';
 
 const DAYS_TO_KEEP = 7;
 
-// 30日以上前かどうかをチェック
+// 指定日数以上前かどうかをチェック
 function isOlderThanDays(date: Date, days: number): boolean {
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - days);
@@ -48,20 +48,23 @@ export async function cleanupOldFiles(): Promise<{ deletedCount: number; errorCo
 
       for (const messageDoc of messagesSnapshot.docs) {
         const data = messageDoc.data();
-        const timestamp = data.timestamp?.toDate();
+        const timestamp = data.createdAt?.toDate?.() || data.timestamp?.toDate?.();
 
         if (!timestamp) continue;
 
-        // 30日以上前のメッセージのファイルをチェック
+        // 指定日数以上前のメッセージのファイルをチェック
         if (isOlderThanDays(timestamp, DAYS_TO_KEEP)) {
           let needsUpdate = false;
-          const updates: { imageUrl?: null; fileUrl?: null; fileName?: null; fileType?: null } = {};
+          const updates: Record<string, null | boolean | Date> = {};
+          const imageUrl = data.imageURL || data.imageUrl;
+          const fileUrl = data.fileURL || data.fileUrl;
 
           // 画像ファイルの削除
-          if (data.imageUrl) {
-            const deleted = await deleteStorageFile(data.imageUrl);
+          if (imageUrl) {
+            const deleted = await deleteStorageFile(imageUrl);
             if (deleted) {
-              updates.imageUrl = null;
+              if ('imageURL' in data) updates.imageURL = null;
+              if ('imageUrl' in data) updates.imageUrl = null;
               needsUpdate = true;
               deletedCount++;
             } else {
@@ -70,10 +73,11 @@ export async function cleanupOldFiles(): Promise<{ deletedCount: number; errorCo
           }
 
           // 添付ファイルの削除
-          if (data.fileUrl) {
-            const deleted = await deleteStorageFile(data.fileUrl);
+          if (fileUrl) {
+            const deleted = await deleteStorageFile(fileUrl);
             if (deleted) {
-              updates.fileUrl = null;
+              if ('fileURL' in data) updates.fileURL = null;
+              if ('fileUrl' in data) updates.fileUrl = null;
               updates.fileName = null;
               updates.fileType = null;
               needsUpdate = true;

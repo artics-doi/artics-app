@@ -1,0 +1,1661 @@
+/* Memo Page - Google Keep風 UI */
+
+.memoRoot {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* ヘッダー（Home画面と統一） */
+.memoHeader {
+  display: flex;
+  align-items: center;
+  padding: 14px 16px;
+  gap: 12px;
+  flex-shrink: 0;
+  background: var(--bg-header);
+  color: white;
+}
+
+.backButton {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 6px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.backButton:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.memoHeaderTitle {
+  font-size: 18px;
+  font-weight: 600;
+  flex: 1;
+}
+
+.labelManageBtn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 8px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+.labelManageBtn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* ============================================================
+   コンポーザー（Google Keep準拠: 影のみ、ボーダーなし）
+   ============================================================ */
+.composerWrapper {
+  padding: 16px 16px 8px;
+  display: flex;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* --- 折りたたみ時: テキスト + 右端にアイコン --- */
+.composerCollapsed {
+  max-width: 600px;
+  width: 100%;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 8px 12px 16px;
+  cursor: text;
+  font-size: 14px;
+  background: var(--bg-secondary);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.08);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: box-shadow 0.2s;
+}
+
+.composerCollapsed:hover {
+  box-shadow: 0 2px 6px rgba(0,0,0,0.16), 0 4px 12px rgba(0,0,0,0.10);
+}
+
+.composerCollapsedText {
+  flex: 1;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.composerCollapsedActions {
+  display: flex;
+  gap: 2px;
+}
+
+.composerCollapsedBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+
+.composerCollapsedBtn:hover {
+  background: var(--bg-hover);
+}
+
+/* --- 展開時 --- */
+.composerExpanded {
+  max-width: 600px;
+  width: 100%;
+  border: none;
+  border-radius: 12px;
+  background: var(--bg-secondary);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.16), 0 4px 16px rgba(0,0,0,0.12);
+  overflow: hidden;
+}
+
+.composerTitleInput {
+  width: 100%;
+  border: none;
+  outline: none;
+  padding: 14px 16px 4px;
+  font-size: 15px;
+  font-weight: 600;
+  background: transparent;
+  color: var(--text-primary);
+  box-sizing: border-box;
+}
+
+.composerTitleInput::placeholder {
+  color: var(--text-tertiary);
+  font-weight: 500;
+}
+
+.composerTextarea {
+  width: 100%;
+  border: none;
+  outline: none;
+  padding: 4px 16px 10px;
+  font-size: 14px;
+  background: transparent;
+  color: var(--text-primary);
+  resize: none;
+  min-height: 46px;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.composerTextarea::placeholder {
+  color: var(--text-tertiary);
+}
+
+.composerImagePreview {
+  position: relative;
+  padding: 4px 16px 8px;
+}
+
+.composerImagePreview img {
+  width: 100%;
+  max-height: 200px;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.composerImageRemove {
+  position: absolute;
+  top: 8px;
+  right: 20px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.6);
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.composerImageRemove:hover {
+  background: rgba(0,0,0,0.8);
+}
+
+.composerActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  border-top: 1px solid var(--border-color);
+}
+
+.composerActionsLeft {
+  display: flex;
+  gap: 2px;
+}
+
+.composerActionBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  transition: background 0.15s, color 0.15s;
+}
+
+.composerActionBtn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.composerActionBtnActive {
+  color: var(--accent-color, #1a73e8);
+}
+
+.composerCloseBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px 20px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  transition: background 0.15s;
+}
+
+.composerCloseBtn:hover {
+  background: var(--bg-hover);
+}
+
+.composerColorPalette {
+  display: flex;
+  gap: 6px;
+  padding: 8px 16px;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--border-color);
+}
+
+/* ============================================================
+   フィルターチップ
+   ============================================================ */
+.filterChips {
+  display: flex;
+  overflow-x: auto;
+  gap: 8px;
+  padding: 4px 16px 12px;
+  flex-shrink: 0;
+  scrollbar-width: none;
+}
+
+.filterChips::-webkit-scrollbar {
+  display: none;
+}
+
+.filterChip {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.15s;
+}
+
+.filterChip:hover {
+  background: var(--bg-hover);
+}
+
+.filterChipActive {
+  background: var(--accent-color, #1a73e8);
+  color: #fff;
+  border-color: var(--accent-color, #1a73e8);
+}
+
+.filterChipActive:hover {
+  background: var(--accent-color, #1a73e8);
+  opacity: 0.9;
+}
+
+.filterChipDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+/* ============================================================
+   セクション
+   ============================================================ */
+.memoBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 16px 24px;
+}
+
+.sectionBlock {
+  margin-bottom: 8px;
+}
+
+.sectionHeader {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-tertiary);
+  padding: 8px 8px 6px;
+}
+
+.sectionDivider {
+  border: none;
+  border-top: 1px solid var(--border-color);
+  margin: 4px 8px 12px;
+}
+
+/* ============================================================
+   Masonry グリッド（間隔を詰める）
+   ============================================================ */
+.memoGrid {
+  column-count: 4;
+  column-gap: 12px;
+}
+
+@media (max-width: 1200px) {
+  .memoGrid { column-count: 3; }
+}
+
+@media (max-width: 900px) {
+  .memoGrid { column-count: 2; }
+}
+
+@media (max-width: 500px) {
+  .memoGrid { column-count: 1; }
+}
+
+/* ============================================================
+   カード（Google Keep準拠: ボーダーなし、影で立体感）
+   ============================================================ */
+.memoCard {
+  break-inside: avoid;
+  border: none;
+  border-radius: 12px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  overflow: hidden;
+  background: var(--bg-secondary);
+  position: relative;
+  min-height: 80px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.06);
+  transition: box-shadow 0.2s, transform 0.15s;
+}
+
+.memoCard:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.16), 0 4px 16px rgba(0,0,0,0.10);
+  transform: translateY(-2px);
+}
+
+/* --- ホバー時に左下ピンボタン --- */
+.cardHoverPin {
+  position: absolute;
+  bottom: 6px;
+  left: 6px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255,255,255,0.9);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+  z-index: 2;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+}
+
+@media (hover: hover) {
+  .memoCard:hover .cardHoverPin {
+    opacity: 1;
+  }
+}
+
+@media (hover: none) {
+  /* H-7: タッチ端末では未ピンのカードでもピンボタンを常時表示 */
+  .cardHoverPin {
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.85);
+  }
+  .cardHoverPinActive {
+    display: flex;
+    opacity: 1;
+  }
+  :global([data-theme="dark"]) .cardHoverPin {
+    background: rgba(50, 50, 50, 0.85);
+  }
+}
+
+.cardHoverPin:hover {
+  background: #fff;
+  color: var(--text-primary);
+}
+
+.cardHoverPinActive {
+  opacity: 1;
+  color: var(--accent-color, #1a73e8);
+}
+
+:global([data-theme="dark"]) .cardHoverPin {
+  background: rgba(50,50,50,0.9);
+}
+
+:global([data-theme="dark"]) .cardHoverPin:hover {
+  background: rgba(70,70,70,1);
+}
+
+/* --- ホバー時の下部アクションバー --- */
+.cardHoverActions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 8px 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+@media (hover: hover) {
+  .memoCard:hover .cardHoverActions {
+    opacity: 1;
+  }
+}
+
+@media (hover: none) {
+  .cardHoverActions {
+    opacity: 1;
+  }
+}
+
+.cardHoverBtn {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: none;
+  background: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+  transition: background 0.15s, color 0.15s;
+}
+
+.cardHoverBtn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.cardHoverBtnDanger:hover {
+  color: #e53935;
+}
+
+/* --- カード中身 --- */
+.cardImage {
+  width: 100%;
+  display: block;
+  /* M-22: カード一覧でのプレビューは 120px に抑え、テキストの可視性を確保 */
+  max-height: 120px;
+  object-fit: cover;
+}
+
+/* M-24: メモ画像アップロード中の overlay spinner */
+.cardImageWrapper {
+  position: relative;
+}
+
+.cardImageUploading {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  gap: 6px;
+}
+
+.cardImageUploading svg {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.cardContent {
+  padding: 12px 12px 4px;
+}
+
+.cardTitle {
+  font-size: 14px;
+  font-weight: 600;
+  word-break: break-word;
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+
+.cardBody {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.5;
+}
+
+.memoLink {
+  color: #1a73e8;
+  text-decoration: underline;
+  word-break: break-all;
+}
+
+.memoLink:hover {
+  opacity: 0.8;
+}
+
+.cardFooter {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 2px 12px 6px;
+}
+
+.cardPinIndicator {
+  color: var(--text-tertiary);
+}
+
+.cardDate {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.cardLabels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 2px 12px 4px;
+}
+
+.labelChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.labelChipRemove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-tertiary);
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 2px;
+}
+
+.labelChipRemove:hover {
+  color: var(--text-primary);
+}
+
+/* ============================================================
+   空の状態
+   ============================================================ */
+.emptyState {
+  text-align: center;
+  padding: 80px 16px;
+  color: var(--text-tertiary);
+}
+
+.emptyIcon {
+  margin-bottom: 20px;
+  opacity: 0.3;
+}
+
+.emptyText {
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 8px;
+  color: var(--text-secondary);
+}
+
+.emptySubtext {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* ============================================================
+   モーダル
+   ============================================================ */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 24px;
+}
+
+.modalCard {
+  width: 100%;
+  max-width: 600px;
+  max-height: 80vh;
+  border-radius: 12px;
+  background: var(--bg-secondary);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modalContent {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+}
+
+.modalTitleInput {
+  width: 100%;
+  border: none;
+  outline: none;
+  padding: 20px 20px 6px;
+  font-size: 18px;
+  font-weight: 600;
+  background: transparent;
+  color: var(--text-primary);
+  box-sizing: border-box;
+}
+
+.modalTitleInput::placeholder {
+  color: var(--text-tertiary);
+}
+
+.modalTextarea {
+  width: 100%;
+  border: none;
+  outline: none;
+  padding: 8px 20px 12px;
+  font-size: 14px;
+  background: transparent;
+  color: var(--text-primary);
+  resize: none;
+  font-family: inherit;
+  box-sizing: border-box;
+  min-height: 140px;
+  line-height: 1.6;
+}
+
+.modalTextarea::placeholder {
+  color: var(--text-tertiary);
+}
+
+.modalImagePreview {
+  padding: 8px 20px;
+}
+
+.modalImagePreview img {
+  width: 100%;
+  max-height: 300px;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.modalLabels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px 20px;
+}
+
+/* 色パレット */
+.colorPalette {
+  display: flex;
+  gap: 6px;
+  padding: 10px 20px;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--border-color);
+}
+
+.colorSwatch {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid var(--border-color);
+  cursor: pointer;
+  background: var(--bg-secondary);
+  transition: transform 0.15s, border-color 0.15s;
+}
+
+.colorSwatch:hover {
+  transform: scale(1.15);
+  border-color: var(--text-secondary);
+}
+
+.colorSwatchActive {
+  border-color: var(--text-primary);
+  box-shadow: 0 0 0 2px var(--bg-primary), 0 0 0 4px var(--text-primary);
+}
+
+/* ラベルチェックリスト */
+.labelCheckList {
+  padding: 8px 20px 12px;
+  border-top: 1px solid var(--border-color);
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.labelCheckItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 6px;
+  cursor: pointer;
+  font-size: 14px;
+  border-radius: 6px;
+  transition: background 0.1s;
+}
+
+.labelCheckItem:hover {
+  background: var(--bg-hover);
+}
+
+.labelCheckDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.labelCheckEmpty {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  padding: 12px 0;
+  line-height: 1.5;
+}
+
+/* 削除確認バー */
+.deleteConfirmBar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  border-top: 1px solid var(--border-color);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.deleteConfirmYes {
+  background: #d32f2f;
+  color: #fff;
+  border: none;
+  padding: 6px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.deleteConfirmYes:hover {
+  background: #b71c1c;
+}
+
+.deleteConfirmNo {
+  background: none;
+  border: 1px solid var(--border-color);
+  padding: 6px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.deleteConfirmNo:hover {
+  background: var(--bg-hover);
+}
+
+/* モーダルアクションバー */
+.modalActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border-color);
+}
+
+.modalActionsLeft {
+  display: flex;
+  gap: 2px;
+}
+
+.modalActionBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  transition: background 0.15s, color 0.15s;
+}
+
+.modalActionBtn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.modalActionBtnActive {
+  color: var(--accent-color, #1a73e8);
+}
+
+.modalActionBtnDanger:hover {
+  color: #d32f2f;
+}
+
+.modalCloseBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px 24px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  transition: background 0.15s;
+}
+
+.modalCloseBtn:hover {
+  background: var(--bg-hover);
+}
+
+/* ============================================================
+   ラベル管理モーダル
+   ============================================================ */
+.labelManageModal {
+  width: 100%;
+  max-width: 400px;
+  max-height: 70vh;
+  border-radius: 12px;
+  background: var(--bg-secondary);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.labelManageHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.labelManageClose {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 22px;
+  color: var(--text-secondary);
+  padding: 4px 8px;
+  border-radius: 50%;
+  line-height: 1;
+}
+
+.labelManageClose:hover {
+  background: var(--bg-hover);
+}
+
+.labelManageBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 20px 16px;
+}
+
+.labelManageEmpty {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  padding: 16px 0;
+  text-align: center;
+  line-height: 1.5;
+}
+
+.labelManageItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 4px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.labelManageItem:last-of-type {
+  border-bottom: none;
+}
+
+.labelManageNameInput {
+  flex: 1;
+  border: none;
+  border-bottom: 1px solid transparent;
+  outline: none;
+  padding: 4px 0;
+  font-size: 14px;
+  background: transparent;
+  color: var(--text-primary);
+}
+
+.labelManageNameInput:focus {
+  border-bottom-color: var(--accent-color, #1a73e8);
+}
+
+.labelManageDeleteBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-tertiary);
+  padding: 6px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  transition: color 0.15s, background 0.15s;
+}
+
+.labelManageDeleteBtn:hover {
+  color: #d32f2f;
+  background: var(--bg-hover);
+}
+
+.labelManageAdd {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 4px 4px;
+  border-top: 1px solid var(--border-color);
+  margin-top: 4px;
+}
+
+.labelManageAddInput {
+  flex: 1;
+  border: none;
+  border-bottom: 1px solid var(--border-color);
+  outline: none;
+  padding: 4px 0;
+  font-size: 14px;
+  background: transparent;
+  color: var(--text-primary);
+}
+
+.labelManageAddInput:focus {
+  border-bottom-color: var(--accent-color, #1a73e8);
+}
+
+.labelManageAddBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--accent-color, #1a73e8);
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  border-radius: 50%;
+  transition: background 0.15s;
+}
+
+.labelManageAddBtn:hover {
+  background: var(--bg-hover);
+}
+
+.labelManageAddBtn:disabled {
+  color: var(--text-tertiary);
+  cursor: default;
+}
+
+.labelManageAddBtn:disabled:hover {
+  background: none;
+}
+
+/* ============================================================
+   ダークモード
+   ============================================================ */
+:global([data-theme="dark"]) .memoCard {
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2), 0 1px 4px rgba(0,0,0,0.16);
+}
+
+:global([data-theme="dark"]) .memoCard:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4), 0 6px 20px rgba(0,0,0,0.3);
+}
+
+:global([data-theme="dark"]) .composerCollapsed {
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3), 0 2px 8px rgba(0,0,0,0.2);
+}
+
+:global([data-theme="dark"]) .composerCollapsed:hover {
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4), 0 4px 14px rgba(0,0,0,0.3);
+}
+
+:global([data-theme="dark"]) .composerExpanded {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3), 0 4px 18px rgba(0,0,0,0.25);
+}
+
+:global([data-theme="dark"]) .modalCard {
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+}
+
+/* カードホバーアクション用のポップオーバー */
+.cardColorPopover {
+  position: absolute;
+  bottom: 40px;
+  left: 8px;
+  right: 8px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+  padding: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  z-index: 10;
+}
+
+.cardLabelPopover {
+  position: absolute;
+  bottom: 40px;
+  left: 8px;
+  right: 8px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+  padding: 8px;
+  z-index: 10;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.cardLabelPopoverItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 4px;
+  cursor: pointer;
+  font-size: 12px;
+  border-radius: 4px;
+}
+
+.cardLabelPopoverItem:hover {
+  background: var(--bg-hover);
+}
+
+.cardLabelPopoverEmpty {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  padding: 4px;
+}
+
+/* ============================================================
+   検索バー
+   ============================================================ */
+.searchBar {
+  padding: 12px 16px 4px;
+  display: flex;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.searchBarInner {
+  max-width: 600px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+}
+
+.searchInput {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.searchInput::placeholder {
+  color: var(--text-tertiary);
+}
+
+.searchClear {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.searchClear:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+/* ============================================================
+   ⋮ メニュー（編集モーダル内）
+   ============================================================ */
+.moreMenuWrapper {
+  position: relative;
+}
+
+.moreMenuPopover {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  margin-bottom: 4px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+  min-width: 140px;
+  z-index: 20;
+  padding: 4px 0;
+}
+
+.moreMenuItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  width: 100%;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text-primary);
+}
+
+.moreMenuItem:hover {
+  background: var(--bg-hover);
+}
+
+.moreMenuItemDanger {
+  color: #d32f2f;
+}
+
+:global([data-theme="dark"]) .moreMenuItemDanger {
+  color: #ef5350;
+}
+
+/* ============================================================
+   チェックリスト（カード表示）
+   ============================================================ */
+.cardChecklist {
+  padding: 4px 12px 0;
+}
+
+.cardCheckItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 2px 0;
+  color: var(--text-primary);
+}
+
+.cardCheckItem input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
+.cardCheckItemChecked {
+  text-decoration: line-through;
+  color: var(--text-tertiary);
+}
+
+.cardCheckMore {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  padding: 2px 0 0 20px;
+}
+
+.cardCheckProgress {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  padding: 4px 12px 0;
+}
+
+/* ============================================================
+   チェックリスト（モーダル編集）
+   ============================================================ */
+.modalCheckList {
+  padding: 8px 20px;
+}
+
+.modalCheckItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.modalCheckItem input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.modalCheckItemInput {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-family: inherit;
+  padding: 4px 0;
+  border-bottom: 1px solid transparent;
+}
+
+.modalCheckItemInput:focus {
+  border-bottom-color: var(--border-color);
+}
+
+.modalCheckItemChecked {
+  text-decoration: line-through;
+  color: var(--text-tertiary);
+}
+
+.modalCheckItemDelete {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 2px 4px;
+  border-radius: 50%;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.modalCheckItem:hover .modalCheckItemDelete {
+  opacity: 1;
+}
+
+.modalCheckItemDelete:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.modalCheckAddBtn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 6px 0;
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.modalCheckAddBtn:hover {
+  color: var(--text-primary);
+}
+
+/* ============================================================
+   コンポーザー チェックリスト入力
+   ============================================================ */
+.composerCheckList {
+  padding: 4px 16px;
+}
+
+.composerCheckItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+}
+
+.composerCheckItem input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.composerCheckItemInput {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-family: inherit;
+  padding: 2px 0;
+}
+
+.composerCheckItemDelete {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.composerCheckItem:hover .composerCheckItemDelete {
+  opacity: 1;
+}
+
+.composerCheckAddBtn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  padding: 4px 0;
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.composerCheckAddBtn:hover {
+  color: var(--text-primary);
+}
+
+/* ============================================================
+   コンポーザー ラベル付与
+   ============================================================ */
+.composerLabelList {
+  padding: 8px 12px;
+  border-top: 1px solid var(--border-color);
+}
+
+.composerLabelItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.composerLabelItem input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+.composerLabelAdd {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border-color);
+}
+
+.composerLabelAddInput {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  padding: 4px 0;
+}
+
+.composerLabelAddInput::placeholder {
+  color: var(--text-tertiary);
+}
+
+.composerSelectedLabels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px 12px 8px;
+}
+
+/* ============================================================
+   モーダル ラベル作成入力
+   ============================================================ */
+.labelCheckAdd {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border-color);
+}
+
+.labelCheckAddInput {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  padding: 4px 0;
+}
+
+.labelCheckAddInput::placeholder {
+  color: var(--text-tertiary);
+}
+
+/* ============================================================
+   ↑↓並び替えボタン
+   ============================================================ */
+.cardMoveButtons {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 2;
+}
+
+@media (hover: hover) {
+  .memoCard:hover .cardMoveButtons {
+    opacity: 1;
+  }
+}
+
+@media (hover: none) {
+  .cardMoveButtons {
+    opacity: 1;
+  }
+}
+
+.cardMoveBtn {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: none;
+  background: rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+  padding: 0;
+  transition: background 0.15s, color 0.15s;
+}
+
+.cardMoveBtn:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.12);
+  color: var(--text-primary);
+}
+
+.cardMoveBtn:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+:global([data-theme="dark"]) .cardMoveBtn {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+:global([data-theme="dark"]) .cardMoveBtn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+/* 2026-05-26 UI/UX mockup implementation: Memo / Settings companion polish */
+.memoRoot {
+  background:
+    radial-gradient(circle at 15% 0%, rgba(14, 165, 233, 0.16), transparent 30%),
+    var(--bg-primary);
+}
+
+.memoHeader {
+  background: linear-gradient(180deg, #ffffff 0%, #f7fbf8 100%);
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color);
+  box-shadow: 0 3px 14px rgba(15, 23, 42, 0.06);
+}
+
+.backButton,
+.labelManageBtn {
+  min-height: 44px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.backButton:hover,
+.labelManageBtn:hover {
+  background: var(--accent-color-soft);
+  color: var(--accent-color-strong);
+}
+
+.memoHeaderTitle {
+  color: var(--text-primary);
+  font-weight: 800;
+}
+
+.composerCollapsed,
+.composerExpanded,
+.memoCard,
+.modalContent {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.07);
+}
+
+.composerCollapsed:hover,
+.memoCard:hover {
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.10);
+}
+
+.composerActionBtn,
+.composerCollapsedBtn,
+.cardHoverPin,
+.modalActionBtn {
+  min-width: 40px;
+  min-height: 40px;
+}
+
+.composerActionBtn:hover,
+.composerCollapsedBtn:hover,
+.composerCloseBtn:hover,
+.filterChip:hover,
+.cardHoverPin:hover,
+.modalActionBtn:hover {
+  background: var(--accent-color-soft);
+  color: var(--accent-color-strong);
+}
+
+.composerActionBtnActive,
+.cardHoverPinActive,
+.modalActionBtnActive {
+  color: var(--accent-color-strong);
+}
+
+.filterChip {
+  min-height: 40px;
+  border-color: var(--border-color);
+  background: var(--bg-secondary);
+}
+
+.filterChipActive {
+  background: var(--accent-color);
+  border-color: var(--accent-color);
+  color: #fff;
+}
+
+.filterChipActive:hover {
+  background: var(--accent-color-strong);
+  color: #fff;
+}
+
+.sectionHeader {
+  color: var(--text-secondary);
+  letter-spacing: 0;
+}
+
+.memoCard {
+  border-radius: var(--radius-md);
+}
+
+.cardTitle {
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.cardContent {
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.modalContent {
+  box-shadow: var(--shadow-panel);
+}
+
+.modalTitleInput:focus,
+.modalTextarea:focus,
+.searchInput:focus {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px var(--accent-color-soft);
+}
+
+.cardMoveBtn {
+  min-width: 28px;
+  min-height: 28px;
+}
+
+:global([data-theme="dark"]) .memoHeader {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+:global([data-theme="dark"]) .backButton,
+:global([data-theme="dark"]) .labelManageBtn {
+  border-color: var(--border-color);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}

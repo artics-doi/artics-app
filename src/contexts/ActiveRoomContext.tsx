@@ -10,6 +10,8 @@ interface ActiveRoomContextType {
 
 const ActiveRoomContext = createContext<ActiveRoomContextType | undefined>(undefined);
 
+// TODO: split into Provider/hook files to enable Fast Refresh fully
+// eslint-disable-next-line react-refresh/only-export-components
 export function useActiveRoom() {
   const context = useContext(ActiveRoomContext);
   if (context === undefined) {

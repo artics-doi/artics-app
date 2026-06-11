@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
   "appId": "com.artics.chat",
-  "productName": "Artics",
+  "productName": "ArticsChat",
   "copyright": "Copyright © 2024",
   "directories": {
     "output": "release",
@@ -14,7 +14,7 @@
   ],
   "extraResources": [
     {
-      "from": "public/favicon.png",
+      "from": "public/icon-512x512.png",
       "to": "favicon.png"
     }
   ],
@@ -25,16 +25,20 @@
         "arch": ["x64"]
       }
     ],
-    "artifactName": "${productName} Setup ${version}.${ext}"
+    "icon": "build/icon.ico",
+    "artifactName": "${productName}.Setup.${version}.${ext}"
   },
   "nsis": {
-    "oneClick": false,
+    "oneClick": true,
     "perMachine": false,
-    "allowToChangeInstallationDirectory": true,
     "deleteAppDataOnUninstall": false,
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
-    "shortcutName": "Artics"
+    "shortcutName": "ArticsChat",
+    "installerIcon": "build/icon.ico",
+    "uninstallerIcon": "build/icon.ico",
+    "runAfterFinish": true,
+    "include": "build/installer.nsh"
   },
   "publish": {
     "provider": "github",

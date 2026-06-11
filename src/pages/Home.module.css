@@ -66,6 +66,22 @@
   background: rgba(255, 255, 255, 0.3);
 }
 
+.memoButton {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  padding: 8px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.memoButton:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
 .searchButton {
   background: rgba(255, 255, 255, 0.2);
   border: none;
@@ -165,6 +181,28 @@
   margin-left: 8px;
 }
 
+/* お気に入りボタン */
+.favoriteButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.2rem;
+  padding: 4px 6px;
+  opacity: 0.4;
+  transition: opacity 0.2s, transform 0.2s;
+  color: var(--text-secondary);
+}
+
+.favoriteButton:hover {
+  opacity: 0.8;
+  transform: scale(1.1);
+}
+
+.favoriteButton.favorited {
+  opacity: 1;
+  color: #ffc107;
+}
+
 .inviteButton,
 .deleteButton {
   width: 36px;
@@ -176,6 +214,16 @@
   align-items: center;
   justify-content: center;
   transition: background 0.2s;
+}
+
+/* M-40: タッチ端末では 44x44 を確保（マウス端末は 36x36 のままで一覧の密度維持） */
+@media (hover: none) and (pointer: coarse) {
+  .inviteButton,
+  .deleteButton,
+  .favoriteButton {
+    min-width: 44px;
+    min-height: 44px;
+  }
 }
 
 .inviteButton {
@@ -216,32 +264,21 @@
   position: relative;
 }
 
-.onlineIndicatorAvatar {
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  width: 14px;
-  height: 14px;
-  background: #22c55e;
-  border-radius: 50%;
-  border: 2px solid var(--bg-secondary);
-}
-
-.offlineIndicatorAvatar {
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  width: 14px;
-  height: 14px;
-  background: #9ca3af;
-  border-radius: 50%;
-  border: 2px solid var(--bg-secondary);
-}
-
 .avatarImage {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.avatarSilhouette {
+  width: 60%;
+  height: 60%;
+  color: #8fafc4;
+}
+
+.memoIcon {
+  font-size: 26px;
+  line-height: 1;
 }
 
 .chatInfo {
@@ -271,25 +308,17 @@
   color: var(--text-muted);
 }
 
-/* 名前の横のオンライン/オフラインインジケータ */
-.chatNameIndicatorOnline {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  background: #22c55e;
-  border-radius: 50%;
-  margin-left: 2px;
-  vertical-align: middle;
+.mutedIndicator {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+  color: var(--text-muted);
+  opacity: 0.7;
 }
 
-.chatNameIndicatorOffline {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  background: #9ca3af;
-  border-radius: 50%;
-  margin-left: 2px;
-  vertical-align: middle;
+.mutedIndicator svg {
+  width: 14px;
+  height: 14px;
 }
 
 .chatTime {
@@ -319,14 +348,18 @@
   color: white;
   font-size: 11px;
   font-weight: 600;
-  min-width: 20px;
+  /* M-12: 「99+」表示でも崩れないよう、幅と高さを固定 */
+  min-width: 22px;
   height: 20px;
   border-radius: 10px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 0 6px;
   flex-shrink: 0;
+  line-height: 1;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 /* モーダル */
@@ -510,7 +543,18 @@
   padding: 12px 14px;
   cursor: pointer;
   transition: background 0.15s;
+  border: none;
   border-bottom: 1px solid var(--border-light);
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.userItem:focus-visible {
+  outline: 2px solid #1a73e8;
+  outline-offset: -2px;
 }
 
 .userItem:last-child {
@@ -525,6 +569,119 @@
   background: rgba(26, 115, 232, 0.15);
 }
 
+/* M-13: 新規チャット 1対1/グループ選択画面 */
+.newChatTypeChoices {
+  display: flex;
+  gap: 16px;
+  margin: 16px 0 24px;
+}
+
+.newChatTypeChoice {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 24px 16px;
+  border: 1.5px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--bg-secondary);
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, transform 0.1s;
+  color: var(--text-primary);
+  min-height: 130px;
+}
+
+.newChatTypeChoice:hover {
+  border-color: #1a73e8;
+  background: rgba(26, 115, 232, 0.06);
+}
+
+.newChatTypeChoice:active {
+  transform: translateY(1px);
+}
+
+.newChatTypeChoice:focus-visible {
+  outline: 2px solid #1a73e8;
+  outline-offset: 2px;
+}
+
+.newChatTypeIcon {
+  color: #1a73e8;
+}
+
+.newChatTypeLabel {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.newChatTypeHint {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.newChatBackButton {
+  background: none;
+  border: none;
+  color: #1a73e8;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 6px 0 12px;
+  text-align: left;
+  width: fit-content;
+}
+
+.newChatBackButton:hover {
+  text-decoration: underline;
+}
+
+/* M-14: 選択中メンバー chip */
+.memberChipList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0 12px;
+  max-height: 96px;
+  overflow-y: auto;
+}
+
+.memberChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 10px;
+  background: rgba(26, 115, 232, 0.12);
+  border: 1px solid rgba(26, 115, 232, 0.3);
+  color: #1a73e8;
+  border-radius: 14px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.memberChipName {
+  max-width: 160px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.memberChipRemove {
+  background: none;
+  border: none;
+  color: #1a73e8;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 50%;
+  min-width: 24px;
+  min-height: 24px;
+}
+
+.memberChipRemove:hover {
+  background: rgba(26, 115, 232, 0.2);
+}
+
 .userAvatar {
   width: 36px;
   height: 36px;
@@ -533,29 +690,6 @@
   margin-right: 12px;
   flex-shrink: 0;
   position: relative;
-}
-
-/* オンラインインジケーター */
-.onlineIndicator {
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  width: 12px;
-  height: 12px;
-  background: #22c55e;
-  border-radius: 50%;
-  border: 2px solid var(--bg-secondary);
-}
-
-.offlineIndicator {
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  width: 12px;
-  height: 12px;
-  background: #9ca3af;
-  border-radius: 50%;
-  border: 2px solid var(--bg-secondary);
 }
 
 .userName {
@@ -662,6 +796,15 @@
 
 .settingsMenuItem:hover {
   background: var(--border-light);
+}
+
+.settingsMenuToggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--bg-primary);
+  border-radius: 8px;
 }
 
 .settingsMenuItemLogout {
@@ -971,20 +1114,6 @@
   background: var(--bg-primary);
 }
 
-.onlineDot {
-  width: 10px;
-  height: 10px;
-  background: #22c55e;
-  border-radius: 50%;
-}
-
-.offlineDot {
-  width: 10px;
-  height: 10px;
-  background: #9ca3af;
-  border-radius: 50%;
-}
-
 .userListItem {
   display: flex;
   align-items: center;
@@ -1052,33 +1181,6 @@
   display: flex;
   align-items: center;
   gap: 6px;
-}
-
-/* ユーザー一覧の名前横インジケータ */
-.userListNameIndicatorOnline {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  background: #22c55e;
-  border-radius: 50%;
-}
-
-.userListNameIndicatorOffline {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  background: #9ca3af;
-  border-radius: 50%;
-}
-
-.userListStatus {
-  font-size: 13px;
-  color: #22c55e;
-}
-
-.userListStatusOffline {
-  font-size: 13px;
-  color: var(--text-muted);
 }
 
 /* ユーザーモーダル */
@@ -1352,4 +1454,1667 @@
   height: 1px;
   background: var(--border-color);
   margin: 8px 0;
+}
+
+/* バージョン情報セクション */
+.versionSection {
+  margin-top: 16px;
+  margin-bottom: 16px;
+  padding: 16px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.versionInfo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.versionLabel {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.versionNumber {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.updateButton {
+  width: 100%;
+  padding: 10px 16px;
+  background: #1a73e8;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.updateButton:hover:not(:disabled) {
+  background: #1557b0;
+}
+
+.updateButton:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.updateMessage {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #856404;
+  text-align: center;
+}
+
+.updateMessageSuccess {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: #d4edda;
+  border: 1px solid #28a745;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #155724;
+  text-align: center;
+}
+
+.updateMessageError {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: #f8d7da;
+  border: 1px solid #dc3545;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #721c24;
+  text-align: center;
+}
+
+/* ユーザー管理モーダル */
+.userManagementNote {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.userManagementList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 400px;
+  overflow-y: auto;
+  margin-bottom: 16px;
+}
+
+.userManagementItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  gap: 12px;
+}
+
+.userManagementInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.userManagementDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.userManagementName {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.userManagementEmail {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.userManagementActions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.userEditButton {
+  background: var(--accent-color);
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.userEditButton:hover {
+  opacity: 0.8;
+}
+
+.userDeleteButton {
+  background: #dc3545;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.userDeleteButton:hover {
+  opacity: 0.8;
+}
+
+.deleteNote {
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-align: center;
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+/* 2026-05-26 UI/UX mockup implementation: friendly LINE-like home hub */
+.container {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(14, 165, 233, 0.14), transparent 32%),
+    var(--bg-primary);
+}
+
+.header {
+  background: linear-gradient(180deg, #ffffff 0%, #f7fbf8 100%);
+  color: var(--text-primary);
+  padding: 12px 16px 14px;
+  flex-wrap: wrap;
+  gap: 10px;
+  border-bottom: 1px solid var(--border-color);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+}
+
+.storageIndicator {
+  order: -1;
+  width: 100%;
+  min-height: 44px;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+}
+
+.storageIndicator::before {
+  content: "ストレージ";
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.storageBarContainer {
+  flex: 1;
+  width: auto;
+  height: 9px;
+  background: #dbeee1;
+}
+
+.storageBar {
+  background: var(--accent-color);
+}
+
+.storageBar.warning {
+  background: var(--warning-color);
+}
+
+.storageBar.danger {
+  background: var(--danger-color);
+}
+
+.storageText {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.headerButtons {
+  width: 100%;
+  margin-left: 0;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.newChatButton,
+.usersButton,
+.memoButton,
+.searchButton,
+.settingsButton {
+  width: 100%;
+  min-height: 54px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  padding: 8px 6px;
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.newChatButton:hover,
+.usersButton:hover,
+.memoButton:hover,
+.searchButton:hover,
+.settingsButton:hover {
+  background: var(--accent-color-soft);
+  border-color: rgba(3, 105, 161, 0.38);
+  color: var(--accent-color-strong);
+}
+
+.newChatButton::before,
+.usersButton::before,
+.memoButton::before {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  color: white;
+  background: var(--accent-color);
+  font-size: 15px;
+  line-height: 1;
+}
+
+.newChatButton::before {
+  content: "+";
+}
+
+.usersButton::before {
+  content: "人";
+  font-size: 11px;
+}
+
+.memoButton::before {
+  content: "メ";
+  font-size: 11px;
+  background: var(--utility-blue);
+}
+
+.searchIcon {
+  width: 22px;
+  height: 22px;
+  color: var(--utility-blue);
+}
+
+.settingsIcon {
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+}
+
+.settingsIcon span {
+  width: 18px;
+  background: var(--text-secondary);
+}
+
+.actionLabel {
+  font-size: 12px;
+  line-height: 1.15;
+}
+
+.chatList {
+  background: transparent;
+  padding: 10px 12px 18px;
+}
+
+.empty {
+  background: var(--bg-secondary);
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-md);
+  margin-top: 12px;
+}
+
+.chatItem {
+  min-height: 74px;
+  margin-bottom: 8px;
+  padding: 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: 0 1px 5px rgba(15, 23, 42, 0.05);
+}
+
+.chatItem:hover,
+.chatItem:active {
+  background: var(--bg-hover);
+  border-color: rgba(3, 105, 161, 0.32);
+}
+
+.avatar,
+.userListAvatar,
+.userAvatar {
+  background: linear-gradient(135deg, #dff5ff, #e6f0ff);
+}
+
+.chatHeader {
+  margin-bottom: 6px;
+}
+
+.chatName {
+  font-size: 16px;
+  gap: 7px;
+  line-height: 1.25;
+}
+
+.memberCount {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+
+.lastMessage {
+  font-size: 13.5px;
+  line-height: 1.35;
+}
+
+.chatActions {
+  gap: 6px;
+}
+
+.favoriteButton,
+.inviteButton,
+.deleteButton {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.favoriteButton {
+  border-radius: 50%;
+  background: var(--bg-tertiary);
+}
+
+.favoriteButton.favorited {
+  color: #f59e0b;
+  background: #fff8df;
+}
+
+.inviteButton {
+  background: var(--utility-blue-soft);
+  color: var(--utility-blue);
+}
+
+.deleteButton {
+  background: var(--danger-soft);
+  color: var(--danger-color);
+}
+
+.unreadBadge {
+  background: var(--danger-color);
+  min-width: 24px;
+  height: 22px;
+  border-radius: 999px;
+}
+
+.mutedIndicator {
+  color: var(--text-muted);
+}
+
+.modal {
+  background: rgba(15, 23, 42, 0.38);
+  backdrop-filter: blur(5px);
+}
+
+.modalContent {
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-panel);
+}
+
+.modalContent h2 {
+  font-size: 20px;
+  text-align: left;
+}
+
+.modalButtons button,
+.newChatTypeChoice,
+.userItem,
+.settingsMenuItem,
+.settingsMenuToggle,
+.notificationOption,
+.searchResultItem,
+.userManagementItem {
+  min-height: 48px;
+  border-radius: var(--radius-md);
+}
+
+.modalButtons button,
+.createButton,
+.searchSubmitButton,
+.updateButton {
+  background: var(--accent-color);
+  border-color: var(--accent-color);
+}
+
+.modalButtons button:hover,
+.createButton:hover:not(:disabled),
+.searchSubmitButton:hover:not(:disabled),
+.updateButton:hover:not(:disabled) {
+  background: var(--accent-color-strong);
+}
+
+.newChatTypeChoice {
+  border-width: 2px;
+  background: var(--bg-tertiary);
+}
+
+.newChatTypeChoice:hover {
+  border-color: var(--accent-color);
+  background: var(--accent-color-soft);
+}
+
+.newChatTypeIcon,
+.newChatBackButton,
+.searchResultRoom,
+.checkmark,
+.themeCheck,
+.memberChip,
+.memberChipRemove {
+  color: var(--accent-color-strong);
+}
+
+.memberChip {
+  background: var(--accent-color-soft);
+  border-color: rgba(3, 105, 161, 0.34);
+}
+
+.groupImagePreview,
+.profileImagePreview {
+  border-color: var(--accent-color);
+  background: var(--bg-tertiary);
+}
+
+.groupNameInput:focus,
+.profileNameInput:focus,
+.searchInput:focus {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px var(--accent-color-soft);
+}
+
+.settingsMenu {
+  gap: 10px;
+}
+
+.settingsMenuItem,
+.settingsMenuToggle,
+.notificationOption,
+.versionSection,
+.userManagementItem {
+  border: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+}
+
+.settingsMenuItem:hover {
+  background: var(--bg-hover);
+}
+
+/* 設定モーダル B案: account-first layout */
+.settingsModalContent {
+  display: flex;
+  width: min(440px, calc(100vw - 32px));
+  max-width: none;
+  max-height: min(760px, calc(100dvh - 36px));
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  background:
+    linear-gradient(180deg, rgba(232, 246, 255, 0.8), rgba(255, 255, 255, 0) 170px),
+    var(--bg-secondary);
+  overflow-y: auto;
+}
+
+.settingsHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settingsHeader h2 {
+  margin: 2px 0 0;
+  color: var(--text-primary);
+  font-size: 22px;
+  line-height: 1.2;
+  text-align: left;
+}
+
+.settingsEyebrow {
+  display: block;
+  color: var(--accent-color-strong);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.settingsCloseIcon {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+}
+
+.settingsCloseIcon:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+  border-color: rgba(3, 105, 161, 0.32);
+}
+
+.settingsProfileCard {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 78px;
+  padding: 12px;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  cursor: pointer;
+  text-align: left;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+}
+
+.settingsProfileCard:hover {
+  background: var(--bg-hover);
+  border-color: rgba(3, 105, 161, 0.32);
+  transform: translateY(-1px);
+}
+
+.settingsProfileAvatar {
+  display: inline-flex;
+  width: 52px;
+  height: 52px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: #ffffff;
+  background: linear-gradient(135deg, #0284c7, #38bdf8);
+  border-radius: 16px;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.settingsProfileAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.settingsProfileText {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settingsProfileText strong,
+.menuText strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settingsProfileText small,
+.menuText small {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settingsProfileAction {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  color: var(--accent-color-strong);
+  background: var(--accent-color-soft);
+  border: 1px solid rgba(3, 105, 161, 0.2);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.settingsSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settingsSection h3 {
+  margin: 4px 2px 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.settingsModalContent .settingsMenuItem,
+.settingsModalContent .settingsMenuToggle,
+.settingsModalContent .settingsMenuItemLogout {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 62px;
+  margin: 0;
+  padding: 11px 12px;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  text-align: left;
+}
+
+.settingsModalContent .settingsMenuItem,
+.settingsModalContent .settingsMenuItemLogout {
+  cursor: pointer;
+  transition: background 0.16s ease, border-color 0.16s ease;
+}
+
+.settingsModalContent .settingsMenuItem:hover {
+  background: var(--bg-hover);
+  border-color: rgba(3, 105, 161, 0.32);
+}
+
+.settingsModalContent .settingsMenuItemLogout {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.18);
+}
+
+.settingsModalContent .settingsMenuItemLogout:hover {
+  background: rgba(239, 68, 68, 0.14);
+  border-color: rgba(239, 68, 68, 0.28);
+}
+
+.settingsDangerSection .menuText strong {
+  color: var(--danger-color);
+}
+
+.settingsDangerSection .menuText small {
+  color: #b45353;
+}
+
+.settingsItemIcon {
+  position: relative;
+  display: inline-flex;
+  width: 38px;
+  height: 38px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+}
+
+.settingsItemIcon::before,
+.settingsItemIcon::after {
+  position: absolute;
+  content: "";
+}
+
+.settingsItemIcon::before {
+  width: 14px;
+  height: 14px;
+  background: currentColor;
+  border-radius: 999px;
+}
+
+.settingsIconTheme {
+  color: #0284c7;
+  background: #e0f2fe;
+}
+
+.settingsIconTheme::before {
+  box-shadow: inset -5px 0 0 rgba(255, 255, 255, 0.72);
+}
+
+.settingsIconNotification {
+  color: #7c3aed;
+  background: #ede9fe;
+}
+
+.settingsIconNotification::before {
+  width: 15px;
+  height: 16px;
+  border-radius: 999px 999px 6px 6px;
+}
+
+.settingsIconNotification::after {
+  bottom: 10px;
+  width: 7px;
+  height: 3px;
+  background: currentColor;
+  border-radius: 999px;
+}
+
+.settingsIconPin {
+  color: #0891b2;
+  background: #cffafe;
+}
+
+.settingsIconPin::before {
+  width: 7px;
+  height: 18px;
+  border-radius: 999px;
+  transform: rotate(38deg);
+}
+
+.settingsIconNote {
+  color: #16a34a;
+  background: #dcfce7;
+}
+
+.settingsIconNote::before {
+  width: 15px;
+  height: 18px;
+  border-radius: 4px;
+}
+
+.settingsIconNote::after {
+  top: 13px;
+  width: 8px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.78);
+  border-radius: 999px;
+}
+
+.settingsIconRefresh {
+  color: #ea580c;
+  background: #ffedd5;
+}
+
+.settingsIconRefresh::before {
+  width: 16px;
+  height: 16px;
+  background: transparent;
+  border: 3px solid currentColor;
+  border-left-color: transparent;
+}
+
+.settingsIconLogout {
+  color: #dc2626;
+  background: #fee2e2;
+}
+
+.settingsIconLogout::before {
+  width: 16px;
+  height: 11px;
+  background: transparent;
+  border: 3px solid currentColor;
+  border-left: 0;
+  border-radius: 3px;
+}
+
+.settingsIconLogout::after {
+  width: 13px;
+  height: 3px;
+  background: currentColor;
+  border-radius: 999px;
+  transform: translateX(-3px);
+}
+
+.settingsModalContent .menuText {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+  color: var(--text-primary);
+}
+
+.settingsModalContent .menuArrow {
+  color: var(--text-muted);
+  font-size: 21px;
+  line-height: 1;
+}
+
+.settingsModalContent .versionSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 13px;
+  background: var(--bg-primary);
+  border-radius: 12px;
+}
+
+.settingsModalContent .versionInfo {
+  margin: 0;
+}
+
+.settingsModalContent .versionLabel {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.settingsModalContent .versionNumber {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.settingsModalContent .updateButton {
+  min-height: 42px;
+  border-radius: 10px;
+  font-weight: 800;
+}
+
+.toggleSwitch input:checked + .toggleSlider {
+  background-color: var(--accent-color);
+}
+
+.closeButton {
+  min-height: 44px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+}
+
+.deleteConfirmButton,
+.userDeleteButton {
+  background: var(--danger-color);
+}
+
+@media (max-width: 640px) {
+  .header {
+    padding: 10px;
+  }
+
+  .headerButtons {
+    gap: 6px;
+  }
+
+  .newChatButton,
+  .usersButton,
+  .memoButton,
+  .searchButton,
+  .settingsButton {
+    min-height: 50px;
+    font-size: 11px;
+    padding: 7px 3px;
+  }
+
+  .actionLabel {
+    font-size: 11px;
+  }
+
+  .storageIndicator {
+    display: flex;
+    min-height: 42px;
+  }
+
+  .storageIndicator::before {
+    display: none;
+  }
+
+  .chatList {
+    padding: 8px;
+  }
+
+  .chatItem {
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .chatActions {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .favoriteButton,
+  .inviteButton,
+  .deleteButton {
+    min-width: 40px;
+    min-height: 40px;
+  }
+}
+
+/* 2026-05-26 mockup alignment pass: Pattern A home first-view fidelity */
+.container {
+  background: #ffffff;
+}
+
+.header {
+  gap: 0;
+  padding: 18px clamp(18px, 4vw, 56px) 0;
+  background: #ffffff;
+  border-bottom: 0;
+  box-shadow: none;
+}
+
+.headerTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 24px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.brandBlock {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: max-content;
+}
+
+.brandMark {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, 9px);
+  grid-template-rows: repeat(2, 9px);
+  place-content: center;
+  gap: 5px;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #0284c7, #38bdf8);
+  box-shadow: 0 10px 24px rgba(3, 105, 161, 0.18);
+}
+
+.brandMark span {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #ffffff;
+}
+
+.brandName {
+  color: #0f172a;
+  font-size: clamp(28px, 3vw, 42px);
+  font-weight: 800;
+  line-height: 1;
+}
+
+.storageIndicator {
+  display: grid;
+  grid-template-columns: minmax(150px, 420px) auto;
+  align-items: center;
+  width: min(520px, 44vw);
+  min-height: auto;
+  gap: 12px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.storageIndicator::before {
+  display: none;
+}
+
+.storageBarContainer {
+  width: 100%;
+  height: 12px;
+  background: #d8edf6;
+  border-radius: 999px;
+}
+
+.storageBar {
+  background: linear-gradient(90deg, #0369a1, #0ea5e9);
+}
+
+.storageText {
+  color: #334155;
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.headerButtons {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  width: 100%;
+  gap: 0;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.scheduleButton,
+.newChatButton,
+.usersButton,
+.memoButton,
+.searchButton,
+.settingsButton {
+  min-height: 88px;
+  padding: 8px 10px;
+  color: #0f172a;
+  font-size: 18px;
+  font-weight: 800;
+  background: transparent;
+  border: 0;
+  border-right: 1px solid var(--border-light);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.settingsButton {
+  border-right: 0;
+}
+
+.scheduleButton:hover,
+.newChatButton:hover,
+.usersButton:hover,
+.memoButton:hover,
+.searchButton:hover,
+.settingsButton:hover {
+  color: var(--accent-color-strong);
+  background: #f4fbff;
+  border-color: var(--border-light);
+  box-shadow: none;
+  transform: none;
+}
+
+.scheduleButton::before,
+.newChatButton::before,
+.usersButton::before,
+.memoButton::before {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  margin-bottom: 8px;
+  color: #ffffff;
+  font-size: 25px;
+  line-height: 1;
+  background: var(--accent-color);
+  border-radius: 50%;
+  box-shadow: 0 8px 18px rgba(3, 105, 161, 0.16);
+}
+
+.scheduleButton::before {
+  content: "予";
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.newChatButton::before {
+  content: "+";
+}
+
+.usersButton::before {
+  content: "人";
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.memoButton::before {
+  content: "";
+  border-radius: 10px;
+  background:
+    linear-gradient(#ffffff 0 0) 11px 13px / 20px 3px no-repeat,
+    linear-gradient(#ffffff 0 0) 11px 22px / 15px 3px no-repeat,
+    linear-gradient(135deg, #0284c7, #38bdf8);
+}
+
+.searchIcon {
+  width: 42px;
+  height: 42px;
+  margin-bottom: 8px;
+  color: #2563eb;
+}
+
+.settingsIcon {
+  width: 42px;
+  height: 42px;
+  margin-bottom: 8px;
+  color: #334155;
+}
+
+.settingsIcon span {
+  width: 30px;
+  height: 2px;
+  background: currentColor;
+}
+
+.actionLabel {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.listHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 28px clamp(18px, 4vw, 56px) 12px;
+  background: #ffffff;
+}
+
+.listHeader h2 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.sortButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 2px;
+  color: #334155;
+  font-size: 17px;
+  font-weight: 700;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.chatList {
+  padding: 0 clamp(16px, 3.5vw, 56px) 40px;
+  background: #ffffff;
+}
+
+.chatItem {
+  min-height: 110px;
+  margin: 0;
+  padding: 22px 0;
+  background: #ffffff;
+  border: 0;
+  border-bottom: 1px solid #e5edf3;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.chatItem:hover,
+.chatItem:active {
+  background: #f7fcff;
+  border-color: #d8edf6;
+  transform: none;
+}
+
+.avatar {
+  width: 76px;
+  height: 76px;
+  margin-right: 22px;
+  color: #7da9c0;
+  background: linear-gradient(135deg, #dff5ff, #e8f8ff);
+}
+
+.avatarSilhouette {
+  width: 42px;
+  height: 42px;
+}
+
+.chatInfo {
+  min-width: 0;
+}
+
+.chatHeader {
+  margin-bottom: 8px;
+}
+
+.chatName {
+  color: #0f172a;
+  font-size: 23px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.memberCount {
+  color: #0284c7;
+  font-size: 14px;
+  font-weight: 700;
+  background: #eef9ff;
+  border-color: #bae6fd;
+}
+
+.lastMessage {
+  color: #334155;
+  font-size: 17px;
+  line-height: 1.45;
+}
+
+.chatActions {
+  gap: 14px;
+  margin-left: 18px;
+}
+
+.favoriteButton,
+.inviteButton,
+.deleteButton {
+  min-width: 54px;
+  min-height: 54px;
+  width: 54px;
+  height: 54px;
+  font-size: 30px;
+  border-radius: 50%;
+  box-shadow: none;
+}
+
+.favoriteButton {
+  color: #b8c6d1;
+  background: #f8fbfd;
+}
+
+.favoriteButton.favorited {
+  color: #f59e0b;
+  background: #fff7db;
+}
+
+.inviteButton {
+  color: #2563eb;
+  background: #eaf1ff;
+}
+
+.deleteButton {
+  color: #ef4444;
+  background: #ffe4e6;
+}
+
+.inviteButton svg,
+.deleteButton svg {
+  width: 24px;
+  height: 24px;
+}
+
+.unreadBadge {
+  min-width: 26px;
+  height: 24px;
+  padding: 0 8px;
+  font-size: 13px;
+}
+
+.empty {
+  margin: 0;
+  background: #f8fcff;
+  border-color: #d8edf6;
+}
+
+@media (max-width: 900px) {
+  .headerTop {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .storageIndicator {
+    width: 100%;
+    grid-template-columns: 1fr auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .header {
+    padding: 14px 14px 0;
+  }
+
+  .headerTop {
+    padding-bottom: 14px;
+  }
+
+  .brandMark {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+  }
+
+  .brandName {
+    font-size: 24px;
+  }
+
+  .storageText {
+    font-size: 13px;
+  }
+
+  .headerButtons {
+    padding: 14px 0;
+  }
+
+  .scheduleButton,
+  .newChatButton,
+  .usersButton,
+  .memoButton,
+  .searchButton,
+  .settingsButton {
+    min-height: 68px;
+    padding: 6px 2px;
+    font-size: 12px;
+  }
+
+  .scheduleButton::before,
+  .newChatButton::before,
+  .usersButton::before,
+  .memoButton::before,
+  .searchIcon,
+  .settingsIcon {
+    width: 32px;
+    height: 32px;
+    margin-bottom: 5px;
+  }
+
+  .usersButton::before {
+    font-size: 17px;
+  }
+
+  .actionLabel {
+    font-size: 12px;
+  }
+
+  .listHeader {
+    padding: 20px 14px 8px;
+  }
+
+  .listHeader h2 {
+    font-size: 22px;
+  }
+
+  .sortButton {
+    font-size: 14px;
+  }
+
+  .chatList {
+    padding: 0 14px 28px;
+  }
+
+  .chatItem {
+    min-height: 90px;
+    padding: 14px 0;
+    gap: 10px;
+  }
+
+  .avatar {
+    width: 56px;
+    height: 56px;
+    margin-right: 10px;
+  }
+
+  .avatarSilhouette {
+    width: 32px;
+    height: 32px;
+  }
+
+  .chatName {
+    font-size: 17px;
+  }
+
+  .lastMessage {
+    font-size: 13.5px;
+  }
+
+  .chatActions {
+    gap: 6px;
+    margin-left: 8px;
+  }
+
+  .favoriteButton,
+  .inviteButton,
+  .deleteButton {
+    min-width: 40px;
+    min-height: 40px;
+    width: 40px;
+    height: 40px;
+    font-size: 22px;
+  }
+}
+
+:global([data-theme="dark"]) .container,
+:global([data-theme="dark"]) .header,
+:global([data-theme="dark"]) .listHeader,
+:global([data-theme="dark"]) .chatList,
+:global([data-theme="dark"]) .chatItem {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+:global([data-theme="dark"]) .headerTop,
+:global([data-theme="dark"]) .headerButtons,
+:global([data-theme="dark"]) .chatItem {
+  border-color: var(--border-color);
+}
+
+:global([data-theme="dark"]) .brandName,
+:global([data-theme="dark"]) .listHeader h2,
+:global([data-theme="dark"]) .chatName {
+  color: var(--text-primary);
+}
+
+:global([data-theme="dark"]) .storageText,
+:global([data-theme="dark"]) .sortButton,
+:global([data-theme="dark"]) .lastMessage,
+:global([data-theme="dark"]) .settingsIcon {
+  color: var(--text-secondary);
+}
+
+:global([data-theme="dark"]) .storageBarContainer,
+:global([data-theme="dark"]) .empty {
+  background: var(--bg-tertiary);
+}
+
+:global([data-theme="dark"]) .scheduleButton,
+:global([data-theme="dark"]) .newChatButton,
+:global([data-theme="dark"]) .usersButton,
+:global([data-theme="dark"]) .memoButton,
+:global([data-theme="dark"]) .searchButton,
+:global([data-theme="dark"]) .settingsButton {
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+:global([data-theme="dark"]) .scheduleButton:hover,
+:global([data-theme="dark"]) .newChatButton:hover,
+:global([data-theme="dark"]) .usersButton:hover,
+:global([data-theme="dark"]) .memoButton:hover,
+:global([data-theme="dark"]) .searchButton:hover,
+:global([data-theme="dark"]) .settingsButton:hover,
+:global([data-theme="dark"]) .chatItem:hover,
+:global([data-theme="dark"]) .chatItem:active {
+  background: var(--bg-hover);
+  border-color: var(--border-color);
+}
+
+:global([data-theme="dark"]) .avatar {
+  color: var(--accent-color-strong);
+  background: linear-gradient(135deg, #1f3b52, #263f57);
+}
+
+:global([data-theme="dark"]) .memberCount {
+  color: var(--accent-color-strong);
+  background: var(--accent-color-soft);
+  border-color: rgba(125, 211, 252, 0.3);
+}
+
+:global([data-theme="dark"]) .favoriteButton {
+  color: var(--text-tertiary);
+  background: var(--bg-tertiary);
+}
+
+:global([data-theme="dark"]) .favoriteButton.favorited {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.14);
+}
+
+:global([data-theme="dark"]) .inviteButton {
+  color: var(--accent-color-strong);
+  background: var(--accent-color-soft);
+}
+
+:global([data-theme="dark"]) .deleteButton {
+  color: var(--danger-color);
+  background: var(--danger-soft);
+}
+
+:global([data-theme="dark"]) .modalContent,
+:global([data-theme="dark"]) .settingsMenuItem,
+:global([data-theme="dark"]) .settingsMenuToggle,
+:global([data-theme="dark"]) .notificationOption,
+:global([data-theme="dark"]) .versionSection,
+:global([data-theme="dark"]) .userManagementItem,
+:global([data-theme="dark"]) .newChatTypeChoice,
+:global([data-theme="dark"]) .closeButton {
+  border-color: var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+:global([data-theme="dark"]) .settingsMenuItem:hover,
+:global([data-theme="dark"]) .newChatTypeChoice:hover {
+  background: var(--bg-hover);
+}
+
+:global([data-theme="dark"]) .settingsModalContent {
+  background:
+    linear-gradient(180deg, rgba(14, 116, 144, 0.16), rgba(255, 255, 255, 0) 170px),
+    var(--bg-secondary);
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.42);
+}
+
+:global([data-theme="dark"]) .settingsCloseIcon,
+:global([data-theme="dark"]) .settingsProfileCard,
+:global([data-theme="dark"]) .settingsModalContent .settingsMenuItem,
+:global([data-theme="dark"]) .settingsModalContent .settingsMenuToggle,
+:global([data-theme="dark"]) .settingsModalContent .versionSection {
+  background: var(--bg-tertiary);
+  border-color: var(--border-color);
+}
+
+:global([data-theme="dark"]) .settingsProfileCard:hover,
+:global([data-theme="dark"]) .settingsModalContent .settingsMenuItem:hover,
+:global([data-theme="dark"]) .settingsCloseIcon:hover {
+  background: var(--bg-hover);
+  border-color: rgba(125, 211, 252, 0.28);
+}
+
+:global([data-theme="dark"]) .settingsProfileAction {
+  color: #7dd3fc;
+  background: rgba(14, 165, 233, 0.14);
+  border-color: rgba(125, 211, 252, 0.2);
+}
+
+:global([data-theme="dark"]) .settingsIconTheme {
+  color: #7dd3fc;
+  background: rgba(14, 165, 233, 0.16);
+}
+
+:global([data-theme="dark"]) .settingsIconNotification {
+  color: #c4b5fd;
+  background: rgba(124, 58, 237, 0.18);
+}
+
+:global([data-theme="dark"]) .settingsIconPin {
+  color: #67e8f9;
+  background: rgba(8, 145, 178, 0.18);
+}
+
+:global([data-theme="dark"]) .settingsIconNote {
+  color: #86efac;
+  background: rgba(34, 197, 94, 0.15);
+}
+
+:global([data-theme="dark"]) .settingsIconRefresh {
+  color: #fdba74;
+  background: rgba(234, 88, 12, 0.16);
+}
+
+:global([data-theme="dark"]) .settingsIconLogout {
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.16);
+}
+
+:global([data-theme="dark"]) .settingsModalContent .settingsMenuItemLogout {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(248, 113, 113, 0.2);
+}
+
+:global([data-theme="dark"]) .settingsModalContent .settingsMenuItemLogout:hover {
+  background: rgba(239, 68, 68, 0.16);
+  border-color: rgba(248, 113, 113, 0.34);
+}
+
+:global([data-theme="dark"]) .settingsDangerSection .menuText strong,
+:global([data-theme="dark"]) .settingsMenuItemLogout .menuText {
+  color: #fca5a5;
+}
+
+:global([data-theme="dark"]) .settingsDangerSection .menuText small {
+  color: #fda4af;
+}
+
+:global([data-theme="dark"]) .updateMessage {
+  background: var(--warning-soft);
+  border-color: rgba(251, 191, 36, 0.34);
+  color: var(--warning-color);
+}
+
+:global([data-theme="dark"]) .updateMessageSuccess {
+  background: rgba(34, 197, 94, 0.14);
+  border-color: rgba(74, 222, 128, 0.32);
+  color: #86efac;
+}
+
+:global([data-theme="dark"]) .updateMessageError {
+  background: var(--danger-soft);
+  border-color: rgba(248, 113, 113, 0.34);
+  color: var(--danger-color);
 }

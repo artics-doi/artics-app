@@ -7,15 +7,14 @@ export interface User {
   displayName: string;
   photoURL: string | null;
   createdAt: Date;
-  lastSeen: Date;
-  isOnline: boolean;
 }
 
 // チャットルーム
 export interface ChatRoom {
   id: string;
   name: string;                    // グループ名（1対1の場合は空）
-  type: 'direct' | 'group';        // 1対1 or グループ
+  type: 'direct' | 'group' | 'memo'; // 1対1 or グループ or メモ
+  directKey?: string;              // 1対1チャットの重複防止キー
   photoURL?: string | null;        // グループ画像URL
   members: string[];               // メンバーのUID配列
   memberDetails: {                 // メンバーの詳細情報
@@ -24,12 +23,15 @@ export interface ChatRoom {
       photoURL: string | null;
     }
   };
+  typing?: Record<string, import('firebase/firestore').Timestamp>;
   lastMessage: {
     text: string;
     senderId: string;
     senderName: string;
     timestamp: Date;
   } | null;
+  unreadCounts?: { [userId: string]: number };  // ユーザーごとの未読数
+  favorites?: string[];            // お気に入りしたユーザーIDの配列
   createdAt: Date;
   updatedAt: Date;
 }
@@ -46,12 +48,31 @@ export interface Message {
   fileURL: string | null;          // ファイルのURL
   fileName: string | null;         // ファイル名
   fileType: string | null;         // ファイルの種類
+  storagePath?: string | null;     // Firebase Storage path
+  fileSize?: number | null;        // Storage上の実サイズ
   readBy: string[];                // 既読者のUID配列
   createdAt: Date;
 }
 
-// 既読情報
-export interface ReadReceipt {
-  oderId: string;
-  readAt: Date;
+// 拡張されたメッセージ型（編集・削除・リアクション・返信・ピン留め・メンション）
+export interface ExtendedMessage extends Message {
+  isEdited?: boolean;
+  isDeleted?: boolean;
+  reactions?: { [emoji: string]: string[] }; // emoji -> userIds
+  reactionsByUser?: { [uid: string]: string[] }; // uid -> emoji[]
+  replyTo?: {
+    messageId: string;
+    text: string;
+    senderName: string;
+  } | null;
+  isPinned?: boolean;
+  mentions?: string[]; // mentioned userIds
+  // 楽観的更新用フラグ（Firestore には存在しないクライアント内部の状態）
+  _pending?: 'sending' | 'failed';
+}
+
+// ルーム通知設定
+export interface RoomNotificationSetting {
+  muted: boolean;
+  mutedAt?: Date;
 }

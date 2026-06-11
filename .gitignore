@@ -25,3 +25,20 @@ release
 *.sln
 *.sw?
 nul
+
+# 環境設定ファイル
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+.env.test
+functions/serviceAccountKey.json
+**/serviceAccountKey.json
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
+lint-a11y-baseline.log
+lint-baseline.log

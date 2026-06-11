@@ -1,42 +1,212 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    // ユーザードキュメント
-    match /users/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == userId;
+    function signedIn() {
+      return request.auth != null;
+    }
 
-      // FCMトークンサブコレクション - ユーザー自身のみ書き込み可能
+    function isAdmin() {
+      return signedIn() &&
+        'admin' in request.auth.token &&
+        request.auth.token.admin == true;
+    }
+
+    function isSelf(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function roomPath(roomId) {
+      return /databases/$(database)/documents/chatRooms/$(roomId);
+    }
+
+    function roomExists(roomId) {
+      return exists(roomPath(roomId));
+    }
+
+    function isRoomMember(roomId) {
+      return signedIn() &&
+        roomExists(roomId) &&
+        request.auth.uid in get(roomPath(roomId)).data.members;
+    }
+
+    function isRoomResourceMember() {
+      return signedIn() && request.auth.uid in resource.data.members;
+    }
+
+    function changedOnly(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
+    }
+
+    function createsOwnMessage(roomId) {
+      return isRoomMember(roomId) &&
+        request.resource.data.senderId == request.auth.uid &&
+        request.resource.data.chatRoomId == roomId;
+    }
+
+    function updatesOwnReadBy(roomId) {
+      let oldReadBy = resource.data.get('readBy', []);
+      let newReadBy = request.resource.data.get('readBy', []);
+      return isRoomMember(roomId) &&
+        changedOnly(['readBy']) &&
+        newReadBy.hasAll(oldReadBy) &&
+        (
+          (request.auth.uid in oldReadBy && newReadBy.size() == oldReadBy.size()) ||
+          (!(request.auth.uid in oldReadBy) &&
+            request.auth.uid in newReadBy &&
+            newReadBy.size() == oldReadBy.size() + 1)
+        );
+    }
+
+    function updatesOwnReactions(roomId) {
+      let oldReactions = resource.data.get('reactionsByUser', {});
+      let newReactions = request.resource.data.get('reactionsByUser', {});
+      return isRoomMember(roomId) &&
+        changedOnly(['reactionsByUser']) &&
+        newReactions.diff(oldReactions).affectedKeys().hasOnly([request.auth.uid]);
+    }
+
+    function updatesPin(roomId) {
+      return isRoomMember(roomId) && changedOnly(['isPinned']);
+    }
+
+    function senderUpdatesOwnMessage() {
+      return signedIn() &&
+        resource.data.senderId == request.auth.uid &&
+        changedOnly([
+          'text',
+          'title',
+          'isEdited',
+          'isDeleted',
+          'imageURL',
+          'fileURL',
+          'storagePath',
+          'fileSize',
+          'fileName',
+          'fileType',
+          'colorId',
+          'noteType',
+          'checkItems',
+          'orderIndex',
+          'updatedAt'
+        ]);
+    }
+
+    match /users/{userId} {
+      allow read: if signedIn();
+      allow create: if isSelf(userId) && request.resource.data.uid == userId;
+      allow update: if isAdmin() ||
+        (isSelf(userId) && changedOnly([
+          'displayName',
+          'photoURL',
+          'photoStoragePath',
+          'photoFileSize'
+        ]));
+      allow delete: if isAdmin();
+
       match /fcmTokens/{tokenId} {
-        allow read: if request.auth != null && request.auth.uid == userId;
-        allow write: if request.auth != null && request.auth.uid == userId;
+        allow read, write, delete: if isSelf(userId) || isAdmin();
+      }
+
+      match /notificationSettings/{roomId} {
+        allow read, write, delete: if isSelf(userId) || isAdmin();
       }
     }
 
-    // 設定ドキュメント（更新ノート、ストレージ使用量など）
     match /settings/{settingId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow read: if signedIn();
+      allow write: if isAdmin();
     }
 
-    // チャットルーム - 認証済みユーザーなら読み取り可能（メンバーチェックはアプリ側で実施）
-    match /chatRooms/{roomId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null;
-      allow delete: if request.auth != null;
+    match /schedules/{scheduleId} {
+      allow read, create, update, delete: if signedIn();
+    }
 
-      // メッセージサブコレクション
-      match /messages/{messageId} {
-        allow read: if request.auth != null;
-        allow create: if request.auth != null;
-        // 送信者は全フィールドを更新可能、それ以外のユーザーはreadByのみ更新可能
-        allow update: if request.auth != null && (
-          request.auth.uid == resource.data.senderId ||
-          // readBy配列への自分のUID追加のみ許可（既読処理）
-          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readBy']))
+    // ===== 工程管理（process management）=====
+    // 行動予定表(schedules)とは完全に独立したコレクション群。
+    // 業務要件「権限を分けない（ログイン者は全員 read/write 可）」のため、
+    // chatRooms のようなフィールド単位ホワイトリストは使わない。
+    // 縛るのは「作成者の詐称防止」と「createdBy / projectId の不変」のみ。
+    // 物理削除は Cloud Function(Admin SDK)だけが行うため、クライアントの delete は全面禁止。
+
+    // プロジェクト本体。削除はクライアント不可（update で pendingDelete:true を立て、Function が実削除）。
+    match /projects/{projectId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.createdBy == request.auth.uid   // 作成者の詐称防止
+        && request.resource.data.name is string;
+      allow update: if signedIn()
+        && request.resource.data.createdBy == resource.data.createdBy;  // createdBy は不変
+        // ※ pendingDelete:true / status / columns 等の変更はすべて許可（全員編集要件）
+      allow delete: if false;   // 物理削除は Function のみ
+    }
+
+    // タスク。projectId は不変（別PJへの付け替えを防ぐ）。
+    // タスクはサブコレクションを持たない単一ドキュメントなので、削除はクライアントから許可する
+    // （プロジェクト削除のような Function バッチは不要）。プロジェクト本体の物理削除のみ Function 専用。
+    match /tasks/{taskId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.createdBy == request.auth.uid   // 作成者の詐称防止
+        && request.resource.data.projectId is string;
+      allow update: if signedIn()
+        && request.resource.data.projectId == resource.data.projectId   // projectId は不変
+        && request.resource.data.createdBy == resource.data.createdBy;   // createdBy は不変
+      allow delete: if signedIn();   // タスク単体はクライアントから直接削除可（全員編集要件）
+    }
+
+    // 工程管理メンバー（担当者マスタ）。当面は delete も許容（将来は無効化フラグへ移行）。
+    match /processMembers/{memberId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() && request.resource.data.name is string;
+      allow delete: if signedIn();
+    }
+
+    // ===== 工程管理ここまで =====
+
+    match /chatRooms/{roomId} {
+      allow read: if isAdmin() || isRoomResourceMember();
+      allow create: if signedIn() &&
+        request.auth.uid in request.resource.data.members;
+      allow update: if isAdmin() ||
+        (
+          isRoomResourceMember() &&
+          changedOnly([
+            'name',
+            'photoURL',
+            'photoStoragePath',
+            'photoFileSize',
+            'members',
+            'memberDetails',
+            'favorites',
+            'lastMessage',
+            'unreadCounts',
+            'updatedAt'
+          ])
         );
-        allow delete: if request.auth != null;
+      allow delete: if isAdmin();
+
+      match /readStates/{userId} {
+        allow read: if isAdmin() || isRoomMember(roomId);
+        allow create: if isSelf(userId) &&
+          isRoomMember(roomId) &&
+          request.resource.data.keys().hasOnly(['lastReadAt']);
+        allow update: if isSelf(userId) &&
+          isRoomMember(roomId) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastReadAt']);
+        allow delete: if isAdmin();
+      }
+
+      match /messages/{messageId} {
+        allow read: if isAdmin() || isRoomMember(roomId);
+        allow create: if createsOwnMessage(roomId);
+        allow update: if isAdmin() ||
+          senderUpdatesOwnMessage() ||
+          updatesOwnReadBy(roomId) ||
+          updatesOwnReactions(roomId) ||
+          updatesPin(roomId);
+        allow delete: if isAdmin() ||
+          (signedIn() && resource.data.senderId == request.auth.uid);
       }
     }
   }

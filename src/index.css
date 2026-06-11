@@ -1,36 +1,81 @@
-/* グローバルスタイル - LINE風・青テーマ */
+/* グローバルスタイル - 会社カラーの水色 primary テーマ */
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap');
 
 * {
   box-sizing: border-box;
 }
 
+/* S3-G-3: WCAG AA キーボードナビゲーション用 focus-visible 強調 */
+:focus-visible {
+  outline: 2px solid var(--focus-ring, #0369a1);
+  outline-offset: 2px;
+}
+
+/* マウスでクリックした際に outline が残らないように focus は外す（focus-visible のみで強調） */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* L-36: テーマ切替時のチカチカ感を緩和（背景・文字色のみ 0.2s でなめらかに） */
+html,
+body,
+[data-theme] {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* prefers-reduced-motion: アニメーション軽減指定があれば transition を消す */
+@media (prefers-reduced-motion: reduce) {
+  html,
+  body,
+  [data-theme] {
+    transition: none;
+  }
+}
+
 :root {
   font-family: 'Noto Sans JP', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', Meiryo, sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  color: #333;
-  background-color: #e8f4f8;
+  color: #1f2933;
+  background-color: #e7f7ff;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
   /* ライトモード（デフォルト） */
-  --bg-primary: #e8f4f8;
+  --bg-primary: #e7f7ff;
   --bg-secondary: #fff;
-  --bg-chat: #e8f0f5;
+  --bg-tertiary: #f2fbff;
+  --bg-hover: #eaf7fd;
+  --bg-chat: #eaf8ff;
   --bg-message: #fff;
-  --bg-message-own: #8bc34a;
-  --bg-input: #f8f8f8;
-  --bg-header: #1a73e8;
-  --text-primary: #333;
-  --text-secondary: #666;
-  --text-muted: #888;
-  --text-message-own: #333;
-  --border-color: #e5e5e5;
-  --border-light: #f0f0f0;
-  --shadow-message: 0 1px 3px rgba(0, 0, 0, 0.12);
+  --bg-message-own: #bdeeff;
+  --bg-input: #f7fcff;
+  --bg-header: #0369a1;
+  --accent-color: #0369a1;
+  --accent-color-strong: #075985;
+  --accent-color-soft: rgba(3, 105, 161, 0.12);
+  --utility-blue: #2563eb;
+  --utility-blue-soft: rgba(37, 99, 235, 0.12);
+  --warning-color: #f59e0b;
+  --warning-soft: #fff7dd;
+  --danger-color: #dc2626;
+  --danger-soft: #fee2e2;
+  --focus-ring: #0369a1;
+  --text-primary: #1f2933;
+  --text-secondary: #52616b;
+  --text-tertiary: #7b8794;
+  --text-muted: #8a98a6;
+  --text-message-own: #0f3445;
+  --border-color: #d3e8f2;
+  --border-light: #e8f4f9;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --touch-target: 44px;
+  --shadow-message: 0 1px 2px rgba(15, 23, 42, 0.08), 0 8px 18px rgba(15, 23, 42, 0.05);
+  --shadow-panel: 0 12px 32px rgba(15, 23, 42, 0.10);
 
   color: var(--text-primary);
   background-color: var(--bg-primary);
@@ -40,15 +85,28 @@
 [data-theme="dark"] {
   --bg-primary: #1e1e2e;
   --bg-secondary: #2a2a3e;
+  --bg-tertiary: #323249;
+  --bg-hover: #34344a;
   --bg-chat: #252536;
   --bg-message: #3a3a4e;
-  --bg-message-own: #689f38;
+  --bg-message-own: #38bdf8;
   --bg-input: #3a3a4e;
-  --bg-header: #2a2a3e;
+  --bg-header: #075985;
+  --accent-color: #38bdf8;
+  --accent-color-strong: #7dd3fc;
+  --accent-color-soft: rgba(56, 189, 248, 0.16);
+  --utility-blue: #60a5fa;
+  --utility-blue-soft: rgba(96, 165, 250, 0.16);
+  --warning-color: #fbbf24;
+  --warning-soft: rgba(251, 191, 36, 0.14);
+  --danger-color: #f87171;
+  --danger-soft: rgba(248, 113, 113, 0.16);
+  --focus-ring: #7dd3fc;
   --text-primary: #f0f0f0;
   --text-secondary: #c0c0c0;
+  --text-tertiary: #aab0bd;
   --text-muted: #a0a0a0;
-  --text-message-own: #333;
+  --text-message-own: #052536;
   --border-color: #4a4a5e;
   --border-light: #3a3a4e;
   --shadow-message: 0 2px 4px rgba(0, 0, 0, 0.4);
@@ -70,7 +128,7 @@ body {
 }
 
 a {
-  color: #1a73e8;
+  color: var(--utility-blue);
   text-decoration: none;
 }
 
@@ -98,6 +156,6 @@ a:hover {
 
 /* 選択テキストのスタイル */
 ::selection {
-  background: #1a73e8;
+  background: var(--accent-color);
   color: white;
 }

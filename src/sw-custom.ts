@@ -1,5 +1,5 @@
 /// <reference lib="webworker" />
-import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching';
+import { precacheAndRoute, cleanupOutdatedCaches, createHandlerBoundToURL } from 'workbox-precaching';
 import { registerRoute, NavigationRoute } from 'workbox-routing';
 import { NetworkFirst } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
@@ -10,7 +10,13 @@ declare let self: ServiceWorkerGlobalScope;
 // PWA Service Worker - キャッシュ専用
 // Push通知はfirebase-messaging-sw.jsが処理するため、ここでは処理しない
 
-self.skipWaiting();
+// SKIP_WAITINGメッセージを受け取ったらskipWaitingを実行
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
 clientsClaim();
 
 // Workboxのプリキャッシュ
@@ -21,14 +27,7 @@ cleanupOutdatedCaches();
 
 // ナビゲーションルート（firebase-messaging-sw.jsは除外）
 const navigationRoute = new NavigationRoute(
-  async () => {
-    const cache = await caches.open('navigation-cache');
-    const cachedResponse = await cache.match('/index.html');
-    if (cachedResponse) {
-      return cachedResponse;
-    }
-    return fetch('/index.html');
-  },
+  createHandlerBoundToURL('/index.html'),
   {
     denylist: [/^\/firebase-messaging-sw\.js$/]
   }
