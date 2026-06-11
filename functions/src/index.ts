@@ -27,6 +27,25 @@ async function adjustStorageUsage(deltaBytes: number): Promise<void> {
   }, { merge: true });
 }
 
+// lastReadAt 以降の「他人からの未削除メッセージ」件数を数える。
+// メッセージ作成時と readStates 書き込み時の両方がこの同じ計算式で
+// 絶対値を書くことで、増分方式と絶対値方式の併存による未読数のずれを防ぐ
+async function computeUnreadCount(
+  roomRef: admin.firestore.DocumentReference,
+  userId: string,
+  lastReadAt: Timestamp | null
+): Promise<number> {
+  let messagesQuery: admin.firestore.Query = roomRef.collection('messages');
+  if (lastReadAt) {
+    messagesQuery = messagesQuery.where('createdAt', '>', lastReadAt);
+  }
+  const messagesSnapshot = await messagesQuery.get();
+  return messagesSnapshot.docs.filter((messageDoc) => {
+    const message = messageDoc.data();
+    return message.senderId !== userId && message.isDeleted !== true;
+  }).length;
+}
+
 function isInvalidRegistrationToken(error: admin.FirebaseError | undefined): boolean {
   return error?.code === 'messaging/registration-token-not-registered' ||
     error?.code === 'messaging/invalid-registration-token' ||
@@ -170,22 +189,20 @@ export const updateUnreadCountsOnNewMessage = onDocumentCreated(
 
     const members: string[] = roomData.members || [];
 
-    const createdAt = message.createdAt instanceof Timestamp ? message.createdAt : null;
-
-    // 送信者以外の未読数を+1。ただし、Functions 実行時点ですでに readStates が進んでいるユーザーは増やさない。
-    const updateData: { [key: string]: FieldValue } = {};
+    // 送信者以外の未読数を lastReadAt 基準の絶対値で再計算する。
+    // 以前の increment(+1) は normalizeUnreadCountOnReadStateWrite の絶対値上書きと
+    // 並行実行されると二重加算・取りこぼしが起きるため、計算式を一本化した
+    const updateData: { [key: string]: number } = {};
     await Promise.all(members.map(async (memberId) => {
       if (memberId === senderId) return;
 
       const readStateDoc = await roomRef.collection('readStates').doc(memberId).get();
       const lastReadAt = readStateDoc.data()?.lastReadAt;
-      const alreadyRead = createdAt &&
-        lastReadAt instanceof Timestamp &&
-        lastReadAt.toMillis() >= createdAt.toMillis();
-
-      if (!alreadyRead) {
-        updateData[`unreadCounts.${memberId}`] = FieldValue.increment(1);
-      }
+      updateData[`unreadCounts.${memberId}`] = await computeUnreadCount(
+        roomRef,
+        memberId,
+        lastReadAt instanceof Timestamp ? lastReadAt : null
+      );
     }));
 
     if (Object.keys(updateData).length > 0) {
@@ -470,15 +487,7 @@ export const normalizeUnreadCountOnReadStateWrite = onDocumentWritten(
     if (!(lastReadAt instanceof Timestamp)) return;
 
     const roomRef = db.collection('chatRooms').doc(chatRoomId);
-    const messagesSnapshot = await roomRef
-      .collection('messages')
-      .where('createdAt', '>', lastReadAt)
-      .get();
-
-    const unreadCount = messagesSnapshot.docs.filter((messageDoc) => {
-      const message = messageDoc.data();
-      return message.senderId !== userId && message.isDeleted !== true;
-    }).length;
+    const unreadCount = await computeUnreadCount(roomRef, userId, lastReadAt);
 
     await roomRef.update({
       [`unreadCounts.${userId}`]: unreadCount

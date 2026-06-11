@@ -43,6 +43,9 @@ export function useReadReceipt({ roomId, messages, currentUser }: UseReadReceipt
   // 既読書き込みとカウントリセット
   const processedReadIdsRef = useRef<Set<string>>(new Set());
   const currentRoomIdRef = useRef<string | null>(null);
+  // ルーム入室時の lastReadAt 書き込みを1回に抑えるフラグ。
+  // 以前は未読ゼロでもスナップショットのたびに書き込んでいた（書き込み増幅）
+  const entryWriteDoneRef = useRef(false);
 
   const updateReadState = useCallback(async (targetRoomId: string, uid: string) => {
     await setDoc(
@@ -56,17 +59,11 @@ export function useReadReceipt({ roomId, messages, currentUser }: UseReadReceipt
     // ルーム切り替え時に処理済みセットをリセット
     if (currentRoomIdRef.current !== roomId) {
       processedReadIdsRef.current.clear();
+      entryWriteDoneRef.current = false;
       currentRoomIdRef.current = roomId || null;
     }
 
     if (!currentUser || !roomId) return;
-
-    if (messages.length === 0) {
-      updateReadState(roomId, currentUser.uid).catch((error) => {
-        console.error('既読状態更新エラー:', error);
-      });
-      return;
-    }
 
     const unreadMessages = messages.filter(
       (msg) =>
@@ -76,9 +73,14 @@ export function useReadReceipt({ roomId, messages, currentUser }: UseReadReceipt
     );
 
     if (unreadMessages.length === 0) {
-      updateReadState(roomId, currentUser.uid).catch((error) => {
-        console.error('既読状態更新エラー:', error);
-      });
+      // lastReadAt の更新（= unreadCounts 正規化のトリガー）は入室後の1回だけ。
+      // 未読ゼロのまま再レンダリングされるたびに書くと Firestore 書き込みが膨らむ
+      if (!entryWriteDoneRef.current) {
+        entryWriteDoneRef.current = true;
+        updateReadState(roomId, currentUser.uid).catch((error) => {
+          console.error('既読状態更新エラー:', error);
+        });
+      }
       return;
     }
 
@@ -96,6 +98,7 @@ export function useReadReceipt({ roomId, messages, currentUser }: UseReadReceipt
 
       try {
         await batch.commit();
+        entryWriteDoneRef.current = true;
         await updateReadState(roomId, currentUser.uid);
       } catch (error) {
         // 失敗時は処理済みから外して再試行可能にする

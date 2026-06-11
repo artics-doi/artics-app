@@ -40,6 +40,20 @@ async function adjustStorageUsage(deltaBytes) {
         lastUpdated: firestore_2.FieldValue.serverTimestamp()
     }, { merge: true });
 }
+// lastReadAt 以降の「他人からの未削除メッセージ」件数を数える。
+// メッセージ作成時と readStates 書き込み時の両方がこの同じ計算式で
+// 絶対値を書くことで、増分方式と絶対値方式の併存による未読数のずれを防ぐ
+async function computeUnreadCount(roomRef, userId, lastReadAt) {
+    let messagesQuery = roomRef.collection('messages');
+    if (lastReadAt) {
+        messagesQuery = messagesQuery.where('createdAt', '>', lastReadAt);
+    }
+    const messagesSnapshot = await messagesQuery.get();
+    return messagesSnapshot.docs.filter((messageDoc) => {
+        const message = messageDoc.data();
+        return message.senderId !== userId && message.isDeleted !== true;
+    }).length;
+}
 function isInvalidRegistrationToken(error) {
     return (error === null || error === void 0 ? void 0 : error.code) === 'messaging/registration-token-not-registered' ||
         (error === null || error === void 0 ? void 0 : error.code) === 'messaging/invalid-registration-token' ||
@@ -146,8 +160,9 @@ exports.updateUnreadCountsOnNewMessage = (0, firestore_1.onDocumentCreated)('cha
     if (!roomData)
         return;
     const members = roomData.members || [];
-    const createdAt = message.createdAt instanceof firestore_2.Timestamp ? message.createdAt : null;
-    // 送信者以外の未読数を+1。ただし、Functions 実行時点ですでに readStates が進んでいるユーザーは増やさない。
+    // 送信者以外の未読数を lastReadAt 基準の絶対値で再計算する。
+    // 以前の increment(+1) は normalizeUnreadCountOnReadStateWrite の絶対値上書きと
+    // 並行実行されると二重加算・取りこぼしが起きるため、計算式を一本化した
     const updateData = {};
     await Promise.all(members.map(async (memberId) => {
         var _a;
@@ -155,12 +170,7 @@ exports.updateUnreadCountsOnNewMessage = (0, firestore_1.onDocumentCreated)('cha
             return;
         const readStateDoc = await roomRef.collection('readStates').doc(memberId).get();
         const lastReadAt = (_a = readStateDoc.data()) === null || _a === void 0 ? void 0 : _a.lastReadAt;
-        const alreadyRead = createdAt &&
-            lastReadAt instanceof firestore_2.Timestamp &&
-            lastReadAt.toMillis() >= createdAt.toMillis();
-        if (!alreadyRead) {
-            updateData[`unreadCounts.${memberId}`] = firestore_2.FieldValue.increment(1);
-        }
+        updateData[`unreadCounts.${memberId}`] = await computeUnreadCount(roomRef, memberId, lastReadAt instanceof firestore_2.Timestamp ? lastReadAt : null);
     }));
     if (Object.keys(updateData).length > 0) {
         try {
@@ -415,14 +425,7 @@ exports.normalizeUnreadCountOnReadStateWrite = (0, firestore_1.onDocumentWritten
     if (!(lastReadAt instanceof firestore_2.Timestamp))
         return;
     const roomRef = db.collection('chatRooms').doc(chatRoomId);
-    const messagesSnapshot = await roomRef
-        .collection('messages')
-        .where('createdAt', '>', lastReadAt)
-        .get();
-    const unreadCount = messagesSnapshot.docs.filter((messageDoc) => {
-        const message = messageDoc.data();
-        return message.senderId !== userId && message.isDeleted !== true;
-    }).length;
+    const unreadCount = await computeUnreadCount(roomRef, userId, lastReadAt);
     await roomRef.update({
         [`unreadCounts.${userId}`]: unreadCount
     });
