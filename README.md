@@ -1,73 +1,37 @@
-# React + TypeScript + Vite
+# ArticsChat
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+社内チャットアプリケーション。Windows PC 向け Electron デスクトップアプリとスマートフォン向け PWA の2形態で提供する。
 
-Currently, two official plugins are available:
+- チャット（1対1 / グループ / メモ）、リアクション、返信、ピン留め、既読、画像・ファイル送信
+- 行動予定表（カレンダー・予定通知）、工程管理（カンバン / ガント / 工数レポート）
+- プッシュ通知（PWA: FCM / Electron: カスタム通知ウィンドウ）
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 技術スタック
 
-## React Compiler
+React 19 / TypeScript / Vite / Firebase（Auth, Firestore, Storage, RTDB, Cloud Functions, FCM, Hosting）/ Electron
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## セットアップ
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cd chat-app
+npm install
+cp .env.example .env   # Firebase 設定を記入（VITE_FIREBASE_* / VITE_FIREBASE_VAPID_KEY）
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## 開発コマンド
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+| コマンド | 内容 |
+|---|---|
+| `npm run dev` | PWA 開発サーバー（http://127.0.0.1:5173） |
+| `npm run dev:electron` | Electron 開発モード |
+| `npm run build` | typecheck + Web ビルド |
+| `npm run build:electron` | Electron インストーラー生成（release/） |
+| `npm run lint` / `npm run typecheck` | 静的チェック |
+| `npm run test` | ユニットテスト（vitest、emulator 不要） |
+| `npm run test:rules` | セキュリティルールテスト（Java + emulator 必須） |
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## ドキュメント
+
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — 構成・規約・データフロー・危険地帯の索引（開発前に必読）
+- `PROJECT.md` — 過去の設計判断と変更履歴
+- 公開手順 — `.claude/skills/artics-deploy/skill.md`（デプロイは手順書に従い明示的に行う）
