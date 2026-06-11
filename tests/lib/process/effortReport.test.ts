@@ -6,6 +6,7 @@ import {
   compressEffortDailyDetails,
   DEFAULT_HOURS_PER_BUSINESS_DAY,
   effortReportFileName,
+  memberUniqueBusinessDays,
   scheduleHolidayDateKeys,
 } from '../../../src/lib/process/effortReport';
 import type { Project, ProcessMember, Task } from '../../../src/types/process';
@@ -255,5 +256,29 @@ describe('buildEffortReport', () => {
       { startDateKey: '2026-08-03', endDateKey: '2026-08-03', days: 1, totalHours: 4 },
       { startDateKey: '2026-08-04', endDateKey: '2026-08-04', days: 1, totalHours: 8 },
     ]);
+  });
+
+  test('memberUniqueBusinessDays は同一日の複数プロジェクト担当を二重カウントしない', () => {
+    const report = buildEffortReport({
+      fiscalYear: 2026,
+      projects: [project(), project({ id: 'p2', name: 'PJ2' })],
+      members: [member()],
+      tasks: [
+        task({ id: 't1', projectId: 'p1', startDate: d(2026, 8, 3), endDate: d(2026, 8, 3) }),
+        task({ id: 't2', projectId: 'p2', startDate: d(2026, 8, 3), endDate: d(2026, 8, 3) }),
+      ],
+      schedules: [],
+    });
+
+    // プロジェクト単位の businessDays は各1日（単純加算では2日に見える）
+    const summed = report.projects.reduce(
+      (sum, projectSummary) =>
+        sum + projectSummary.memberSummaries.reduce((acc, summary) => acc + summary.businessDays, 0),
+      0,
+    );
+    expect(summed).toBe(2);
+
+    // 横断のユニーク稼働日は1日（暦日数を超えない）
+    expect(memberUniqueBusinessDays(report).get('m1')).toBe(1);
   });
 });

@@ -425,6 +425,21 @@ export function compressEffortDailyDetails(report: EffortReportResult): EffortRe
   return compressed;
 }
 
+// プロジェクト横断のメンバー別ユニーク稼働日数。
+// memberSummary.businessDays はプロジェクト単位の実稼働日数なので、
+// 横断集計で単純加算すると同一日に複数プロジェクトを担当した日が二重に数えられる
+export function memberUniqueBusinessDays(report: EffortReportResult): Map<string, number> {
+  const daysByMember = new Map<string, Set<string>>();
+  report.projects.forEach((project) => {
+    project.memberSummaries.forEach((summary) => {
+      const days = daysByMember.get(summary.memberId) ?? new Set<string>();
+      summary.dailyDetails.forEach((detail) => days.add(detail.dateKey));
+      daysByMember.set(summary.memberId, days);
+    });
+  });
+  return new Map([...daysByMember.entries()].map(([memberId, days]) => [memberId, days.size]));
+}
+
 export function formatEffortHours(hours: number): string {
   return `${(Math.round(hours * 10) / 10).toFixed(1)}時間`;
 }

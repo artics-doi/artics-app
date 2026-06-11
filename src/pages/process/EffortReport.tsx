@@ -13,6 +13,7 @@ import {
   effortReportFileName,
   formatEffortDate,
   formatEffortHours,
+  memberUniqueBusinessDays,
 } from '../../lib/process/effortReport';
 import type { ProcessMember } from '../../types/process';
 import { ChevronLeftIcon, ChevronRightIcon } from '../../components/process/icons';
@@ -79,15 +80,17 @@ export default function EffortReport() {
   const warnings = report.issues.filter((issue) => issue.severity === 'warning');
   const canExport = !loading && errors.length === 0 && report.projects.length > 0;
   const memberTotals = useMemo(() => {
+    // 営業日はプロジェクト横断のユニーク日数。businessDays の単純加算だと
+    // 同一日に複数プロジェクトを担当した日が二重に数えられ、暦日数を超え得る
+    const uniqueDays = memberUniqueBusinessDays(report);
     const totals = new Map<string, MemberTotal>();
     report.projects.forEach((project) => {
       project.memberSummaries.forEach((summary) => {
         const current = totals.get(summary.memberId) ?? {
           memberId: summary.memberId,
-          businessDays: 0,
+          businessDays: uniqueDays.get(summary.memberId) ?? 0,
           totalHours: 0,
         };
-        current.businessDays += summary.businessDays;
         current.totalHours += summary.totalHours;
         totals.set(summary.memberId, current);
       });
@@ -95,7 +98,7 @@ export default function EffortReport() {
     return [...totals.values()].sort((a, b) =>
       memberName(memberById, a.memberId).localeCompare(memberName(memberById, b.memberId), 'ja'),
     );
-  }, [memberById, report.projects]);
+  }, [memberById, report]);
 
   const downloadPdf = async () => {
     if (!currentUser || !canExport) return;
