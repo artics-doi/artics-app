@@ -103,6 +103,8 @@ export function useProjectTasks(currentUser: FirebaseUser | null, projectId: str
             assigneeIds: sourceTask.assigneeIds,
             startDate: sourceTask.startDate,
             endDate: sourceTask.endDate,
+            completedDate: sourceTask.completedDate,
+            completionChecked: sourceTask.completionChecked,
             description: sourceTask.description,
           },
           projectId,
@@ -125,6 +127,19 @@ export function useProjectTasks(currentUser: FirebaseUser | null, projectId: str
     [currentUser],
   );
 
+  // 個別アーカイブは1ドキュメントだけを更新し、購読条件は増やさない。
+  const setTaskArchived = useCallback(
+    async (taskId: string, isArchived: boolean) => {
+      if (!currentUser) throw new Error('ログインが必要です');
+      console.info('[Process] setTaskArchived', { taskId, isArchived });
+      await updateDoc(doc(db, PROCESS_COLLECTIONS.tasks, taskId), {
+        isArchived,
+        updatedAt: serverTimestamp(),
+      });
+    },
+    [currentUser],
+  );
+
   // 列をまたいだ移動 + 並び順を1回の更新で確定する。
   // targetColumnId 内の prevOrder/nextOrder の間に入るキーを採番する（どちらも null 可）。
   const moveTask = useCallback(
@@ -133,15 +148,23 @@ export function useProjectTasks(currentUser: FirebaseUser | null, projectId: str
       targetColumnId: string,
       prevOrder: string | null,
       nextOrder: string | null,
+      updates: Partial<Pick<TaskInput, 'completedDate' | 'completionChecked'>> = {},
     ) => {
       if (!currentUser) throw new Error('ログインが必要です');
       const order = betweenOrderKey(prevOrder, nextOrder);
       console.info('[Process] moveTask', { taskId, targetColumnId });
-      await updateDoc(doc(db, PROCESS_COLLECTIONS.tasks, taskId), {
+      const updateData: Record<string, unknown> = {
         columnId: targetColumnId,
         order,
         updatedAt: serverTimestamp(),
-      });
+      };
+      if ('completedDate' in updates) {
+        updateData.completedDate = updates.completedDate;
+      }
+      if ('completionChecked' in updates) {
+        updateData.completionChecked = updates.completionChecked === true;
+      }
+      await updateDoc(doc(db, PROCESS_COLLECTIONS.tasks, taskId), updateData);
     },
     [currentUser],
   );
@@ -202,6 +225,7 @@ export function useProjectTasks(currentUser: FirebaseUser | null, projectId: str
     createTask,
     duplicateTask,
     updateTask,
+    setTaskArchived,
     moveTask,
     reorderTask,
     setGanttOrderForTasks,

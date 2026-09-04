@@ -1,11 +1,13 @@
 import type { Task } from '../../types/process';
 
 export type TaskDateFilter = 'all' | 'complete' | 'missing';
+export type TaskArchiveMode = 'active' | 'all' | 'archived';
 
 export interface TaskFilterState {
   query: string;
   assigneeId: string;
   columnId: string;
+  archiveMode: TaskArchiveMode;
   dateFilter: TaskDateFilter;
   missingOnly: boolean;
 }
@@ -20,6 +22,7 @@ export const EMPTY_TASK_FILTERS: TaskFilterState = {
   query: '',
   assigneeId: 'all',
   columnId: 'all',
+  archiveMode: 'active',
   dateFilter: 'all',
   missingOnly: false,
 };
@@ -38,6 +41,9 @@ export function hasTaskMissingFields(task: Task): boolean {
 }
 
 export function taskMatchesFilters(task: Task, filters: TaskFilterState): boolean {
+  if (filters.archiveMode === 'active' && task.isArchived) return false;
+  if (filters.archiveMode === 'archived' && !task.isArchived) return false;
+
   const normalizedQuery = filters.query.trim().toLowerCase();
   if (normalizedQuery) {
     const haystack = `${task.title}\n${task.description}`.toLowerCase();

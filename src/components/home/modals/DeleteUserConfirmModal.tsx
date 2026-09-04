@@ -6,13 +6,15 @@ interface DeleteUserConfirmModalProps {
   userName: string | undefined;
   onClose: () => void;
   onDelete: () => void;
+  deletionState?: string | null;
 }
 
 export default function DeleteUserConfirmModal({
   isOpen,
   userName,
   onClose,
-  onDelete
+  onDelete,
+  deletionState = null
 }: DeleteUserConfirmModalProps) {
   const { modalProps } = useModal({ isOpen, onClose });
 
@@ -22,7 +24,7 @@ export default function DeleteUserConfirmModal({
     <div
       {...modalProps}
       className={styles.modal}
-      onClick={onClose}
+      onClick={deletionState ? undefined : onClose}
       aria-labelledby="delete-user-modal-title"
     >
       <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
@@ -35,14 +37,16 @@ export default function DeleteUserConfirmModal({
           ※ Firebase Authenticationからの削除は<br />
           別途管理コンソールで行ってください
         </p>
+        {deletionState && <p role="status">削除処理: {deletionState}</p>}
         <div className={styles.modalActions}>
           <button
             className={styles.deleteConfirmButton}
             onClick={onDelete}
+            disabled={Boolean(deletionState)}
           >
             削除
           </button>
-          <button className={styles.closeButton} onClick={onClose}>
+          <button className={styles.closeButton} onClick={onClose} disabled={Boolean(deletionState)}>
             キャンセル
           </button>
         </div>

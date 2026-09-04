@@ -19,7 +19,7 @@ import {
 } from 'firebase/firestore';
 import { deleteObject, ref, uploadBytes } from 'firebase/storage';
 
-const PROJECT_ID = 'company-chat-a9cf0';
+const PROJECT_ID = 'demo-artics-refactor';
 
 let testEnv: RulesTestEnvironment;
 
@@ -51,9 +51,24 @@ beforeEach(async () => {
       displayName: 'Bob',
       photoURL: null,
     });
+    await setDoc(doc(db, 'users/admin'), {
+      uid: 'admin',
+      displayName: 'Admin',
+      photoURL: null,
+    });
+    await setDoc(doc(db, 'users/disabled'), {
+      uid: 'disabled',
+      displayName: 'Disabled',
+      photoURL: null,
+      lifecycleState: 'disabling',
+      lifecycleVersion: 1,
+      activeOperationId: 'op1',
+    });
     await setDoc(doc(db, 'chatRooms/room1'), {
       name: 'Room 1',
       type: 'group',
+      createdBy: 'alice',
+      deletionState: 'active',
       members: ['alice'],
       memberDetails: {
         alice: { displayName: 'Alice', photoURL: null },
@@ -113,7 +128,7 @@ describe('Firestore rules', () => {
     }));
   });
 
-  it('requires admin claims for management operations', async () => {
+  it('requires admin claims for management operations and keeps room deletion server-only', async () => {
     const aliceDb = testEnv.authenticatedContext('alice').firestore();
     const adminDb = testEnv.authenticatedContext('admin', { admin: true }).firestore();
 
@@ -131,7 +146,40 @@ describe('Firestore rules', () => {
     await assertSucceeds(setDoc(doc(adminDb, 'settings/releaseNotes'), {
       content: 'allowed',
     }));
-    await assertSucceeds(deleteDoc(doc(adminDb, 'chatRooms/room1')));
+    await assertFails(deleteDoc(doc(adminDb, 'chatRooms/room1')));
+  });
+
+  it('prevents creator spoofing while accepting legacy room creation without createdBy', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+    const baseRoom = {
+      name: 'Room',
+      type: 'group',
+      members: ['alice'],
+      memberDetails: {},
+      lastMessage: null,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+    await assertSucceeds(setDoc(doc(aliceDb, 'chatRooms/legacy'), baseRoom));
+    await assertSucceeds(setDoc(doc(aliceDb, 'chatRooms/owned'), { ...baseRoom, createdBy: 'alice' }));
+    await assertFails(setDoc(doc(aliceDb, 'chatRooms/spoofed'), { ...baseRoom, createdBy: 'bob' }));
+  });
+
+  it('blocks disabled users and protects server-owned lifecycle state', async () => {
+    const disabledDb = testEnv.authenticatedContext('disabled').firestore();
+    const adminDb = testEnv.authenticatedContext('admin', { admin: true }).firestore();
+
+    await assertFails(getDoc(doc(disabledDb, 'users/alice')));
+    await assertFails(updateDoc(doc(adminDb, 'users/alice'), {
+      lifecycleState: 'disabling',
+      lifecycleVersion: 1,
+      activeOperationId: 'op1',
+    }));
+    await assertFails(deleteDoc(doc(adminDb, 'users/alice')));
+    await assertFails(setDoc(doc(adminDb, 'userDeletionOperations/op1'), {
+      targetUid: 'alice',
+      state: 'requested',
+    }));
   });
 
   it('allows signed-in users to manage shared schedules', async () => {
@@ -175,9 +223,13 @@ describe('Firestore rules', () => {
 
     await assertSucceeds(setDoc(doc(aliceDb, 'chatRooms/room1/readStates/alice'), {
       lastReadAt: serverTimestamp(),
+      version: 1,
+      eventId: 'read-event-1',
     }));
     await assertFails(setDoc(doc(aliceDb, 'chatRooms/room1/readStates/bob'), {
       lastReadAt: serverTimestamp(),
+      version: 1,
+      eventId: 'spoofed-read-event',
     }));
 
     await assertSucceeds(updateDoc(messageRef, {
@@ -245,6 +297,25 @@ describe('Firestore rules', () => {
       updatedAt: serverTimestamp(),
     }));
   });
+
+  it('blocks new messages and read-state writes while a room is being deleted', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(doc(context.firestore(), 'chatRooms/room1'), { deletionState: 'deleting' });
+    });
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+    await assertFails(addDoc(collection(aliceDb, 'chatRooms/room1/messages'), {
+      chatRoomId: 'room1',
+      senderId: 'alice',
+      text: 'blocked',
+      readBy: ['alice'],
+      createdAt: serverTimestamp(),
+    }));
+    await assertFails(setDoc(doc(aliceDb, 'chatRooms/room1/readStates/alice'), {
+      lastReadAt: serverTimestamp(),
+      version: 1,
+      eventId: 'blocked-read',
+    }));
+  });
 });
 
 describe('Storage rules', () => {
@@ -253,9 +324,10 @@ describe('Storage rules', () => {
     const bobStorage = testEnv.authenticatedContext('bob').storage();
     const adminStorage = testEnv.authenticatedContext('admin', { admin: true }).storage();
 
-    await assertSucceeds(uploadBytes(ref(aliceStorage, 'chatFiles/room1/a.txt'), new Uint8Array([1])));
+    await assertSucceeds(uploadBytes(ref(aliceStorage, 'chatFiles/room1/a.txt'), new Uint8Array([1]), { contentType: 'text/plain' }));
     await assertFails(uploadBytes(ref(bobStorage, 'chatFiles/room1/b.txt'), new Uint8Array([1])));
-    await assertSucceeds(uploadBytes(ref(adminStorage, 'chatImages/room1/admin.png'), new Uint8Array([1])));
+    await assertSucceeds(uploadBytes(ref(adminStorage, 'chatImages/room1/admin.png'), new Uint8Array([1]), { contentType: 'image/png' }));
+    await assertFails(uploadBytes(ref(aliceStorage, 'chatImages/room1/not-image.txt'), new Uint8Array([1]), { contentType: 'text/plain' }));
     await assertSucceeds(deleteObject(ref(adminStorage, 'chatFiles/room1/a.txt')));
   });
 
@@ -264,12 +336,33 @@ describe('Storage rules', () => {
     const bobStorage = testEnv.authenticatedContext('bob').storage();
     const adminStorage = testEnv.authenticatedContext('admin', { admin: true }).storage();
 
-    await assertSucceeds(uploadBytes(ref(aliceStorage, 'profileImages/alice'), new Uint8Array([1])));
+    await assertSucceeds(uploadBytes(ref(aliceStorage, 'profileImages/alice'), new Uint8Array([1]), { contentType: 'image/png' }));
     await assertFails(uploadBytes(ref(bobStorage, 'profileImages/alice'), new Uint8Array([1])));
-    await assertSucceeds(uploadBytes(ref(adminStorage, 'profileImages/alice'), new Uint8Array([2])));
+    await assertSucceeds(uploadBytes(ref(adminStorage, 'profileImages/alice'), new Uint8Array([2]), { contentType: 'image/png' }));
+  });
+
+  it('blocks storage access for disabled users', async () => {
+    const disabledStorage = testEnv.authenticatedContext('disabled').storage();
+    await assertFails(uploadBytes(
+      ref(disabledStorage, 'profileImages/disabled'),
+      new Uint8Array([1]),
+      { contentType: 'image/png' },
+    ));
+  });
+
+  it('blocks new room files while deletion is in progress', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(doc(context.firestore(), 'chatRooms/room1'), { deletionState: 'deleting' });
+    });
+    const aliceStorage = testEnv.authenticatedContext('alice').storage();
+    await assertFails(uploadBytes(
+      ref(aliceStorage, 'chatFiles/room1/blocked.txt'),
+      new Uint8Array([1]),
+      { contentType: 'text/plain' },
+    ));
   });
 });
 
 it('uses the expected rules test project', () => {
-  expect(PROJECT_ID).toBe('company-chat-a9cf0');
+  expect(PROJECT_ID).toBe('demo-artics-refactor');
 });

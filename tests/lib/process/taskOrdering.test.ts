@@ -43,6 +43,8 @@ describe('process task ordering', () => {
       assigneeIds: [],
       startDate: null,
       endDate: null,
+      completedDate: null,
+      completionChecked: false,
       description: '',
     };
 

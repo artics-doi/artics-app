@@ -132,4 +132,6 @@ npx vite build --config vite.electron.config.ts     # Electron バンドル（pu
 - `npm run build:electron` の electron-builder で `--publish` を付けること、`GH_TOKEN` / `GITHUB_TOKEN` の設定
 - GitHub Releases の作成・更新
 
-公開手順は `.claude/skills/artics-deploy/skill.md` を参照（特に latest.yml とファイル名の一致確認）。
+公開手順は `.claude/skills/artics-chat-release/skill.md` を参照（特に latest.yml とファイル名の一致確認）。
+
+`npm run build`（PWA）と `npm run build:electron` は同じ `dist/` に出力する。`build:electron` 後の `dist/` は `manifest.webmanifest` と生成 SW を持たない Electron 用バンドルなので、その状態で Hosting に出さない。

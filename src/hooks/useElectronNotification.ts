@@ -56,10 +56,11 @@ export function useElectronNotification() {
     messageId?: string,
     roomId?: string,
     kind: 'chat' | 'schedule' = 'chat',
+    scheduleId?: string,
   ) => {
     if (isElectron && window.electronAPI) {
       // Electron環境（roomIdを渡して通知から直接ルームに遷移できるようにする）
-      return await window.electronAPI.showNotification({ title, body, roomId, kind });
+      return await window.electronAPI.showNotification({ title, body, roomId, scheduleId, kind });
     } else {
       // ブラウザ環境
       if ('Notification' in window && Notification.permission === 'granted') {

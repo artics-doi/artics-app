@@ -1,17 +1,25 @@
 // チャット画面
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from 'react';
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import {
   collection,
   onSnapshot,
   addDoc,
+  setDoc,
   updateDoc,
   doc,
   serverTimestamp,
   arrayUnion,
   arrayRemove,
   deleteField,
+  type DocumentReference,
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from '../lib/firebase';
@@ -25,13 +33,22 @@ import { useTypingIndicator } from '../hooks/useTypingIndicator';
 import { useMessages } from '../hooks/useMessages';
 import { useChatRooms } from '../hooks/useChatRooms';
 import { useReadReceipt } from '../hooks/useReadReceipt';
+import { useSchedules } from '../hooks/useSchedules';
+import { useProjects } from '../hooks/process/useProjects';
+import { useProjectTasks } from '../hooks/process/useProjectTasks';
+import { useProcessMembers } from '../hooks/process/useProcessMembers';
 import { useVisualViewport } from '../hooks/useVisualViewport';
-import type { ChatRoom, ExtendedMessage } from '../types';
+import { useIsNarrowViewport } from '../hooks/useIsNarrowViewport';
+import { isElectronEnv } from '../hooks/useElectronNotification';
+import { useDesktopRoomPaneResize } from '../hooks/useDesktopRoomPaneResize';
+import type { ChatRoom, ExtendedMessage, User } from '../types';
+import type { ScheduleCategoryId } from '../types/schedule';
+import type { TaskInput } from '../types/process';
 import { compressImage, isImageFile } from '../utils/imageCompression';
 import { getRoomDisplayName } from '../utils/room';
-import { formatTimeSmart } from '../utils/dateUtils';
-import { getAppEntryPath } from '../utils/navigation';
+import { ELECTRON_COMPACT_MAX_WIDTH, getAppEntryPath } from '../utils/navigation';
 import { MAX_FILE_SIZE, HIGHLIGHT_DURATION, MAX_TEXTAREA_HEIGHT } from '../constants';
+import { SCHEDULE_CATEGORIES } from '../constants/schedule';
 import ImagePreviewModal from '../components/ImagePreviewModal';
 import ConfirmModal from '../components/modals/ConfirmModal';
 import {
@@ -44,14 +61,54 @@ import {
   TypingIndicator,
 } from '../components/chat';
 import DesktopRoomPane from '../components/desktop/DesktopRoomPane';
+import DesktopChatLanding from '../components/desktop/DesktopChatLanding';
+import DesktopRoomInfoPane from '../components/desktop/DesktopRoomInfoPane';
 import DesktopUtilityModals from '../components/desktop/DesktopUtilityModals';
 import DesktopNewChatModals from '../components/desktop/DesktopNewChatModals';
+import TaskPanel from '../components/process/TaskPanel';
+import { DeleteRoomConfirmModal } from '../components/home/modals';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { resolveMenuPosition } from '../lib/chat/menuPosition';
+import { createScheduleFormFromMessage, createTaskInputFromMessage } from '../lib/chat/createFromMessage';
+import { isPermissionDeniedError, withoutAttachmentFields } from '../lib/chat/attachmentCompat';
+import { getClipboardImageFiles, validatePendingAttachments } from '../lib/chat/pendingAttachments';
+import { canDeleteChatRoom } from '../lib/chat/roomDeletion';
+import { deleteChatRoom } from '../lib/chat/roomDeletionClient';
+import { buildDate, isValidDate } from '../lib/schedule/calendar';
+import type { ScheduleFormState } from '../lib/schedule/form';
 import styles from './Chat.module.css';
 
-export default function Chat() {
-  const { roomId } = useParams<{ roomId: string }>();
+/**
+ * メッセージ更新を書き込む。attachmentState などの新フィールドを許可しない
+ * 旧 firestore.rules 環境では permission-denied になるため、その場合だけ
+ * 添付専用フィールドを外して再試行する（段階移行用）。
+ *
+ * @returns フォールバックで書き込んだ場合 true。ルール反映後は常に false になる。
+ */
+async function updateMessageWithAttachmentCompat(
+  messageRef: DocumentReference,
+  payload: Record<string, unknown>
+): Promise<boolean> {
+  try {
+    await updateDoc(messageRef, payload);
+    return false;
+  } catch (error) {
+    if (!isPermissionDeniedError(error)) throw error;
+    console.warn('[attachment] 旧ルール互換モードで再試行します（firestore.rules 未反映）');
+    await updateDoc(messageRef, withoutAttachmentFields(payload));
+    return true;
+  }
+}
+
+interface ChatProps {
+  embeddedRoomId?: string;
+  onEmbeddedBack?: () => void;
+}
+
+export default function Chat({ embeddedRoomId, onEmbeddedBack }: ChatProps = {}) {
+  const { roomId: routeRoomId } = useParams<{ roomId: string }>();
+  const roomId = embeddedRoomId ?? routeRoomId;
+  const isEmbedded = Boolean(embeddedRoomId);
   const [searchParams] = useSearchParams();
   const location = useLocation();
   const { setActiveRoomId } = useActiveRoom();
@@ -74,6 +131,7 @@ export default function Chat() {
   // M-10: アップロード進捗を構造化（"N / total" 表示用）
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
   const uploading = uploadProgress !== null;
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [previewImage, setPreviewImage] = useState<{ url: string; fileName: string } | null>(null);
 
   // 編集・削除機能
@@ -177,15 +235,20 @@ export default function Chat() {
   // メンバー一覧
   const [showMemberList, setShowMemberList] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [showDeleteRoomConfirm, setShowDeleteRoomConfirm] = useState(false);
+  const [isDeletingRoom, setIsDeletingRoom] = useState(false);
 
   const { currentUser } = useAuth();
+  const isNarrowViewport = useIsNarrowViewport(ELECTRON_COMPACT_MAX_WIDTH);
+  const isElectronCompact = isElectronEnv() && isNarrowViewport;
   const { showToast } = useToast();
   const { isRoomMuted, toggleMute } = useRoomNotificationSettings();
-  const { chatRooms: desktopChatRooms } = useChatRooms(currentUser);
+  const { chatRooms: desktopChatRooms } = useChatRooms(isEmbedded ? null : currentUser);
   const navigate = useNavigate();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
   const { users, fetchUsers } = useUsers();
   const {
     selectedUsers: inviteSelectedUsers,
@@ -194,10 +257,22 @@ export default function Chat() {
     inviteMembers
   } = useInviteMembers(users);
   const { setTyping, clearTyping } = useTypingIndicator(roomId, currentUser?.uid);
-  const [desktopSidePanelOpen, setDesktopSidePanelOpen] = useState(false);
+  const [desktopSidePanelOpen, setDesktopSidePanelOpen] = useState(() => !isEmbedded);
+  const {
+    paneWidth: desktopRoomPaneWidth,
+    isResizing: desktopRoomPaneResizing,
+    paneStyle: desktopChatLayoutStyle,
+    handleResizePointerDown: handleDesktopRoomPaneResizePointerDown,
+    handleResizeKeyDown: handleDesktopRoomPaneResizeKeyDown,
+  } = useDesktopRoomPaneResize(chatContainerRef, desktopSidePanelOpen);
   const [desktopSearchOpen, setDesktopSearchOpen] = useState(false);
   const [desktopSettingsOpen, setDesktopSettingsOpen] = useState(false);
   const [desktopNewChatOpen, setDesktopNewChatOpen] = useState(false);
+  const [scheduleDraft, setScheduleDraft] = useState<ScheduleFormState | null>(null);
+  const [scheduleDraftSaving, setScheduleDraftSaving] = useState(false);
+  const [scheduleDraftUserIds, setScheduleDraftUserIds] = useState<string[]>([]);
+  const [taskDraftMessage, setTaskDraftMessage] = useState<ExtendedMessage | null>(null);
+  const [taskProjectId, setTaskProjectId] = useState('');
 
   // オンラインステータス
   const memberIds = useMemo(() => chatRoom?.members ?? [], [chatRoom?.members]);
@@ -206,6 +281,38 @@ export default function Chat() {
     if (chatRoom?.type !== 'direct' || !currentUser) return null;
     return chatRoom.members.find(uid => uid !== currentUser.uid) ?? null;
   }, [chatRoom, currentUser]);
+  const { createSchedule } = useSchedules(currentUser, { subscribe: false });
+  const { projects: activeProjects } = useProjects(currentUser, 'active');
+  const selectedTaskProject = activeProjects.find((project) => project.id === taskProjectId) ?? activeProjects[0] ?? null;
+  const selectedTaskProjectId = taskDraftMessage ? selectedTaskProject?.id ?? null : null;
+  const {
+    createTask: createChatTask,
+  } = useProjectTasks(currentUser, selectedTaskProjectId);
+  const { members: processMembers } = useProcessMembers(currentUser);
+  const scheduleTargetUsers = useMemo<User[]>(() => {
+    if (!currentUser) return users;
+    const currentAsUser: User = {
+      uid: currentUser.uid,
+      email: currentUser.email || '',
+      displayName: currentUser.displayName || currentUser.email || '自分',
+      photoURL: currentUser.photoURL,
+      createdAt: new Date(),
+    };
+    const unique = new Map<string, User>();
+    [currentAsUser, ...users].forEach((user) => unique.set(user.uid, user));
+    return Array.from(unique.values()).sort((a, b) => a.displayName.localeCompare(b.displayName, 'ja'));
+  }, [currentUser, users]);
+
+  const desktopRoomPaneResizeHandle = (
+    <button
+      type="button"
+      className={`${styles.desktopRoomPaneResizeHandle} ${desktopRoomPaneResizing ? styles.dragging : ''}`}
+      onPointerDown={handleDesktopRoomPaneResizePointerDown}
+      onKeyDown={handleDesktopRoomPaneResizeKeyDown}
+      aria-label={`チャット一覧の幅を調整（現在${desktopRoomPaneWidth}px）`}
+      title="左右にドラッグしてチャット一覧の幅を調整"
+    />
+  );
 
   // 現在閲覧中のルームをグローバルに設定（通知抑制用）
   useEffect(() => {
@@ -254,13 +361,22 @@ export default function Chat() {
     const unsubscribe = onSnapshot(roomRef, (roomDoc) => {
       if (!roomDoc.exists()) {
         setChatRoom(null);
+        if (isEmbedded) {
+          onEmbeddedBack?.();
+        } else {
+          navigate(getAppEntryPath(), { replace: true });
+        }
         return;
       }
 
       const data = roomDoc.data();
       // メモルームの場合はメモページにリダイレクト
       if (data.type === 'memo') {
-        navigate(`/memo/${roomId}`, { replace: true });
+        if (isEmbedded) {
+          onEmbeddedBack?.();
+        } else {
+          navigate(`/memo/${roomId}`, { replace: true });
+        }
         return;
       }
       setChatRoom({
@@ -272,7 +388,7 @@ export default function Chat() {
     });
 
     return () => unsubscribe();
-  }, [roomId, navigate]);
+  }, [isEmbedded, navigate, onEmbeddedBack, roomId]);
 
   // 検索からのジャンプ対応（searchParamsが変わった時のみ）
   const handledJumpRef = useRef<string | null>(null);
@@ -300,6 +416,8 @@ export default function Chat() {
   // ルーム変更時のフラグリセット
   useEffect(() => {
     hasJumpedToUnreadRef.current = false;
+    setPendingFiles([]);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   }, [roomId]);
 
   // 未読位置への自動ジャンプ
@@ -440,11 +558,13 @@ export default function Chat() {
 
   // メッセージを送信（H-2: 楽観的更新で即時表示）
   async function sendMessage() {
-    if (!newMessage.trim() || !currentUser || !roomId || sending) return;
+    const text = newMessage.trim();
+    const filesToSend = [...pendingFiles];
+    if ((!text && filesToSend.length === 0) || !currentUser || !roomId || sending) return;
 
     setSending(true);
-    const text = newMessage.trim();
-    const mentions = extractMentions(newMessage);
+    try {
+    const mentions = text ? extractMentions(newMessage) : [];
     const replyToSnapshot = replyingTo
       ? {
           messageId: replyingTo.id,
@@ -453,39 +573,11 @@ export default function Chat() {
         }
       : null;
 
-    // (1) ローカルで即時表示（送信中フラグ付き）
-    const localId = addOptimistic({
-      chatRoomId: roomId,
-      senderId: currentUser.uid,
-      senderName: currentUser.displayName || 'Unknown',
-      senderPhotoURL: currentUser.photoURL,
-      text,
-      imageURL: null,
-      fileURL: null,
-      storagePath: null,
-      fileSize: null,
-      fileName: null,
-      fileType: null,
-      readBy: [currentUser.uid],
-      createdAt: new Date(),
-      isEdited: false,
-      isDeleted: false,
-      reactions: {},
-      reactionsByUser: {},
-      replyTo: replyToSnapshot,
-      isPinned: false,
-      mentions,
-    });
+    let sentAnything = false;
 
-    // (2) UI 側のリセットは送信完了を待たずに行う（入力欄を即クリア）
-    setNewMessage('');
-    setReplyingTo(null);
-    if (messageInputRef.current) {
-      messageInputRef.current.style.height = 'auto';
-    }
-
-    try {
-      const messageData: Record<string, unknown> = {
+    if (text) {
+      // (1) 本文はローカルで即時表示（送信中フラグ付き）
+      const localId = addOptimistic({
         chatRoomId: roomId,
         senderId: currentUser.uid,
         senderName: currentUser.displayName || 'Unknown',
@@ -498,7 +590,7 @@ export default function Chat() {
         fileName: null,
         fileType: null,
         readBy: [currentUser.uid],
-        createdAt: serverTimestamp(),
+        createdAt: new Date(),
         isEdited: false,
         isDeleted: false,
         reactions: {},
@@ -506,30 +598,67 @@ export default function Chat() {
         replyTo: replyToSnapshot,
         isPinned: false,
         mentions,
-      };
-
-      await addDoc(collection(db, 'chatRooms', roomId, 'messages'), messageData);
-
-      // チャットルームの最終メッセージを更新
-      await updateDoc(doc(db, 'chatRooms', roomId), {
-        lastMessage: {
-          text,
-          senderId: currentUser.uid,
-          senderName: currentUser.displayName || 'Unknown',
-          timestamp: serverTimestamp(),
-        },
-        updatedAt: serverTimestamp(),
       });
 
-      await clearTyping();
+      // (2) 本文は従来どおり、送信完了を待たずに入力欄からクリアする
+      setNewMessage('');
+      if (messageInputRef.current) messageInputRef.current.style.height = 'auto';
 
-      // (3) 送信成功: ローカル側を消す（Firestore 版が onSnapshot で入ってくる）
-      confirmOptimistic(localId);
-    } catch (error) {
-      console.error('メッセージ送信エラー:', error);
-      // (4) 送信失敗: ローカル側を failed 状態にして UI で再送/破棄を促す
-      failOptimistic(localId);
-      showToast('error', 'メッセージの送信に失敗しました');
+      try {
+        const messageData: Record<string, unknown> = {
+          chatRoomId: roomId,
+          senderId: currentUser.uid,
+          senderName: currentUser.displayName || 'Unknown',
+          senderPhotoURL: currentUser.photoURL,
+          text,
+          imageURL: null,
+          fileURL: null,
+          storagePath: null,
+          fileSize: null,
+          fileName: null,
+          fileType: null,
+          readBy: [currentUser.uid],
+          createdAt: serverTimestamp(),
+          isEdited: false,
+          isDeleted: false,
+          reactions: {},
+          reactionsByUser: {},
+          replyTo: replyToSnapshot,
+          isPinned: false,
+          mentions,
+        };
+
+        await addDoc(collection(db, 'chatRooms', roomId, 'messages'), messageData);
+        await updateDoc(doc(db, 'chatRooms', roomId), {
+          lastMessage: {
+            text,
+            senderId: currentUser.uid,
+            senderName: currentUser.displayName || 'Unknown',
+            timestamp: serverTimestamp(),
+          },
+          updatedAt: serverTimestamp(),
+        });
+        confirmOptimistic(localId);
+        sentAnything = true;
+      } catch (error) {
+        console.error('メッセージ送信エラー:', error);
+        failOptimistic(localId);
+        showToast('error', 'メッセージの送信に失敗しました');
+      }
+    }
+
+    if (filesToSend.length > 0) {
+      const filesSent = await uploadFiles(filesToSend, replyToSnapshot);
+      if (filesSent) {
+        setPendingFiles([]);
+        sentAnything = true;
+      }
+    }
+
+    if (sentAnything) {
+      setReplyingTo(null);
+      await clearTyping();
+    }
     } finally {
       setSending(false);
     }
@@ -578,19 +707,39 @@ export default function Chat() {
       pendingDeleteTimersRef.current.delete(messageId);
       try {
         if (targetMessage?.storagePath) {
-          await deleteObject(ref(storage, targetMessage.storagePath)).catch((error) => {
-            if (error?.code !== 'storage/object-not-found') throw error;
+          const messageRef = doc(db, 'chatRooms', roomId, 'messages', messageId);
+          const usedLegacyRules = await updateMessageWithAttachmentCompat(messageRef, {
+            text: '',
+            isDeleted: true,
+            attachmentState: 'deleting',
+            attachmentOperationId: crypto.randomUUID(),
+            updatedAt: serverTimestamp(),
+          });
+          if (usedLegacyRules) {
+            // 旧ルール環境では cleanupDeletingAttachment が実体を消さないため、
+            // 旧実装どおりクライアントから削除して参照も外す
+            await deleteObject(ref(storage, targetMessage.storagePath)).catch((error) => {
+              if (error?.code !== 'storage/object-not-found') {
+                console.error('添付削除エラー（旧ルール互換モード）:', error);
+              }
+            });
+            await updateDoc(messageRef, {
+              imageURL: null,
+              fileURL: null,
+              storagePath: null,
+              fileSize: null,
+            });
+          }
+        } else {
+          await updateDoc(doc(db, 'chatRooms', roomId, 'messages', messageId), {
+            text: '',
+            isDeleted: true,
+            imageURL: null,
+            fileURL: null,
+            storagePath: null,
+            fileSize: null,
           });
         }
-
-        await updateDoc(doc(db, 'chatRooms', roomId, 'messages', messageId), {
-          text: '',
-          isDeleted: true,
-          imageURL: null,
-          fileURL: null,
-          storagePath: null,
-          fileSize: null,
-        });
 
         // 反映後は非表示を解除し、他ユーザーと同じ「削除されました」表示に揃える
         setPendingDeleteIds((prev) => {
@@ -789,7 +938,11 @@ export default function Chat() {
       });
 
       setShowLeaveConfirm(false);
-      navigate(getAppEntryPath());
+      if (isEmbedded) {
+        onEmbeddedBack?.();
+      } else {
+        navigate(getAppEntryPath());
+      }
       showToast('success', 'グループから退出しました');
     } catch (error) {
       console.error('グループ退出エラー:', error);
@@ -797,34 +950,78 @@ export default function Chat() {
     }
   }
 
-  // ファイルを送信
-  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = e.target.files;
-    if (!files || files.length === 0 || !currentUser || !roomId) return;
-    await uploadFiles(Array.from(files));
-  }
-
-  // ドラッグ&ドロップでファイルアップロード
-  const uploadFiles = async (files: File[]) => {
-    if (!currentUser || !roomId) return;
-
-    // ファイルサイズチェック
-    const totalSize = files.reduce((sum, file) => sum + file.size, 0);
-    if (totalSize > MAX_FILE_SIZE) {
-      const sizeMB = (totalSize / (1024 * 1024)).toFixed(1);
-      showToast('warning', `ファイルサイズが制限を超えています。\n\n選択されたファイル: ${sizeMB}MB\n制限: 30MB\n\n30MB以下のファイルを選択してください。`);
+  async function handleDeleteRoom() {
+    if (!roomId || !chatRoom || isDeletingRoom) return;
+    if (!canDeleteChatRoom(chatRoom, currentUser?.uid)) {
+      showToast('error', 'このルームを削除する権限がありません');
       return;
     }
 
-    // 個別ファイルのサイズもチェック
-    for (const file of files) {
-      if (file.size > MAX_FILE_SIZE) {
-        const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
-        showToast('warning', `ファイル「${file.name}」のサイズが制限を超えています。\n\nファイルサイズ: ${sizeMB}MB\n制限: 30MB\n\n30MB以下のファイルを選択してください。`);
-        return;
+    setIsDeletingRoom(true);
+    try {
+      const result = await deleteChatRoom(roomId);
+      setShowDeleteRoomConfirm(false);
+      if (isEmbedded) {
+        onEmbeddedBack?.();
+      } else {
+        navigate(getAppEntryPath(), { replace: true });
       }
+      showToast('success', result.status === 'already-deleted' ? 'ルームはすでに削除されています' : 'ルームを削除しました');
+    } catch (error) {
+      console.error('チャットルーム削除エラー:', error);
+      const code = (error as { code?: string }).code ?? '';
+      showToast('error', code.includes('permission-denied')
+        ? 'このルームを削除する権限がありません'
+        : 'ルームの完全削除に失敗しました。もう一度お試しください');
+    } finally {
+      setIsDeletingRoom(false);
     }
+  }
 
+  // ファイルは選択時点では送信せず、送信ボタンが押されるまで入力欄に保持する。
+  function queueFiles(files: File[]) {
+    if (files.length === 0) return;
+    const nextFiles = [...pendingFiles, ...files];
+    const validation = validatePendingAttachments(nextFiles, MAX_FILE_SIZE);
+    if (!validation.valid) {
+      const sizeMB = (validation.size / (1024 * 1024)).toFixed(1);
+      if (validation.reason === 'file-too-large') {
+        showToast('warning', `ファイル「${validation.fileName}」のサイズが制限を超えています。\n\nファイルサイズ: ${sizeMB}MB\n制限: 25MB\n\n25MB以下のファイルを選択してください。`);
+      } else {
+        showToast('warning', `保留中のファイル合計が制限を超えています。\n\n合計サイズ: ${sizeMB}MB\n制限: 25MB\n\n合計25MB以下になるようにファイルを選択してください。`);
+      }
+      return;
+    }
+    setPendingFiles(nextFiles);
+  }
+
+  function handleFileSelection(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    queueFiles(files);
+    e.target.value = '';
+  }
+
+  function handleMessagePaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    if (sending || uploading) return;
+    const imageFiles = getClipboardImageFiles(Array.from(e.clipboardData.items));
+    if (imageFiles.length === 0) return;
+
+    // 画像貼り付け時にブラウザ固有の代替テキストやHTMLが入力されないようにする。
+    e.preventDefault();
+    queueFiles(imageFiles);
+  }
+
+  function removePendingFile(index: number) {
+    if (sending) return;
+    setPendingFiles((files) => files.filter((_, fileIndex) => fileIndex !== index));
+  }
+
+  // 送信ボタン押下後に、保留していたファイルを順番に送信する。
+  const uploadFiles = async (
+    files: File[],
+    replyToSnapshot: ExtendedMessage['replyTo'],
+  ): Promise<boolean> => {
+    if (!currentUser || !roomId) return false;
     setUploadProgress({ current: 0, total: files.length });
     try {
       for (let i = 0; i < files.length; i++) {
@@ -838,26 +1035,21 @@ export default function Chat() {
           fileToUpload = await compressImage(file);
         }
 
-        // Storageにアップロード
         const timestamp = Date.now();
         const filePath = `chatFiles/${roomId}/${timestamp}/${file.name}`;
         const storageRef = ref(storage, filePath);
-        await uploadBytes(storageRef, fileToUpload, {
-          cacheControl: 'public, max-age=604800'
-        });
-        const downloadURL = await getDownloadURL(storageRef);
-
-        // メッセージとして保存
+        const operationId = crypto.randomUUID();
+        const messageRef = doc(collection(db, 'chatRooms', roomId, 'messages'));
         const messageData = {
           chatRoomId: roomId,
           senderId: currentUser.uid,
           senderName: currentUser.displayName || 'Unknown',
           senderPhotoURL: currentUser.photoURL,
           text: isImage ? '' : `ファイル: ${file.name}`,
-          imageURL: isImage ? downloadURL : null,
-          fileURL: isImage ? null : downloadURL,
+          imageURL: null,
+          fileURL: null,
           storagePath: filePath,
-          fileSize: fileToUpload.size,
+          fileSize: null,
           fileName: file.name,
           fileType: file.type,
           readBy: [currentUser.uid],
@@ -866,16 +1058,46 @@ export default function Chat() {
           isDeleted: false,
           reactions: {},
           reactionsByUser: {},
-          replyTo: replyingTo ? {
-            messageId: replyingTo.id,
-            text: replyingTo.text.substring(0, 50),
-            senderName: replyingTo.senderName
-          } : null,
+          replyTo: replyToSnapshot ?? null,
           isPinned: false,
-          mentions: []
+          mentions: [],
+          attachmentState: 'uploading',
+          attachmentOperationId: operationId,
         };
 
-        await addDoc(collection(db, 'chatRooms', roomId, 'messages'), messageData);
+        await setDoc(messageRef, messageData);
+        try {
+          await uploadBytes(storageRef, fileToUpload, {
+            cacheControl: 'public, max-age=604800',
+            contentType: fileToUpload.type || 'application/octet-stream',
+          });
+          const downloadURL = await getDownloadURL(storageRef);
+          await updateMessageWithAttachmentCompat(messageRef, {
+            imageURL: isImage ? downloadURL : null,
+            fileURL: isImage ? null : downloadURL,
+            storagePath: filePath,
+            fileSize: fileToUpload.size,
+            attachmentState: 'ready',
+            attachmentError: deleteField(),
+            updatedAt: serverTimestamp(),
+          });
+        } catch (error) {
+          await deleteObject(storageRef).catch((cleanupError) => {
+            if (cleanupError?.code !== 'storage/object-not-found') {
+              console.error('アップロード補償削除エラー:', cleanupError);
+            }
+          });
+          await updateMessageWithAttachmentCompat(messageRef, {
+            imageURL: null,
+            fileURL: null,
+            storagePath: null,
+            fileSize: null,
+            attachmentState: 'failed',
+            attachmentError: 'upload-or-finalize-failed',
+            updatedAt: serverTimestamp(),
+          }).catch(() => undefined);
+          throw error;
+        }
 
         await updateDoc(doc(db, 'chatRooms', roomId), {
           lastMessage: {
@@ -887,15 +1109,13 @@ export default function Chat() {
           updatedAt: serverTimestamp()
         });
       }
-      setReplyingTo(null);
+      return true;
     } catch (error) {
       console.error('ファイルアップロードエラー:', error);
       showToast('error', 'ファイルの送信に失敗しました');
+      return false;
     } finally {
       setUploadProgress(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
     }
   };
 
@@ -923,7 +1143,7 @@ export default function Chat() {
     }
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
+  const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     dragCounter.current = 0;
@@ -931,11 +1151,9 @@ export default function Chat() {
 
     const files = Array.from(e.dataTransfer.files);
     if (files.length > 0) {
-      uploadFiles(files);
+      queueFiles(files);
     }
-    // uploadFiles はコンポーネント内の関数で毎レンダリング再生成されるため意図的に除外
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomId, currentUser, replyingTo]);
+  };
 
   // 時刻のフォーマット（L-1: 当日/当年/それ以前で分岐）
 
@@ -978,38 +1196,215 @@ export default function Chat() {
       .reverse(),
     [messages],
   );
+
+  function openScheduleFromMessage(message: ExtendedMessage) {
+    setScheduleDraft(createScheduleFormFromMessage(message));
+    setScheduleDraftUserIds([]);
+  }
+
+  function openTaskFromMessage(message: ExtendedMessage) {
+    const project = selectedTaskProject ?? activeProjects[0] ?? null;
+    if (!project) {
+      showToast('warning', 'タスク作成先のプロジェクトがありません');
+      return;
+    }
+    setTaskProjectId(project?.id ?? '');
+    setTaskDraftMessage(message);
+  }
+
+  async function saveScheduleDraft() {
+    if (!scheduleDraft) return;
+    if (!scheduleDraft.title.trim()) {
+      showToast('warning', 'タイトルを入力してください');
+      return;
+    }
+    if (!scheduleDraft.categoryId) {
+      showToast('warning', 'カテゴリを選択してください');
+      return;
+    }
+    if (!scheduleDraft.startDate) {
+      showToast('warning', '開始日を入力してください');
+      return;
+    }
+    const startAt = buildDate(scheduleDraft.startDate, scheduleDraft.startTime, scheduleDraft.allDay);
+    const endAt = scheduleDraft.endDate
+      ? buildDate(scheduleDraft.endDate, scheduleDraft.endTime, scheduleDraft.allDay, true)
+      : null;
+    if (!isValidDate(startAt) || (endAt && !isValidDate(endAt))) {
+      showToast('warning', '日付が正しくありません');
+      return;
+    }
+    if (endAt && endAt < startAt) {
+      showToast('warning', '終了日は開始日以降にしてください');
+      return;
+    }
+
+    setScheduleDraftSaving(true);
+    try {
+      const targetUsers = scheduleTargetUsers.filter((user) => scheduleDraftUserIds.includes(user.uid));
+      await createSchedule({
+        title: scheduleDraft.title.trim(),
+        categoryId: scheduleDraft.categoryId,
+        targetUserIds: scheduleDraftUserIds,
+        targetUserNames: targetUsers.map((user) => user.displayName),
+        startAt,
+        endAt,
+        allDay: scheduleDraft.allDay,
+        memo: scheduleDraft.memo.trim(),
+        notification: { enabled: false, timings: [], customAt: null },
+      });
+      showToast('success', 'チャットから予定を追加しました');
+      setScheduleDraft(null);
+      setScheduleDraftUserIds([]);
+    } catch (error) {
+      console.error('チャットから予定作成エラー:', error);
+      showToast('error', '予定の作成に失敗しました');
+    } finally {
+      setScheduleDraftSaving(false);
+    }
+  }
+
+  function currentTaskInitialInput(): TaskInput | undefined {
+    if (!taskDraftMessage || !selectedTaskProject) return undefined;
+    const columnId = selectedTaskProject.columns[0]?.id ?? 'todo';
+    return createTaskInputFromMessage(taskDraftMessage, columnId);
+  }
+
   function handleBackToRooms() {
+    if (isEmbedded) {
+      onEmbeddedBack?.();
+      return;
+    }
     navigate(getAppEntryPath());
   }
 
-  if (loading) {
-    return <div className={styles.loading}>読み込み中...</div>;
+  if (roomId && loading) {
+    return <div className={`${styles.loading} ${isEmbedded ? styles.embeddedLoading : ''}`}>読み込み中...</div>;
+  }
+
+  if (!roomId && isElectronCompact) {
+    return (
+      <div ref={chatContainerRef} className={styles.electronCompactChatList}>
+        <DesktopRoomPane
+          rooms={desktopVisibleRooms}
+          activeRoomId={undefined}
+          currentUserId={currentUser?.uid}
+          users={users}
+          isRoomMuted={isRoomMuted}
+          memoRoom={desktopMemoRoom}
+          memoReturnPath={desktopMemoReturnPath}
+          onOpenSearch={() => setDesktopSearchOpen(true)}
+          onOpenSettings={() => setDesktopSettingsOpen(true)}
+          onOpenNewChat={() => setDesktopNewChatOpen(true)}
+          compactMode
+        />
+        <DesktopUtilityModals
+          currentUser={currentUser}
+          chatRooms={desktopChatRooms}
+          searchOpen={desktopSearchOpen}
+          settingsOpen={desktopSettingsOpen}
+          onCloseSearch={() => setDesktopSearchOpen(false)}
+          onCloseSettings={() => setDesktopSettingsOpen(false)}
+          onOpenSettings={() => setDesktopSettingsOpen(true)}
+        />
+        <DesktopNewChatModals
+          currentUser={currentUser}
+          chatRooms={desktopChatRooms}
+          isOpen={desktopNewChatOpen}
+          onClose={() => setDesktopNewChatOpen(false)}
+        />
+      </div>
+    );
+  }
+
+  if (!roomId) {
+    return (
+      <div
+        ref={chatContainerRef}
+        className={`${styles.container} ${desktopSidePanelOpen ? styles.withDesktopSidePanel : ''}`}
+        style={desktopChatLayoutStyle}
+      >
+        <DesktopRoomPane
+          rooms={desktopVisibleRooms}
+          activeRoomId={undefined}
+          currentUserId={currentUser?.uid}
+          users={users}
+          isRoomMuted={isRoomMuted}
+          memoRoom={desktopMemoRoom}
+          memoReturnPath={desktopMemoReturnPath}
+          onOpenSearch={() => setDesktopSearchOpen(true)}
+          onOpenSettings={() => setDesktopSettingsOpen(true)}
+          onOpenNewChat={() => setDesktopNewChatOpen(true)}
+        />
+        {desktopRoomPaneResizeHandle}
+        <DesktopChatLanding
+          rooms={desktopVisibleRooms}
+          currentUserId={currentUser?.uid}
+          users={users}
+          showSummary={desktopSidePanelOpen}
+          onOpenNewChat={() => setDesktopNewChatOpen(true)}
+          onOpenSummary={() => setDesktopSidePanelOpen(true)}
+          onCloseSummary={() => setDesktopSidePanelOpen(false)}
+        />
+        <DesktopUtilityModals
+          currentUser={currentUser}
+          chatRooms={desktopChatRooms}
+          searchOpen={desktopSearchOpen}
+          settingsOpen={desktopSettingsOpen}
+          onCloseSearch={() => setDesktopSearchOpen(false)}
+          onCloseSettings={() => setDesktopSettingsOpen(false)}
+          onOpenSettings={() => setDesktopSettingsOpen(true)}
+        />
+        <DesktopNewChatModals
+          currentUser={currentUser}
+          chatRooms={desktopChatRooms}
+          isOpen={desktopNewChatOpen}
+          onClose={() => setDesktopNewChatOpen(false)}
+        />
+      </div>
+    );
   }
 
   return (
-    <div className={`${styles.container} ${desktopSidePanelOpen ? styles.withDesktopSidePanel : ''}`}>
+    <div
+      ref={chatContainerRef}
+      className={isEmbedded
+        ? `${styles.container} ${styles.embeddedChatContainer}`
+        : `${styles.container} ${desktopSidePanelOpen ? styles.withDesktopSidePanel : ''}`}
+      style={isEmbedded ? undefined : desktopChatLayoutStyle}
+    >
       {/* M-9: D&D は入力エリア周辺ゾーンに限定（メッセージ閲覧中の誤操作を防止） */}
 
-      <DesktopRoomPane
-        rooms={desktopVisibleRooms}
-        activeRoomId={roomId}
-        currentUserId={currentUser?.uid}
-        users={users}
-        isRoomMuted={isRoomMuted}
-        memoRoom={desktopMemoRoom}
-        memoReturnPath={desktopMemoReturnPath}
-        onOpenSearch={() => setDesktopSearchOpen(true)}
-        onOpenSettings={() => setDesktopSettingsOpen(true)}
-        onOpenNewChat={() => setDesktopNewChatOpen(true)}
-      />
+      {!isEmbedded && (
+        <>
+          <DesktopRoomPane
+            rooms={desktopVisibleRooms}
+            activeRoomId={roomId}
+            currentUserId={currentUser?.uid}
+            users={users}
+            isRoomMuted={isRoomMuted}
+            memoRoom={desktopMemoRoom}
+            memoReturnPath={desktopMemoReturnPath}
+            onOpenSearch={() => setDesktopSearchOpen(true)}
+            onOpenSettings={() => setDesktopSettingsOpen(true)}
+            onOpenNewChat={() => setDesktopNewChatOpen(true)}
+          />
+          {desktopRoomPaneResizeHandle}
+        </>
+      )}
 
-      <main className={styles.chatMainPane}>
+      <main className={`${styles.chatMainPane} ${isEmbedded ? styles.embeddedChatMainPane : ''}`}>
 
       {/* ヘッダー */}
-      <header className={styles.header}>
-        <button className={styles.backButton} onClick={handleBackToRooms} aria-label="戻る">
-          ←
-          <span className={styles.headerActionLabel}>戻る</span>
+      <header className={`${styles.header} ${isEmbedded ? styles.embeddedHeader : ''}`}>
+        <button
+          className={styles.backButton}
+          onClick={handleBackToRooms}
+          aria-label={isEmbedded ? 'チャット一覧へ戻る' : '戻る'}
+          title={isEmbedded ? 'チャット一覧へ戻る' : '戻る'}
+        >
+          <span aria-hidden="true">←</span>
+          <span className={styles.headerActionLabel}>{isEmbedded ? 'チャット一覧' : '戻る'}</span>
         </button>
         <div className={styles.roomInfo}>
           <div className={styles.roomNameContainer}>
@@ -1029,6 +1424,8 @@ export default function Chat() {
             </span>
           )}
         </div>
+        {!isEmbedded && (
+          <>
         {chatRoom?.type === 'group' && (
           <>
             <button
@@ -1090,18 +1487,31 @@ export default function Chat() {
         <button
           className={`${styles.desktopPanelToggle} ${desktopSidePanelOpen ? styles.active : ''}`}
           onClick={() => setDesktopSidePanelOpen((open) => !open)}
-          title={desktopSidePanelOpen ? '右枠を閉じる' : 'ファイルを開く'}
-          aria-label={desktopSidePanelOpen ? '右枠を閉じる' : 'ファイルを開く'}
+          title={desktopSidePanelOpen ? 'ルーム情報を閉じる' : 'ルーム情報を開く'}
+          aria-label={desktopSidePanelOpen ? 'ルーム情報を閉じる' : 'ルーム情報を開く'}
           aria-expanded={desktopSidePanelOpen}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
-            <path d="M4 4h16v16H4z" />
-            <path d="M9 4v16" />
-            <path d="M13 9h4" />
-            <path d="M13 13h4" />
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 16v-4" />
+            <path d="M12 8h.01" />
           </svg>
-          <span className={styles.headerActionLabel}>ファイル</span>
+          <span className={styles.headerActionLabel}>情報</span>
         </button>
+        {chatRoom && canDeleteChatRoom(chatRoom, currentUser?.uid) && (
+          <button
+            className={styles.deleteRoomButton}
+            onClick={() => setShowDeleteRoomConfirm(true)}
+            title="ルームを削除"
+            aria-label="ルームを削除"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            </svg>
+            <span className={styles.headerActionLabel}>削除</span>
+          </button>
+        )}
         {roomId && (
           <button
             className={`${styles.notificationToggle} ${isRoomMuted(roomId) ? styles.muted : ''}`}
@@ -1130,6 +1540,8 @@ export default function Chat() {
             )}
             <span className={styles.headerActionLabel}>{isRoomMuted(roomId) ? '通知オン' : '通知オフ'}</span>
           </button>
+        )}
+          </>
         )}
       </header>
 
@@ -1188,6 +1600,8 @@ export default function Chat() {
         setShowReadDetail={setShowReadDetail}
         setPreviewImage={setPreviewImage}
         copyMessageText={copyMessageText}
+        openScheduleFromMessage={openScheduleFromMessage}
+        openTaskFromMessage={openTaskFromMessage}
         togglePin={togglePin}
         openDeleteMessageConfirm={openDeleteMessageConfirm}
         saveEdit={saveEdit}
@@ -1240,7 +1654,7 @@ export default function Chat() {
         {isDragging && (
           <div className={styles.dragOverlay}>
             <div className={styles.dragContent}>
-              <p>ファイルをドロップして送信</p>
+              <p>ファイルをドロップして添付</p>
             </div>
           </div>
         )}
@@ -1259,10 +1673,37 @@ export default function Chat() {
             ))}
           </div>
         )}
+        {pendingFiles.length > 0 && (
+          <div className={styles.pendingAttachments} aria-label="送信前の添付ファイル" aria-live="polite">
+            {pendingFiles.map((file, index) => (
+              <div className={styles.pendingAttachment} key={`${file.name}-${file.lastModified}-${index}`}>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                </svg>
+                <span className={styles.pendingAttachmentName} title={file.name}>{file.name}</span>
+                <span className={styles.pendingAttachmentSize}>
+                  {file.size >= 1024 * 1024
+                    ? `${(file.size / (1024 * 1024)).toFixed(1)}MB`
+                    : `${Math.max(1, Math.round(file.size / 1024))}KB`}
+                </span>
+                <button
+                  type="button"
+                  className={styles.removePendingAttachment}
+                  onClick={() => removePendingFile(index)}
+                  disabled={sending}
+                  title={`${file.name}の添付を取り消す`}
+                  aria-label={`${file.name}の添付を取り消す`}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         <input
           type="file"
           ref={fileInputRef}
-          onChange={handleFileUpload}
+          onChange={handleFileSelection}
           style={{ display: 'none' }}
           multiple
           accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
@@ -1271,9 +1712,9 @@ export default function Chat() {
           type="button"
           className={styles.attachButton}
           onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
-          title={uploadProgress ? `アップロード中 ${uploadProgress.current}/${uploadProgress.total}` : 'ファイルを添付'}
-          aria-label={uploadProgress ? `アップロード中 ${uploadProgress.current}/${uploadProgress.total}` : 'ファイルを添付'}
+          disabled={sending || uploading}
+          title={uploadProgress ? `アップロード中 ${uploadProgress.current}/${uploadProgress.total}` : pendingFiles.length > 0 ? `ファイルを追加（${pendingFiles.length}件保留中）` : 'ファイルを添付'}
+          aria-label={uploadProgress ? `アップロード中 ${uploadProgress.current}/${uploadProgress.total}` : pendingFiles.length > 0 ? `ファイルを追加（${pendingFiles.length}件保留中）` : 'ファイルを添付'}
           aria-busy={uploading}
         >
           {uploading && uploadProgress ? (
@@ -1297,13 +1738,14 @@ export default function Chat() {
           ref={messageInputRef}
           value={newMessage}
           onChange={handleMessageChange}
+          onPaste={handleMessagePaste}
           onKeyDown={(e) => {
             // Enter で送信、Shift+Enter で改行（IME 変換中の Enter は無視）
             if (
               e.key === 'Enter' &&
               !e.shiftKey &&
               !e.nativeEvent.isComposing &&
-              newMessage.trim() &&
+              (newMessage.trim() || pendingFiles.length > 0) &&
               !sending
             ) {
               e.preventDefault();
@@ -1318,7 +1760,7 @@ export default function Chat() {
         <button
           type="button"
           className={styles.sendButton}
-          disabled={!newMessage.trim() || sending}
+          disabled={(!newMessage.trim() && pendingFiles.length === 0) || sending}
           onClick={sendMessage}
           aria-busy={sending}
           aria-label={sending ? '送信中' : '送信'}
@@ -1337,41 +1779,120 @@ export default function Chat() {
 
       </main>
 
-      <aside className={`${styles.desktopUtilityPane} ${desktopSidePanelOpen ? styles.open : ''}`} aria-label="ファイル">
-        <section className={styles.desktopUtilityCard}>
-          <div className={styles.desktopSectionHeader}>
-            <h2>ファイル</h2>
-            <button type="button" onClick={() => setDesktopSidePanelOpen(false)} className={styles.desktopSubtleButton}>
-              閉じる
-            </button>
+      {!isEmbedded && chatRoom && (
+        <DesktopRoomInfoPane
+          room={chatRoom}
+          currentUserId={currentUser?.uid}
+          currentUserName={currentUser?.displayName}
+          currentUserPhotoURL={currentUser?.photoURL}
+          onlineStatusMap={onlineStatusMap}
+          attachments={desktopAttachments}
+          pinnedMessages={pinnedMessages}
+          isOpen={desktopSidePanelOpen}
+          onClose={() => setDesktopSidePanelOpen(false)}
+          onInvite={openInviteModal}
+          onOpenMessage={(messageId) => document.getElementById(`message-${messageId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+        />
+      )}
+
+      {scheduleDraft && (
+        <div className={styles.chatCreateOverlay} onClick={() => setScheduleDraft(null)} role="presentation">
+          <div className={styles.chatCreateModal} onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="chat-schedule-title">
+            <div className={styles.chatCreateHeader}>
+              <h2 id="chat-schedule-title">チャットから予定を追加</h2>
+              <button type="button" onClick={() => setScheduleDraft(null)} aria-label="閉じる">×</button>
+            </div>
+            <label className={styles.chatCreateField}>
+              <span>タイトル</span>
+              <input value={scheduleDraft.title} onChange={(event) => setScheduleDraft((prev) => prev ? { ...prev, title: event.target.value } : prev)} />
+            </label>
+            <label className={styles.chatCreateField}>
+              <span>カテゴリ</span>
+              <select
+                value={scheduleDraft.categoryId}
+                onChange={(event) => setScheduleDraft((prev) => prev ? { ...prev, categoryId: event.target.value as ScheduleCategoryId | '' } : prev)}
+              >
+                <option value="" disabled>選択してください</option>
+                {SCHEDULE_CATEGORIES.map((category) => (
+                  <option key={category.id} value={category.id}>{category.label}</option>
+                ))}
+              </select>
+            </label>
+            <div className={styles.chatCreateGrid}>
+              <label className={styles.chatCreateField}>
+                <span>開始日</span>
+                <input type="date" value={scheduleDraft.startDate} onChange={(event) => setScheduleDraft((prev) => prev ? { ...prev, startDate: event.target.value, endDate: event.target.value } : prev)} />
+              </label>
+              <label className={styles.chatCreateField}>
+                <span>終了日</span>
+                <input type="date" value={scheduleDraft.endDate} onChange={(event) => setScheduleDraft((prev) => prev ? { ...prev, endDate: event.target.value } : prev)} />
+              </label>
+            </div>
+            <label className={styles.chatCreateCheck}>
+              <input type="checkbox" checked={scheduleDraft.allDay} onChange={(event) => setScheduleDraft((prev) => prev ? { ...prev, allDay: event.target.checked } : prev)} />
+              終日
+            </label>
+            <div className={styles.chatCreateField}>
+              <span>対象ユーザー</span>
+              <div className={styles.chatCreateUserList}>
+                {scheduleTargetUsers.map((user) => (
+                  <button
+                    key={user.uid}
+                    type="button"
+                    className={scheduleDraftUserIds.includes(user.uid) ? styles.chatCreateUserSelected : ''}
+                    onClick={() => setScheduleDraftUserIds((current) => (
+                      current.includes(user.uid)
+                        ? current.filter((id) => id !== user.uid)
+                        : [...current, user.uid]
+                    ))}
+                  >
+                    {user.displayName}
+                  </button>
+                ))}
+                {scheduleTargetUsers.length === 0 && <span>未選択のままでも登録できます</span>}
+              </div>
+            </div>
+            <label className={styles.chatCreateField}>
+              <span>メモ</span>
+              <textarea value={scheduleDraft.memo} onChange={(event) => setScheduleDraft((prev) => prev ? { ...prev, memo: event.target.value } : prev)} rows={5} />
+            </label>
+            <div className={styles.chatCreateActions}>
+              <button type="button" onClick={() => setScheduleDraft(null)}>キャンセル</button>
+              <button type="button" onClick={() => void saveScheduleDraft()} disabled={scheduleDraftSaving}>
+                {scheduleDraftSaving ? '保存中...' : '予定を追加'}
+              </button>
+            </div>
           </div>
-          <div className={styles.desktopResultList}>
-            {desktopAttachments.length > 0 ? (
-              desktopAttachments.map((message) => (
-                <button
-                  key={message.id}
-                  type="button"
-                  onClick={() => document.getElementById(`message-${message.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-                  className={styles.desktopResultItem}
-                >
-                  <span className={styles.desktopResultAvatar} aria-hidden="true">
-                    {message.imageURL ? '画像' : 'FILE'}
-                  </span>
-                  <span className={styles.desktopResultBody}>
-                    <span>
-                      <strong>{message.fileName || '画像'}</strong>
-                      <em>{message.senderName}</em>
-                    </span>
-                    <span>{formatTimeSmart(message.createdAt)}</span>
-                  </span>
-                </button>
-              ))
-            ) : (
-                <p className={styles.desktopEmptyPanel}>このルームのファイルはまだありません。</p>
-            )}
+        </div>
+      )}
+
+      {taskDraftMessage && selectedTaskProject && (
+        <>
+          <div className={styles.taskProjectPicker}>
+            <label>
+              <span>作成先プロジェクト</span>
+              <select value={selectedTaskProject.id} onChange={(event) => setTaskProjectId(event.target.value)}>
+                {activeProjects.map((project) => (
+                  <option key={project.id} value={project.id}>{project.name}</option>
+                ))}
+              </select>
+            </label>
           </div>
-        </section>
-      </aside>
+          <TaskPanel
+            key={`${taskDraftMessage.id}-${selectedTaskProject.id}`}
+            task={null}
+            initialInput={currentTaskInitialInput()}
+            columns={selectedTaskProject.columns}
+            defaultColumnId={selectedTaskProject.columns[0]?.id ?? 'todo'}
+            members={processMembers}
+            onSubmit={async (input) => {
+              await createChatTask(input);
+              showToast('success', 'チャットからタスクを追加しました');
+            }}
+            onClose={() => setTaskDraftMessage(null)}
+          />
+        </>
+      )}
 
       {/* 画像プレビューモーダル */}
       {previewImage && (
@@ -1488,20 +2009,34 @@ export default function Chat() {
         />
       )}
 
-      <DesktopUtilityModals
-        currentUser={currentUser}
-        chatRooms={desktopChatRooms}
-        searchOpen={desktopSearchOpen}
-        settingsOpen={desktopSettingsOpen}
-        onCloseSearch={() => setDesktopSearchOpen(false)}
-        onCloseSettings={() => setDesktopSettingsOpen(false)}
+      <DeleteRoomConfirmModal
+        isOpen={showDeleteRoomConfirm && Boolean(chatRoom)}
+        onClose={() => setShowDeleteRoomConfirm(false)}
+        onDelete={() => { void handleDeleteRoom(); }}
+        roomType={chatRoom?.type}
+        roomName={chatRoom ? getRoomDisplayName(chatRoom, currentUser?.uid) : undefined}
+        isDeleting={isDeletingRoom}
       />
-      <DesktopNewChatModals
-        currentUser={currentUser}
-        chatRooms={desktopChatRooms}
-        isOpen={desktopNewChatOpen}
-        onClose={() => setDesktopNewChatOpen(false)}
-      />
+
+      {!isEmbedded && (
+        <>
+          <DesktopUtilityModals
+            currentUser={currentUser}
+            chatRooms={desktopChatRooms}
+            searchOpen={desktopSearchOpen}
+            settingsOpen={desktopSettingsOpen}
+            onCloseSearch={() => setDesktopSearchOpen(false)}
+            onCloseSettings={() => setDesktopSettingsOpen(false)}
+            onOpenSettings={() => setDesktopSettingsOpen(true)}
+          />
+          <DesktopNewChatModals
+            currentUser={currentUser}
+            chatRooms={desktopChatRooms}
+            isOpen={desktopNewChatOpen}
+            onClose={() => setDesktopNewChatOpen(false)}
+          />
+        </>
+      )}
     </div>
   );
 }

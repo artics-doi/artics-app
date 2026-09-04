@@ -13,12 +13,18 @@ export const GANTT_STATUS_COLORS: Record<
 export function buildGanttInstanceKey(
   viewMode: string,
   layoutVersion: number,
-  tasks: readonly Pick<ProcessGanttTask, 'id' | 'processStatus' | 'ganttOrder'>[],
+  tasks: readonly Pick<ProcessGanttTask, 'id' | 'processStatus' | 'ganttOrder' | 'completedDate' | 'earlyCompletionSolidPercent'>[],
 ): string {
   return [
     viewMode,
     layoutVersion,
-    tasks.map((task) => `${task.id}:${task.processStatus}:${task.ganttOrder}`).join('|'),
+    tasks.map((task) => [
+      task.id,
+      task.processStatus,
+      task.ganttOrder,
+      task.completedDate?.getTime() ?? '',
+      task.earlyCompletionSolidPercent ?? '',
+    ].join(':')).join('|'),
   ].join('__');
 }
 

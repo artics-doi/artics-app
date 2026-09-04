@@ -19,9 +19,20 @@ import { useElectronNotification, isElectronEnv } from '../../hooks/useElectronN
 import { useFCMToken } from '../../hooks/useFCMToken';
 import { useNotificationDiagnostics } from '../../hooks/useNotificationDiagnostics';
 import { useRoomNotificationSettings } from '../../hooks/useRoomNotificationSettings';
+import { useSchedules } from '../../hooks/useSchedules';
+import { useAllProcessTasks } from '../../hooks/process/useAllProcessTasks';
+import { useProjects } from '../../hooks/process/useProjects';
 import { SEARCH_LIMIT_PER_ROOM, SEARCH_RESULTS_LIMIT } from '../../constants';
 import type { ChatRoom } from '../../types';
 import { getRoomDisplayName } from '../../utils/room';
+import {
+  searchMessages as searchGlobalMessages,
+  searchSchedules,
+  searchTasks,
+  sortGlobalSearchResults,
+  type GlobalSearchResult,
+  type SearchableMessage,
+} from '../../lib/search/globalSearch';
 import {
   NotificationSettingsModal,
   ProfileEditModal,
@@ -38,16 +49,8 @@ interface DesktopUtilityModalsProps {
   settingsOpen: boolean;
   onCloseSearch: () => void;
   onCloseSettings: () => void;
+  onOpenSettings: () => void;
 }
-
-type SearchResult = {
-  roomId: string;
-  roomName: string;
-  messageId: string;
-  text: string;
-  senderName: string;
-  timestamp: Date;
-};
 
 export default function DesktopUtilityModals({
   currentUser,
@@ -56,6 +59,7 @@ export default function DesktopUtilityModals({
   settingsOpen,
   onCloseSearch,
   onCloseSettings,
+  onOpenSettings,
 }: DesktopUtilityModalsProps) {
   const navigate = useNavigate();
   const { logout } = useAuth();
@@ -67,10 +71,8 @@ export default function DesktopUtilityModals({
     refresh: refreshNotificationDiagnostics,
     loading: diagnosticsLoading,
   } = useNotificationDiagnostics();
-  const { mutedRooms, toggleMute } = useRoomNotificationSettings();
-
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchResults, setSearchResults] = useState<GlobalSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileName, setProfileName] = useState('');
@@ -87,6 +89,12 @@ export default function DesktopUtilityModals({
   const [appVersion, setAppVersion] = useState('');
   const [alwaysOnTop, setAlwaysOnTop] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'latest' | 'error'>('idle');
+  const { mutedRooms, toggleMute } = useRoomNotificationSettings(settingsOpen || notificationOpen);
+  const searchUser = searchOpen ? currentUser : null;
+  const { schedules } = useSchedules(searchUser);
+  const { tasks: allProcessTasks } = useAllProcessTasks(searchUser);
+  const { projects: activeProjects } = useProjects(searchUser, 'active');
+  const { projects: archivedProjects } = useProjects(searchUser, 'archived');
 
   useEffect(() => {
     if (!settingsOpen) return;
@@ -118,8 +126,7 @@ export default function DesktopUtilityModals({
     setSearching(true);
     setSearchResults([]);
     try {
-      const results: SearchResult[] = [];
-      const normalizedQuery = searchQuery.toLowerCase();
+      const searchableMessages: SearchableMessage[] = [];
       for (const room of chatRooms) {
         const messagesQuery = query(
           collection(db, 'chatRooms', room.id, 'messages'),
@@ -130,33 +137,43 @@ export default function DesktopUtilityModals({
         messagesSnapshot.forEach((messageDoc) => {
           const data = messageDoc.data();
           const text = data.text || '';
-          if (text.toLowerCase().includes(normalizedQuery)) {
-            results.push({
-              roomId: room.id,
-              roomName: getRoomDisplayName(room, currentUser.uid),
-              messageId: messageDoc.id,
-              text,
-              senderName: data.senderName || 'Unknown',
-              timestamp: data.createdAt?.toDate() || new Date(),
-            });
-          }
+          searchableMessages.push({
+            id: messageDoc.id,
+            roomId: room.id,
+            roomName: getRoomDisplayName(room, currentUser.uid),
+            roomType: room.type,
+            text,
+            senderName: data.senderName || 'Unknown',
+            timestamp: data.createdAt?.toDate() || data.timestamp?.toDate() || new Date(0),
+          });
         });
       }
-      results.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-      setSearchResults(results.slice(0, SEARCH_RESULTS_LIMIT));
+      const projectNameById = new Map(
+        [...activeProjects, ...archivedProjects].map((project) => [project.id, project.name]),
+      );
+      setSearchResults(sortGlobalSearchResults([
+        ...searchGlobalMessages(searchableMessages, searchQuery),
+        ...searchSchedules(schedules, searchQuery),
+        ...searchTasks(allProcessTasks, searchQuery, projectNameById),
+      ], SEARCH_RESULTS_LIMIT));
     } catch (error) {
       console.error('検索エラー:', error);
       showToast('error', '検索に失敗しました');
     } finally {
       setSearching(false);
     }
-  }, [chatRooms, currentUser, searchQuery, showToast]);
+  }, [activeProjects, allProcessTasks, archivedProjects, chatRooms, currentUser, schedules, searchQuery, showToast]);
 
   function openProfileEdit() {
     setProfileName(currentUser?.displayName || '');
     setProfileImage(currentUser?.photoURL || null);
     onCloseSettings();
     setProfileOpen(true);
+  }
+
+  function closeSettingsChildModal(closeChild: () => void) {
+    closeChild();
+    onOpenSettings();
   }
 
   async function handleProfileImageChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -267,7 +284,7 @@ export default function DesktopUtilityModals({
         }}
         onSearchQueryChange={setSearchQuery}
         onSearch={searchMessages}
-        onResultClick={(roomId, messageId) => navigate(`/chat/${roomId}?messageId=${messageId}`)}
+        onResultClick={(result) => navigate(result.path)}
       />
 
       <SettingsModal
@@ -304,7 +321,7 @@ export default function DesktopUtilityModals({
         profileImage={profileImage}
         savingProfile={savingProfile}
         currentUserEmail={currentUser?.email}
-        onClose={() => setProfileOpen(false)}
+        onClose={() => closeSettingsChildModal(() => setProfileOpen(false))}
         onProfileNameChange={setProfileName}
         onProfileImageChange={handleProfileImageChange}
         onSave={saveProfile}
@@ -313,7 +330,7 @@ export default function DesktopUtilityModals({
       <ThemeModal
         isOpen={themeOpen}
         theme={theme}
-        onClose={() => setThemeOpen(false)}
+        onClose={() => closeSettingsChildModal(() => setThemeOpen(false))}
         onToggleTheme={toggleTheme}
       />
 
@@ -324,7 +341,7 @@ export default function DesktopUtilityModals({
         diagnostics={notificationDiagnostics}
         diagnosticsLoading={diagnosticsLoading}
         mutedRooms={mutedRoomList}
-        onClose={() => setNotificationOpen(false)}
+        onClose={() => closeSettingsChildModal(() => setNotificationOpen(false))}
         onUpdateSettings={(settings) => { void updateNotificationSettings(settings); }}
         onRefreshDiagnostics={refreshNotificationDiagnostics}
         onRequestPermission={requestPermissionAndRegister}
@@ -337,7 +354,7 @@ export default function DesktopUtilityModals({
       <ReleaseNotesModal
         isOpen={releaseNotesOpen}
         releaseNotes={releaseNotes}
-        onClose={() => setReleaseNotesOpen(false)}
+        onClose={() => closeSettingsChildModal(() => setReleaseNotesOpen(false))}
       />
     </>
   );

@@ -40,7 +40,9 @@ export function useDashboardTasks(currentUser: FirebaseUser | null) {
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        setTasks(snapshot.docs.map((item) => toTask(item.id, item.data())));
+        setTasks(snapshot.docs
+          .map((item) => toTask(item.id, item.data()))
+          .filter((task) => !task.isArchived));
         setLoading(false);
         setError(null);
       },

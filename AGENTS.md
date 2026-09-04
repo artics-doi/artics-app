@@ -13,3 +13,5 @@ ArticsChat（社内チャットアプリ、React 19 + TypeScript + Vite + Fireba
 - **デプロイ禁止**: `firebase deploy` 全種 / functions の deploy / electron-builder `--publish` / GH_TOKEN 設定は、ユーザーの明示的な指示なしに実行しない
 - `functions/src/index.ts` の export 名 = デプロイされる関数名。変更禁止
 - `.env` / `functions/serviceAccountKey.json` はコミットしない
+- 教訓は `tasks/lessons.md` に記録する。作業開始時と完了前に関連項目を確認する
+- 作業中に判明した再発可能なミスは「問題・原因・次回の予防または確認方法」を重複なく `tasks/lessons.md` に追記する

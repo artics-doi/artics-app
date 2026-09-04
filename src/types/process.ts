@@ -15,6 +15,7 @@ export interface ProjectColumn {
   id: string;
   name: string;
   order: number;
+  kind?: 'todo' | 'doing' | 'done' | 'hold' | 'custom';
 }
 
 // プロジェクト本体。
@@ -27,6 +28,9 @@ export interface Project {
   columns: ProjectColumn[];
   order: string; // fractional index（一覧の並び順。lib/process/order.ts で採番）
   pendingDelete?: boolean; // true で Cloud Function が物理削除を行う
+  lifecycleState?: 'active' | 'deleting';
+  lifecycleVersion?: number;
+  operationId?: string;
   createdBy: string;
   createdByName: string;
   createdAt: Date | null;
@@ -53,10 +57,13 @@ export interface Task {
   //   functions の同期トリガーを実装する（プラン §7-3 パターンA）。
   startDate: Date | null;
   endDate: Date | null;
+  completedDate: Date | null;
+  completionChecked: boolean;
   description: string;
   order: string; // fractional index（列内の並び順）
   ganttOrder: string; // fractional index（ガント専用の手動並び順。カンバン order とは独立）
   archived: boolean; // 所属PJのアーカイブに追従（createTime で必ず false を埋める / M1）
+  isArchived: boolean; // 個別タスクのアーカイブ。通常の運用画面では非表示にする
   createdBy: string;
   createdByName: string;
   createdAt: Date | null;
@@ -70,6 +77,8 @@ export interface TaskInput {
   assigneeIds: string[];
   startDate: Date | null;
   endDate: Date | null;
+  completedDate: Date | null;
+  completionChecked: boolean;
   description: string;
 }
 

@@ -11,6 +11,9 @@ contextBridge.exposeInMainWorld('notificationAPI', {
   // 特定のチャットルームを開く
   openRoom: (roomId: string) => ipcRenderer.send('open-room', roomId),
 
+  // 特定の予定を開く
+  openSchedule: (scheduleId: string) => ipcRenderer.send('open-schedule', scheduleId),
+
   // 全ての通知をクリアしてウィンドウを閉じる
   clearAll: () => ipcRenderer.send('clear-all-notifications')
 });

@@ -1,100 +1,85 @@
 "use strict";
-// 工程管理（process management）の Cloud Functions。
-//
-// 【M0・重要】このファイルの export は functions/src/index.ts 末尾の
-//   `export * from './process';` で再エクスポートされて初めてデプロイ対象になる。
-//   再エクスポートを忘れると tsc は通るが Firebase に認識されず、無言で機能しない。
-//   デプロイ後は `firebase functions:list` に onProjectUpdated が出ることを必ず確認する。
-//
-// admin.initializeApp() は functions/src/index.ts で1回だけ実行される前提。
-// ここでは admin.firestore() を関数内で取得して使う（モジュール初期化順の事故を避ける）。
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.onProjectUpdated = void 0;
 const admin = require("firebase-admin");
-const firestore_1 = require("firebase-functions/v2/firestore");
+const firestore_1 = require("firebase-admin/firestore");
+const firestore_2 = require("firebase-functions/v2/firestore");
 const TASKS_COLLECTION = 'tasks';
-const PROJECTS_COLLECTION = 'projects';
-const BATCH_CHUNK = 500; // Firestore のバッチ上限
-/**
- * 指定プロジェクト配下の全タスクを 500件チャンクで物理削除する。
- * 途中失敗しても pendingDelete フラグが残るので、再実行で残りを回収できる（冪等）。
- */
-async function deleteTasksOfProject(db, projectId) {
-    const snapshot = await db
-        .collection(TASKS_COLLECTION)
+const PAGE_SIZE = 200;
+async function processProjectDeletion(projectRef, projectId, cursor) {
+    var _a, _b;
+    const db = admin.firestore();
+    let query = db.collection(TASKS_COLLECTION)
         .where('projectId', '==', projectId)
-        .get();
-    if (snapshot.empty)
-        return 0;
-    const docs = snapshot.docs;
-    for (let i = 0; i < docs.length; i += BATCH_CHUNK) {
-        const batch = db.batch();
-        docs.slice(i, i + BATCH_CHUNK).forEach((taskDoc) => {
-            batch.delete(taskDoc.ref);
-        });
-        await batch.commit();
+        .orderBy(firestore_1.FieldPath.documentId())
+        .limit(PAGE_SIZE);
+    if (cursor)
+        query = query.startAfter(cursor);
+    const snapshot = await query.get();
+    const batch = db.batch();
+    snapshot.docs.forEach((task) => batch.delete(task.ref));
+    if (snapshot.size < PAGE_SIZE) {
+        batch.delete(projectRef);
     }
-    return docs.length;
+    else {
+        batch.update(projectRef, {
+            lifecycleCursor: (_b = (_a = snapshot.docs[snapshot.docs.length - 1]) === null || _a === void 0 ? void 0 : _a.id) !== null && _b !== void 0 ? _b : null,
+            operationVersion: firestore_1.FieldValue.increment(1),
+            updatedAt: firestore_1.FieldValue.serverTimestamp(),
+        });
+    }
+    await batch.commit();
+    console.log(`[process] deletion page ${projectId}: ${snapshot.size}`);
 }
-/**
- * 指定プロジェクト配下の全タスクの archived を 500件チャンクで一括更新する。
- * project ドキュメント自体には一切書き込まない（status 変更で project に書き戻すと無限ループ）。
- */
-async function setArchivedForProjectTasks(db, projectId, archived) {
-    const snapshot = await db
-        .collection(TASKS_COLLECTION)
+async function processArchivePropagation(projectRef, projectId, archived, cursor) {
+    var _a, _b;
+    const db = admin.firestore();
+    let query = db.collection(TASKS_COLLECTION)
         .where('projectId', '==', projectId)
-        .get();
-    if (snapshot.empty)
-        return 0;
-    const docs = snapshot.docs;
-    for (let i = 0; i < docs.length; i += BATCH_CHUNK) {
-        const batch = db.batch();
-        docs.slice(i, i + BATCH_CHUNK).forEach((taskDoc) => {
-            batch.update(taskDoc.ref, { archived });
+        .orderBy(firestore_1.FieldPath.documentId())
+        .limit(PAGE_SIZE);
+    if (cursor)
+        query = query.startAfter(cursor);
+    const snapshot = await query.get();
+    const batch = db.batch();
+    snapshot.docs.forEach((task) => batch.update(task.ref, { archived }));
+    if (snapshot.size < PAGE_SIZE) {
+        batch.update(projectRef, {
+            archiveCursor: firestore_1.FieldValue.delete(),
+            archiveTarget: firestore_1.FieldValue.delete(),
+            archiveOperationVersion: firestore_1.FieldValue.increment(1),
+            updatedAt: firestore_1.FieldValue.serverTimestamp(),
         });
-        await batch.commit();
     }
-    return docs.length;
+    else {
+        batch.update(projectRef, {
+            archiveCursor: (_b = (_a = snapshot.docs[snapshot.docs.length - 1]) === null || _a === void 0 ? void 0 : _a.id) !== null && _b !== void 0 ? _b : null,
+            archiveTarget: archived,
+            archiveOperationVersion: firestore_1.FieldValue.increment(1),
+            updatedAt: firestore_1.FieldValue.serverTimestamp(),
+        });
+    }
+    await batch.commit();
+    console.log(`[process] archive page ${projectId}: archived=${archived}, count=${snapshot.size}`);
 }
-/**
- * プロジェクト更新トリガー。削除分岐とアーカイブ同期分岐を early-return で相互排他にする（M5）。
- *
- * 順序（固定）:
- *   (1) before/after どちらか無ければ何もしない
- *   (2) 削除分岐（最優先・他と排他）: pendingDelete が false→true になったら
- *       配下タスクを全削除 → 最後に project doc を delete。末尾 return でアーカイブ分岐へ進ませない。
- *   (3) アーカイブ同期分岐（削除分岐と排他）: status が変わったら配下タスクの archived を追従更新。
- *       project doc は触らない（再帰防止）。
- *   (4) それ以外（name 変更等）は何もしない。
- */
-exports.onProjectUpdated = (0, firestore_1.onDocumentUpdated)('projects/{id}', async (event) => {
+exports.onProjectUpdated = (0, firestore_2.onDocumentUpdated)({ document: 'projects/{id}', retry: true }, async (event) => {
     var _a, _b;
     const before = (_a = event.data) === null || _a === void 0 ? void 0 : _a.before.data();
-    const after = (_b = event.data) === null || _b === void 0 ? void 0 : _b.after.data();
-    if (!before || !after)
-        return; // (1) early guard
+    const afterSnapshot = (_b = event.data) === null || _b === void 0 ? void 0 : _b.after;
+    const after = afterSnapshot === null || afterSnapshot === void 0 ? void 0 : afterSnapshot.data();
+    if (!before || !after || !afterSnapshot)
+        return;
     const projectId = event.params.id;
-    const db = admin.firestore();
-    // (2) 削除分岐（最優先・他と排他）
-    if (before.pendingDelete !== true && after.pendingDelete === true) {
-        console.log(`[process] onProjectUpdated: delete request for project ${projectId} ` +
-            `(requested by ${typeof after.createdBy === 'string' ? after.createdBy : 'unknown'})`);
-        const deleted = await deleteTasksOfProject(db, projectId);
-        // タスク削除が終わってから project 本体を物理削除（delete は onUpdate を引かない）。
-        await db.collection(PROJECTS_COLLECTION).doc(projectId).delete();
-        console.log(`[process] project ${projectId} deleted with ${deleted} tasks`);
-        return; // 末尾 return でアーカイブ分岐に進ませない
-    }
-    // (3) アーカイブ同期分岐（削除分岐と排他）
-    if (before.status !== after.status) {
-        const archived = after.status === 'archived';
-        const updated = await setArchivedForProjectTasks(db, projectId, archived);
-        console.log(`[process] project ${projectId} status ${String(before.status)}→${String(after.status)}: ` +
-            `archived=${archived} applied to ${updated} tasks`);
+    const projectRef = afterSnapshot.ref;
+    const deleting = after.lifecycleState === 'deleting' || after.pendingDelete === true;
+    if (deleting) {
+        await processProjectDeletion(projectRef, projectId, typeof after.lifecycleCursor === 'string' ? after.lifecycleCursor : null);
         return;
     }
-    // (4) それ以外（name/description/colorIndex/columns 変更等）は何もしない
-    return;
+    const statusChanged = before.status !== after.status;
+    const archiveContinuation = typeof after.archiveTarget === 'boolean';
+    if (statusChanged || archiveContinuation) {
+        await processArchivePropagation(projectRef, projectId, archiveContinuation ? after.archiveTarget : after.status === 'archived', typeof after.archiveCursor === 'string' ? after.archiveCursor : null);
+    }
 });
 //# sourceMappingURL=index.js.map

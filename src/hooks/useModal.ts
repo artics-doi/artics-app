@@ -33,8 +33,13 @@ function getFocusableElements(container: HTMLElement): HTMLElement[] {
 
 export function useModal({ isOpen, onClose, initialFocusRef, restoreFocus = true }: UseModalParams) {
   const modalRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
   // M-38: 開く前のフォーカス要素を保存（閉じる時に復元）
   const previousActiveRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -77,7 +82,7 @@ export function useModal({ isOpen, onClose, initialFocusRef, restoreFocus = true
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
 
@@ -114,7 +119,7 @@ export function useModal({ isOpen, onClose, initialFocusRef, restoreFocus = true
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen, onClose, initialFocusRef]);
+  }, [isOpen, initialFocusRef]);
 
   const modalProps = useMemo(() => ({
     ref: modalRef,

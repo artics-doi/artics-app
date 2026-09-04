@@ -25,9 +25,10 @@ interface LastMessageInfo {
 
 export function useGlobalNotification() {
   const { currentUser } = useAuth();
+  const currentUserId = currentUser?.uid ?? null;
   const { showNotification, isElectron, settings: electronSettings } = useElectronNotification();
   const { activeRoomId } = useActiveRoom();
-  const { isRoomMuted } = useRoomNotificationSettings();
+  const { isRoomMuted } = useRoomNotificationSettings(isElectron);
   const lastMessagesRef = useRef<Map<string, LastMessageInfo>>(new Map());
   // ルームごとの「初回スナップショット受信済みか」。全ルーム共通のフラグ＋遅延タイマー
   // だと、後から購読が増えたルームの既存メッセージや起動直後の新着を誤判定する
@@ -60,7 +61,7 @@ export function useGlobalNotification() {
   }, [electronSettings]);
 
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUserId) return;
     const messageUnsubscribers = messageUnsubscribersRef.current;
     const lastMessages = lastMessagesRef.current;
     const initializedRooms = initializedRoomsRef.current;
@@ -69,15 +70,16 @@ export function useGlobalNotification() {
     // このフックでは通知を表示しない
     const shouldShowNotification = isElectron;
 
-    // Electron環境でなければ、Firestoreリスナーのみ設定して通知は表示しない
+    // PWAはFCM Service Workerが配送を担当するため、room/message購読自体を生成しない。
     if (!shouldShowNotification) {
       console.log('[useGlobalNotification] PWA環境のため通知はService Workerに委譲');
+      return;
     }
 
     // ユーザーが参加しているチャットルームを取得
     const roomsQuery = query(
       collection(db, 'chatRooms'),
-      where('members', 'array-contains', currentUser.uid)
+      where('members', 'array-contains', currentUserId)
     );
 
     const unsubscribeRooms = onSnapshot(roomsQuery, (roomsSnapshot) => {
@@ -92,7 +94,7 @@ export function useGlobalNotification() {
         if (data.type === 'direct' && data.memberDetails) {
           // 1対1チャットの場合、memberDetails から相手の表示名を取得
           const other = Object.entries(data.memberDetails as Record<string, { displayName?: string }>)
-            .find(([uid]) => uid !== currentUser.uid)?.[1];
+            .find(([uid]) => uid !== currentUserId)?.[1];
           if (other?.displayName) roomName = other.displayName;
         }
         roomNames.set(doc.id, roomName);
@@ -134,7 +136,7 @@ export function useGlobalNotification() {
           const text = data.text || '画像/ファイルを送信しました';
 
           // 自分のメッセージは無視
-          if (senderId === currentUser.uid) {
+          if (senderId === currentUserId) {
             lastMessagesRef.current.set(roomId, { id: messageId, timestamp: createdAt });
             return;
           }
@@ -187,5 +189,5 @@ export function useGlobalNotification() {
       lastMessages.clear();
       initializedRooms.clear();
     };
-  }, [currentUser, isElectron]); // showNotificationはrefを通じて呼び出すため依存配列から削除
+  }, [currentUserId, isElectron]); // showNotificationはrefを通じて呼び出すため依存配列から削除
 }

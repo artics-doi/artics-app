@@ -2,12 +2,12 @@
 // Schedule.tsx から機械的に移動（挙動変更なし）。
 
 import { FirebaseError } from 'firebase/app';
-import type { ScheduleCategoryId, ScheduleEvent, ScheduleNotificationTiming } from '../../types/schedule';
+import type { ScheduleCategoryId, ScheduleEvent, ScheduleNotificationRecipientScope, ScheduleNotificationTiming } from '../../types/schedule';
 import { toDateInputValue, toTimeInputValue } from './calendar';
 
 export type ScheduleFormState = {
   title: string;
-  categoryId: ScheduleCategoryId;
+  categoryId: ScheduleCategoryId | '';
   targetUserIds: string[];
   startDate: string;
   startTime: string;
@@ -16,6 +16,7 @@ export type ScheduleFormState = {
   allDay: boolean;
   memo: string;
   notifyEnabled: boolean;
+  notifyRecipientScope: ScheduleNotificationRecipientScope;
   notifyTiming: ScheduleNotificationTiming;
   customNotifyDate: string;
   customNotifyTime: string;
@@ -41,9 +42,13 @@ export function getScheduleErrorMessage(error: unknown, action: 'save' | 'delete
 export function createInitialForm(date: Date, event?: ScheduleEvent): ScheduleFormState {
   const source = event ?? null;
   const customAt = source?.notification.customAt ?? null;
+  const savedTiming = source?.notification.timings[0];
+  const notifyTiming = !savedTiming || savedTiming === 'previousDayEvening' || savedTiming === 'sameDayMorning'
+    ? 'atStart'
+    : savedTiming;
   return {
     title: source?.title ?? '',
-    categoryId: source?.categoryId ?? 'vacation',
+    categoryId: source?.categoryId ?? '',
     targetUserIds: source?.targetUserIds ?? [],
     startDate: toDateInputValue(source?.startAt ?? date),
     startTime: source && !source.allDay ? toTimeInputValue(source.startAt) : '09:00',
@@ -52,7 +57,8 @@ export function createInitialForm(date: Date, event?: ScheduleEvent): ScheduleFo
     allDay: source?.allDay ?? true,
     memo: source?.memo ?? '',
     notifyEnabled: source?.notification.enabled ?? false,
-    notifyTiming: source?.notification.timings[0] ?? 'sameDayMorning',
+    notifyRecipientScope: source?.notification.recipientScope ?? 'targets',
+    notifyTiming,
     customNotifyDate: customAt ? toDateInputValue(customAt) : toDateInputValue(date),
     customNotifyTime: customAt ? toTimeInputValue(customAt) : '08:30',
   };

@@ -3,6 +3,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { ProcessMember, ProjectColumn, Task, TaskInput } from '../../types/process';
+import { defaultCompletedDate, isDoneColumnId } from '../../lib/process/completion';
 import { dateToInputValue, inputValueToDate } from '../../lib/process/dateInput';
 import MemberPicker from './MemberPicker';
 import { CloseIcon } from './icons';
@@ -10,6 +11,7 @@ import styles from './ProcessModal.module.css';
 
 interface TaskPanelProps {
   task: Task | null; // null なら新規作成
+  initialInput?: Partial<TaskInput>;
   columns: ProjectColumn[];
   defaultColumnId: string; // 新規作成時の初期列
   members: ProcessMember[];
@@ -21,6 +23,7 @@ interface TaskPanelProps {
 
 export default function TaskPanel({
   task,
+  initialInput,
   columns,
   defaultColumnId,
   members,
@@ -29,12 +32,13 @@ export default function TaskPanel({
   onDuplicate,
   onClose,
 }: TaskPanelProps) {
-  const [title, setTitle] = useState(task?.title ?? '');
-  const [columnId, setColumnId] = useState(task?.columnId ?? defaultColumnId);
-  const [assigneeIds, setAssigneeIds] = useState<string[]>(task?.assigneeIds ?? []);
-  const [startDate, setStartDate] = useState(dateToInputValue(task?.startDate ?? null));
-  const [endDate, setEndDate] = useState(dateToInputValue(task?.endDate ?? null));
-  const [description, setDescription] = useState(task?.description ?? '');
+  const initialColumnId = task?.columnId ?? initialInput?.columnId ?? defaultColumnId;
+  const [title, setTitle] = useState(task?.title ?? initialInput?.title ?? '');
+  const [columnId, setColumnId] = useState(initialColumnId);
+  const [assigneeIds, setAssigneeIds] = useState<string[]>(task?.assigneeIds ?? initialInput?.assigneeIds ?? []);
+  const [startDate, setStartDate] = useState(dateToInputValue(task?.startDate ?? initialInput?.startDate ?? null));
+  const [endDate, setEndDate] = useState(dateToInputValue(task?.endDate ?? initialInput?.endDate ?? null));
+  const [description, setDescription] = useState(task?.description ?? initialInput?.description ?? '');
   const [submitting, setSubmitting] = useState(false);
   const [dateError, setDateError] = useState('');
   const titleRef = useRef<HTMLInputElement>(null);
@@ -69,10 +73,24 @@ export default function TaskPanel({
     setDateError('');
   };
 
+  const handleColumnChange = (nextColumnId: string) => {
+    setColumnId(nextColumnId);
+  };
+
   const handleSubmit = async () => {
     if (!canSubmit) return;
     const start = inputValueToDate(startDate);
     const end = inputValueToDate(endDate);
+    const isNextDone = isDoneColumnId(columns, columnId);
+    const wasDone = isDoneColumnId(columns, initialColumnId);
+    const completed =
+      isNextDone
+        ? task?.completedDate ?? initialInput?.completedDate ?? defaultCompletedDate()
+        : null;
+    const completionChecked =
+      isNextDone && wasDone
+        ? task?.completionChecked ?? initialInput?.completionChecked ?? false
+        : false;
     // 終了日が開始日より前なら弾く（両方ある場合のみ）。
     if (start && end && end.getTime() < start.getTime()) {
       setDateError('終了日は開始日以降にしてください。');
@@ -87,6 +105,8 @@ export default function TaskPanel({
         assigneeIds,
         startDate: start,
         endDate: end,
+        completedDate: completed,
+        completionChecked,
         description: description.trim(),
       });
       onClose();
@@ -138,7 +158,7 @@ export default function TaskPanel({
             id="task-column"
             className={styles.input}
             value={columnId}
-            onChange={(e) => setColumnId(e.target.value)}
+            onChange={(e) => handleColumnChange(e.target.value)}
           >
             {columns.map((col) => (
               <option key={col.id} value={col.id}>
@@ -153,8 +173,8 @@ export default function TaskPanel({
           <MemberPicker members={members} selectedIds={assigneeIds} onChange={setAssigneeIds} />
         </div>
 
-        <div style={{ display: 'flex', gap: 12 }}>
-          <div className={styles.field} style={{ flex: 1 }}>
+        <div className={styles.dateFields}>
+          <div className={styles.field}>
             <label className={styles.label} htmlFor="task-start">
               開始日
             </label>
@@ -166,7 +186,7 @@ export default function TaskPanel({
               onChange={(e) => handleStartDateChange(e.target.value)}
             />
           </div>
-          <div className={styles.field} style={{ flex: 1 }}>
+          <div className={styles.field}>
             <label className={styles.label} htmlFor="task-end">
               終了日
             </label>

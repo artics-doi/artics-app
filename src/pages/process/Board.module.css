@@ -636,7 +636,39 @@
   pointer-events: auto;
 }
 
+.ganttTaskBarEarlyCompleted {
+  background: transparent;
+}
+
+.ganttTaskBarActual,
+.ganttTaskBarPlannedRemainder {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+
+.ganttTaskBarActual {
+  left: 0;
+  background: var(--artics-gantt-task-fill);
+}
+
+.ganttTaskBarPlannedRemainder {
+  right: 0;
+  background:
+    repeating-linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--artics-gantt-task-border) 36%, transparent) 0,
+      color-mix(in srgb, var(--artics-gantt-task-border) 36%, transparent) 1px,
+      color-mix(in srgb, var(--artics-gantt-task-fill) 12%, white) 1px,
+      color-mix(in srgb, var(--artics-gantt-task-fill) 12%, white) 4px
+    ),
+    color-mix(in srgb, var(--artics-gantt-task-fill) 16%, white);
+}
+
 .ganttTaskBarText {
+  position: relative;
+  z-index: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -828,6 +860,81 @@
   cursor: grab;
 }
 
+.cardCompleted .cardTitle,
+.cardCompleted .cardDescription,
+.cardCompleted .assignee,
+.cardCompleted .missingBadges span {
+  color: var(--text-tertiary);
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+}
+
+.cardCompleted .dueDate {
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.cardArchived {
+  border-style: dashed;
+  opacity: 0.78;
+}
+
+.cardTitleRow {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) 26px;
+  align-items: start;
+  gap: 7px;
+  margin: 0 0 8px;
+}
+
+.cardTitleRowPlain {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 26px;
+  align-items: start;
+  gap: 7px;
+  margin: 0 0 8px;
+}
+
+.cardArchiveButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+
+.cardArchiveButton:hover:not(:disabled) {
+  background: var(--bg-tertiary);
+  color: var(--accent-color-strong);
+}
+
+.cardArchiveButton:disabled {
+  cursor: wait;
+  opacity: 0.5;
+}
+
+.cardCompleteCheck {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 22px;
+  cursor: pointer;
+}
+
+.cardCompleteCheck input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--accent-color);
+}
+
 .cardDragging {
   opacity: 0.5;
 }
@@ -836,7 +943,7 @@
   font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
-  margin: 0 0 8px;
+  margin: 0;
   word-break: break-word;
   line-height: 1.5;
 }

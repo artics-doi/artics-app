@@ -34,4 +34,4 @@ cp .env.example .env   # Firebase 設定を記入（VITE_FIREBASE_* / VITE_FIREB
 
 - **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — 構成・規約・データフロー・危険地帯の索引（開発前に必読）
 - `PROJECT.md` — 過去の設計判断と変更履歴
-- 公開手順 — `.claude/skills/artics-deploy/skill.md`（デプロイは手順書に従い明示的に行う）
+- 公開手順 — `.claude/skills/artics-chat-release/skill.md`（デプロイは手順書に従い明示的に行う）

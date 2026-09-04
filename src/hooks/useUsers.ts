@@ -45,6 +45,11 @@ function userFromDoc(docId: string, data: Record<string, unknown>): User {
     displayName,
     photoURL: typeof data.photoURL === 'string' ? data.photoURL : null,
     createdAt: asDate(data.createdAt),
+    lifecycleState: data.lifecycleState === 'disabling' || data.lifecycleState === 'deleted'
+      ? data.lifecycleState
+      : 'active',
+    lifecycleVersion: typeof data.lifecycleVersion === 'number' ? data.lifecycleVersion : 0,
+    activeOperationId: typeof data.activeOperationId === 'string' ? data.activeOperationId : undefined,
   };
 }
 
@@ -62,6 +67,7 @@ export function useUsers(options: UseUsersOptions = {}) {
       let hasCurrentUser = false;
       snapshot.forEach((doc) => {
         const user = userFromDoc(doc.id, doc.data());
+        if (user.lifecycleState === 'deleted') return;
         if (user.uid === currentUser.uid) {
           hasCurrentUser = true;
           if (includeSelf) userList.push(user);

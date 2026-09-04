@@ -41,6 +41,7 @@ import { useProjectTasks } from '../../hooks/process/useProjectTasks';
 import { useProcessMembers } from '../../hooks/process/useProcessMembers';
 import { useIsDarkTheme } from '../../hooks/process/useIsDarkTheme';
 import { toTaskInput } from '../../lib/process/converters';
+import { defaultCompletedDate, isDoneColumnId } from '../../lib/process/completion';
 import {
   buildGanttTimelineBounds,
   buildReorderedGanttTaskIds,
@@ -137,6 +138,22 @@ function formatTaskDateChange(dates: Pick<TaskInput, 'startDate' | 'endDate'>): 
   return `${start} - ${end}`;
 }
 
+function completedDateForColumn(
+  columns: readonly ProjectColumn[],
+  columnId: string,
+  task: Pick<Task, 'completedDate'> | null = null,
+): Date | null {
+  return isDoneColumnId(columns, columnId) ? task?.completedDate ?? defaultCompletedDate() : null;
+}
+
+function completionCheckedForColumn(
+  columns: readonly ProjectColumn[],
+  columnId: string,
+  task: Pick<Task, 'columnId' | 'completionChecked'> | null = null,
+): boolean {
+  return isDoneColumnId(columns, columnId) && task?.columnId === columnId ? task.completionChecked : false;
+}
+
 function withRequiredColumns(columns: readonly ProjectColumn[]): ProjectColumn[] {
   const sorted = [...columns].sort((a, b) => a.order - b.order);
   if (sorted.some((column) => column.name === HOLD_COLUMN.name || column.id === HOLD_COLUMN.id)) {
@@ -184,13 +201,21 @@ function GanttInlineReorderHandle({
 
 function GanttTaskBarTemplate({ data }: { data: ITask }) {
   const task = data as ProcessGanttTask;
+  const earlyPercent = task.earlyCompletionSolidPercent;
+  const hasEarlyCompletion = typeof earlyPercent === 'number' && earlyPercent > 0 && earlyPercent < 100;
   return (
     <div
-      className={styles.ganttTaskBarTemplate}
+      className={`${styles.ganttTaskBarTemplate} ${hasEarlyCompletion ? styles.ganttTaskBarEarlyCompleted : ''}`}
       style={ganttStatusColorVariables(task.processStatus) as CSSProperties}
       data-task-id={task.id}
       data-task-status={task.processStatus}
     >
+      {hasEarlyCompletion && (
+        <>
+          <span className={styles.ganttTaskBarActual} style={{ width: `${earlyPercent}%` }} aria-hidden="true" />
+          <span className={styles.ganttTaskBarPlannedRemainder} style={{ left: `${earlyPercent}%` }} aria-hidden="true" />
+        </>
+      )}
       <span className={styles.ganttTaskBarText}>{task.text}</span>
     </div>
   );
@@ -218,6 +243,7 @@ export default function Board() {
     createTask,
     duplicateTask,
     updateTask,
+    setTaskArchived,
     moveTask,
     reorderTask,
     setGanttOrderForTasks,
@@ -242,6 +268,7 @@ export default function Board() {
     useState<PendingGanttDateChange | null>(null);
   const [taskFilters, setTaskFilters] = useState<TaskFilterState>(EMPTY_TASK_FILTERS);
   const isDark = useIsDarkTheme();
+  const suppressTaskParamOpenRef = useRef<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -253,18 +280,23 @@ export default function Board() {
     [project?.columns],
   );
 
+  const archiveScopedTasks = useMemo(
+    () => filterTasks(tasks, { ...EMPTY_TASK_FILTERS, archiveMode: taskFilters.archiveMode }),
+    [taskFilters.archiveMode, tasks],
+  );
   const filteredTasks = useMemo(() => filterTasks(tasks, taskFilters), [taskFilters, tasks]);
   const hasActiveFilters = useMemo(
     () => taskFilters.query.trim() !== '' ||
       taskFilters.assigneeId !== 'all' ||
       taskFilters.columnId !== 'all' ||
+      taskFilters.archiveMode !== 'active' ||
       taskFilters.dateFilter !== 'all' ||
       taskFilters.missingOnly,
     [taskFilters],
   );
   const missingTaskCount = useMemo(
-    () => tasks.filter((task) => hasTaskMissingFields(task)).length,
-    [tasks],
+    () => archiveScopedTasks.filter((task) => hasTaskMissingFields(task)).length,
+    [archiveScopedTasks],
   );
 
   const tasksByColumn = useMemo(() => {
@@ -387,7 +419,11 @@ export default function Board() {
 
   useEffect(() => {
     const taskId = searchParams.get('task');
-    if (!taskId || tasksLoading) return;
+    if (!taskId) {
+      suppressTaskParamOpenRef.current = null;
+      return;
+    }
+    if (suppressTaskParamOpenRef.current === taskId || tasksLoading) return;
     const target = taskById.get(taskId);
     if (target && editingTask?.id !== target.id) {
       setEditingTask(target);
@@ -515,7 +551,10 @@ export default function Board() {
     }
 
     if (targetColumnId !== activeTask.columnId) {
-      moveTask(activeId, targetColumnId, prevOrder, nextOrder);
+      moveTask(activeId, targetColumnId, prevOrder, nextOrder, {
+        completedDate: completedDateForColumn(columns, targetColumnId, activeTask),
+        completionChecked: completionCheckedForColumn(columns, targetColumnId, activeTask),
+      });
     } else {
       reorderTask(activeId, prevOrder, nextOrder);
     }
@@ -544,18 +583,22 @@ export default function Board() {
   };
 
   const closeTaskPanel = () => {
-    setEditingTask(null);
-    window.setTimeout(refreshGanttLayout, 0);
     const openedTaskId = searchParams.get('task');
-    if (!openedTaskId) return;
+    if (openedTaskId) {
+      suppressTaskParamOpenRef.current = openedTaskId;
+    }
     if (openedFromDashboard) {
+      setEditingTask(null);
       navigate('/process');
       return;
     }
-    const next = new URLSearchParams(searchParams);
-    next.delete('task');
-    next.delete('from');
-    setSearchParams(next, { replace: true });
+    if (openedTaskId) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('task');
+      next.delete('from');
+      setSearchParams(next, { replace: true });
+    }
+    setEditingTask(null);
   };
 
   const updateTaskFilter = <K extends keyof TaskFilterState>(key: K, value: TaskFilterState[K]) => {
@@ -672,6 +715,16 @@ export default function Board() {
     }, 0);
   };
 
+  const handleTaskCompletedChange = async (task: Task, completed: boolean) => {
+    await updateTask(
+      task.id,
+      toTaskInput(task, {
+        completionChecked: completed,
+      }),
+    );
+    refreshGanttLayout();
+  };
+
   return (
     <div className={styles.page}>
       <div className={styles.header}>
@@ -759,7 +812,7 @@ export default function Board() {
         hasActiveFilters={hasActiveFilters}
         onClear={() => setTaskFilters(EMPTY_TASK_FILTERS)}
         filteredCount={filteredTasks.length}
-        totalCount={tasks.length}
+        totalCount={archiveScopedTasks.length}
       />
 
       <main
@@ -910,6 +963,7 @@ export default function Board() {
                   tasks={tasksByColumn.get(column.id) ?? []}
                   memberById={memberById}
                   isLocked={LOCKED_COLUMN_IDS.has(column.id)}
+                  isDoneColumn={isDoneColumnId(columns, column.id)}
                   isCreating={createInColumn === column.id}
                   onStartCreate={() => setCreateInColumn(column.id)}
                   onCancelCreate={() => setCreateInColumn(null)}
@@ -920,11 +974,19 @@ export default function Board() {
                       assigneeIds: [],
                       startDate: null,
                       endDate: null,
+                      completedDate: completedDateForColumn(columns, column.id),
+                      completionChecked: false,
                       description: '',
                     });
                     setCreateInColumn(null);
                   }}
                   onTaskClick={(task) => setEditingTask(task)}
+                  onTaskCompletedChange={(task, completed) => {
+                    void handleTaskCompletedChange(task, completed);
+                  }}
+                  onTaskArchivedChange={(task, archived) => {
+                    return setTaskArchived(task.id, archived);
+                  }}
                   onRenameColumn={(name) => {
                     updateColumns(columns.map((c) => (c.id === column.id ? { ...c, name } : c)));
                   }}

@@ -6,6 +6,7 @@ import { Fragment } from 'react';
 import { isElectronEnv } from '../../hooks/useElectronNotification';
 import type { ToastType } from '../../contexts/ToastContext';
 import styles from '../../pages/Chat.module.css';
+import { isAllowedHttpsUrl } from '../../lib/security/resourceTarget';
 
 const HTTP_URL_REGEX = /(https?:\/\/[^\s]+)/g;
 const NAS_PATH_REGEX = /"(\\\\(?:Nas-1|Nas-3)\\[^"\r\n]+)"|(\\\\(?:Nas-1|Nas-3)\\[^\s\r\n]+)/g;
@@ -29,7 +30,7 @@ export function renderMessageText(text: string, showToast: ShowToast): React.Rea
   const urlSegments = text.split(HTTP_URL_REGEX);
 
   return urlSegments.flatMap((urlSegment, i) => {
-    if (/^https?:\/\//.test(urlSegment)) {
+    if (isAllowedHttpsUrl(urlSegment)) {
       return (
         <a
           key={`url-${i}`}

@@ -19,7 +19,7 @@ import {
 
 // 工程管理（process management）のセキュリティルール検証。
 // 行動予定表(schedules)とは完全に独立したコレクション群（projects / tasks / processMembers）を対象とする。
-const PROJECT_ID = 'company-chat-a9cf0';
+const PROJECT_ID = 'demo-artics-refactor';
 
 let testEnv: RulesTestEnvironment;
 
@@ -39,11 +39,15 @@ beforeEach(async () => {
   // alice が作成者のプロジェクトとタスクを1件ずつ用意する。
   await testEnv.withSecurityRulesDisabled(async (context) => {
     const db = context.firestore();
+    await setDoc(doc(db, 'users/alice'), { uid: 'alice', displayName: 'Alice' });
+    await setDoc(doc(db, 'users/bob'), { uid: 'bob', displayName: 'Bob' });
     await setDoc(doc(db, 'projects/proj1'), {
       name: 'プロジェクト1',
       description: '',
       colorIndex: 0,
       status: 'active',
+      lifecycleState: 'active',
+      lifecycleVersion: 0,
       columns: [],
       order: 'a0',
       createdBy: 'alice',
@@ -61,6 +65,7 @@ beforeEach(async () => {
       description: '',
       order: 'a0',
       archived: false,
+      isArchived: false,
       createdBy: 'alice',
       createdByName: 'Alice',
       createdAt: serverTimestamp(),
@@ -99,6 +104,8 @@ describe('Process rules: projects', () => {
       createdByName: 'Alice',
       order: 'a1',
       status: 'active',
+      lifecycleState: 'active',
+      lifecycleVersion: 0,
       createdAt: serverTimestamp(),
     }));
 
@@ -107,6 +114,8 @@ describe('Process rules: projects', () => {
       name: '詐称PJ',
       createdBy: 'bob',
       order: 'a2',
+      lifecycleState: 'active',
+      lifecycleVersion: 0,
     }));
   });
 
@@ -126,10 +135,10 @@ describe('Process rules: projects', () => {
     }));
   });
 
-  it('update で pendingDelete:true / status / columns 変更はすべて許可（全員編集要件）', async () => {
+  it('通常更新は許可し、旧pendingDelete更新は拒否する', async () => {
     const aliceDb = testEnv.authenticatedContext('alice').firestore();
 
-    await assertSucceeds(updateDoc(doc(aliceDb, 'projects/proj1'), {
+    await assertFails(updateDoc(doc(aliceDb, 'projects/proj1'), {
       pendingDelete: true,
     }));
     await assertSucceeds(updateDoc(doc(aliceDb, 'projects/proj1'), {
@@ -140,13 +149,16 @@ describe('Process rules: projects', () => {
     }));
   });
 
-  it('【M6】他人PJ（createdBy≠自分）への pendingDelete:true は当面 assertSucceeds', async () => {
-    // 方針(M6): ルールでは全認証ユーザーに pendingDelete:true を許可する（全員可の業務要件の帰結）。
-    // 「誰でも他人PJを消せる」リスクは、当面 UI 側で削除ボタンを作成者のみ表示して運用上抑止する。
-    // 将来大規模化したらルールに createdBy==auth.uid を削除条件として追加する。
+  it('削除はversion付き状態遷移だけを許可する', async () => {
     const bobDb = testEnv.authenticatedContext('bob').firestore();
     await assertSucceeds(updateDoc(doc(bobDb, 'projects/proj1'), {
-      pendingDelete: true,
+      lifecycleState: 'deleting',
+      lifecycleVersion: 1,
+      operationId: 'operation-1',
+      updatedAt: serverTimestamp(),
+    }));
+    await assertFails(updateDoc(doc(bobDb, 'projects/proj1'), {
+      lifecycleVersion: 2,
     }));
   });
 
@@ -166,6 +178,7 @@ describe('Process rules: tasks', () => {
       createdBy: 'alice',
       order: 'a1',
       archived: false,
+      isArchived: false,
       createdAt: serverTimestamp(),
     }));
 
@@ -198,6 +211,14 @@ describe('Process rules: tasks', () => {
     }));
   });
 
+  it('個別アーカイブ状態を1ドキュメント更新できる', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+    await assertSucceeds(updateDoc(doc(aliceDb, 'tasks/task1'), {
+      isArchived: true,
+      updatedAt: serverTimestamp(),
+    }));
+  });
+
   it('タスク単体の delete はログイン者なら許可（サブコレクション無し・Function不要）', async () => {
     const aliceDb = testEnv.authenticatedContext('alice').firestore();
     const anonDb = testEnv.unauthenticatedContext().firestore();
@@ -205,6 +226,24 @@ describe('Process rules: tasks', () => {
     await assertFails(deleteDoc(doc(anonDb, 'tasks/task1')));
     // ログイン者は可
     await assertSucceeds(deleteDoc(doc(aliceDb, 'tasks/task1')));
+  });
+
+  it('親プロジェクトが存在しないか削除中なら書き込みを拒否する', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+
+    await assertFails(addDoc(collection(aliceDb, 'tasks'), {
+      title: 'orphan',
+      projectId: 'missing',
+      createdBy: 'alice',
+    }));
+
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(doc(context.firestore(), 'projects/proj1'), {
+        lifecycleState: 'deleting',
+      });
+    });
+    await assertFails(updateDoc(doc(aliceDb, 'tasks/task1'), { title: 'blocked' }));
+    await assertFails(deleteDoc(doc(aliceDb, 'tasks/task1')));
   });
 });
 

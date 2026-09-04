@@ -193,6 +193,25 @@
   color: #ffcdd2;
 }
 
+.deleteRoomButton {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, color 0.2s;
+}
+
+.deleteRoomButton:hover {
+  background: rgba(220, 38, 38, 0.16);
+  color: #dc2626;
+}
+
 /* 個人メモボタン */
 .personalMemoButton,
 .desktopPanelToggle {
@@ -590,6 +609,171 @@
   color: #dc2626;
 }
 
+.chatCreateOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.42);
+}
+
+.chatCreateModal {
+  width: min(560px, 100%);
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  overflow-y: auto;
+  padding: 18px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.22);
+}
+
+.chatCreateHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.chatCreateHeader h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.chatCreateHeader button {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.chatCreateField {
+  display: grid;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.chatCreateField input,
+.chatCreateField select,
+.chatCreateField textarea,
+.taskProjectPicker select {
+  min-height: 38px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  padding: 8px 10px;
+  font: inherit;
+}
+
+.chatCreateField textarea {
+  resize: vertical;
+}
+
+.chatCreateGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.chatCreateCheck {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.chatCreateUserList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-primary);
+}
+
+.chatCreateUserList button {
+  min-height: 28px;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  padding: 0 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.chatCreateUserSelected {
+  border-color: var(--accent-color) !important;
+  background: var(--accent-color-soft) !important;
+  color: var(--accent-color-strong) !important;
+}
+
+.chatCreateActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.chatCreateActions button,
+.taskProjectPicker button {
+  min-height: 38px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  padding: 0 14px;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.chatCreateActions button:last-child {
+  border-color: var(--accent-color);
+  background: var(--accent-color);
+  color: #ffffff;
+}
+
+.taskProjectPicker {
+  position: fixed;
+  z-index: 1450;
+  top: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(520px, calc(100vw - 32px));
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.18);
+}
+
+.taskProjectPicker label {
+  display: grid;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 /* リアクションピッカー */
 .reactionPicker {
   position: absolute;
@@ -937,6 +1121,7 @@
 /* 入力エリア */
 .inputArea {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   /* iOS のホームバー領域を避けるための safe-area padding（H-5） */
@@ -944,6 +1129,67 @@
   background: var(--bg-secondary);
   border-top: 1px solid var(--border-color);
   position: relative;
+}
+
+.pendingAttachments {
+  flex: 0 0 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 104px;
+  overflow-y: auto;
+  padding: 2px 0 4px;
+}
+
+.pendingAttachment {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: min(100%, 360px);
+  padding: 6px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.pendingAttachmentName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.pendingAttachmentSize {
+  flex: none;
+  color: var(--text-muted);
+}
+
+.removePendingAttachment {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.removePendingAttachment:hover:not(:disabled) {
+  background: rgba(220, 38, 38, 0.1);
+  color: var(--danger-color);
+}
+
+.removePendingAttachment:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .attachButton {
@@ -1734,6 +1980,245 @@
   display: none;
 }
 
+.desktopRoomPaneResizeHandle {
+  display: none;
+}
+
+/* Electron狭幅時の専用チャット一覧。スマホHomeの下部タブやFABは使わず、
+   3カラム版の左ペインを1カラムのワークスペースとして表示する。 */
+.electronCompactChatList {
+  position: fixed;
+  inset: 0;
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  overflow: hidden;
+  background: var(--bg-primary);
+}
+
+.electronCompactChatList .desktopRoomPane {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-primary);
+}
+
+.electronCompactChatList .desktopQuickActions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.electronCompactChatList .desktopPaneHeader {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  padding: 8px 12px 10px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.electronCompactChatList .desktopQuickButton,
+.electronCompactChatList .desktopPrimaryAction,
+.electronCompactChatList .desktopScheduleAction {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  padding: 0 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.electronCompactChatList .desktopPrimaryAction {
+  grid-column: 1 / -1;
+  min-height: 42px;
+}
+
+.electronCompactChatList .desktopScheduleAction {
+  color: var(--accent-color-strong);
+  background: var(--accent-color-soft);
+}
+
+.electronCompactChatList .desktopScheduleAction:has(.desktopWorkspaceHint) {
+  min-height: 58px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 5px 4px;
+  line-height: 1.15;
+}
+
+.electronCompactChatList .desktopWorkspaceHint {
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1.2;
+  opacity: 0.82;
+  white-space: nowrap;
+}
+
+.electronCompactChatList .desktopScheduleAction.active {
+  border-color: transparent;
+  background: var(--accent-color);
+  color: #ffffff;
+}
+
+.electronCompactChatList .desktopQuickButton:hover:not(:disabled),
+.electronCompactChatList .desktopPrimaryAction:hover,
+.electronCompactChatList .desktopScheduleAction:hover,
+.electronCompactChatList .desktopQuickButton:focus-visible,
+.electronCompactChatList .desktopPrimaryAction:focus-visible,
+.electronCompactChatList .desktopScheduleAction:focus-visible {
+  border-color: var(--accent-color);
+  outline: none;
+}
+
+.electronCompactChatList .desktopQuickButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.electronCompactChatList .desktopScheduleAction:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.electronCompactChatList .desktopRoomSectionTitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px 7px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.electronCompactChatList .desktopRoomList {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 8px 10px;
+}
+
+.electronCompactChatList .desktopRoomItem {
+  width: 100%;
+  min-height: 58px;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+  padding: 8px 9px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.electronCompactChatList .desktopRoomItem:hover,
+.electronCompactChatList .desktopRoomItem:focus-visible,
+.electronCompactChatList .desktopRoomItem.active {
+  border-color: color-mix(in srgb, var(--accent-color) 30%, var(--border-color));
+  background: var(--accent-color-soft);
+  outline: none;
+}
+
+.electronCompactChatList .desktopRoomAvatar {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--accent-color);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.electronCompactChatList .desktopRoomAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.electronCompactChatList .desktopRoomText {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.electronCompactChatList .desktopRoomName,
+.electronCompactChatList .desktopRoomLast {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.electronCompactChatList .desktopRoomName {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.electronCompactChatList .desktopRoomLast {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.electronCompactChatList .desktopFavorite {
+  flex: 0 0 auto;
+  color: #f5a400;
+}
+
+.electronCompactChatList .desktopRoomMeta {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 4px;
+  color: var(--text-secondary);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.electronCompactChatList .desktopMuted,
+.electronCompactChatList .desktopUnread {
+  border-radius: 999px;
+  padding: 3px 6px;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.electronCompactChatList .desktopMuted {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.electronCompactChatList .desktopUnread {
+  background: var(--accent-color);
+  color: #ffffff;
+}
+
 .header {
   background: linear-gradient(180deg, #ffffff 0%, #f7fbf8 100%);
   color: var(--text-primary);
@@ -1747,6 +2232,7 @@
 .inviteButton,
 .pinButton,
 .notificationToggle,
+.deleteRoomButton,
 .personalMemoButton,
 .desktopPanelToggle {
   min-width: 44px;
@@ -1763,11 +2249,17 @@
 .inviteButton:hover,
 .pinButton:hover,
 .notificationToggle:hover,
+.deleteRoomButton:hover,
 .personalMemoButton:hover,
 .desktopPanelToggle:hover,
 .desktopPanelToggle.active {
   background: var(--accent-color-soft);
   color: var(--accent-color-strong);
+}
+
+.deleteRoomButton:hover {
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
 }
 
 .headerActionLabel {
@@ -1960,6 +2452,7 @@
   .inviteButton,
   .pinButton,
   .notificationToggle,
+  .deleteRoomButton,
   .personalMemoButton,
   .desktopPanelToggle {
     width: 42px;
@@ -1982,17 +2475,17 @@
 @media (min-width: 1024px) {
   .container {
     display: grid;
-    grid-template-columns: minmax(250px, 330px) minmax(0, 1fr);
+    grid-template-columns: var(--desktop-room-pane-width, 330px) 8px minmax(0, 1fr);
     background: #ffffff;
   }
 
   .container.withDesktopSidePanel {
-    grid-template-columns: minmax(250px, 330px) minmax(0, 1fr) minmax(280px, 392px);
+    grid-template-columns: var(--desktop-room-pane-width, 330px) 8px minmax(0, 1fr) minmax(280px, 392px);
   }
 
   .chatMainPane {
     min-width: 0;
-    border-left: 1px solid #dfe5ec;
+    border-left: 0;
     border-right: 1px solid #dfe5ec;
     background: #ffffff;
   }
@@ -2001,11 +2494,47 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
-    background: #fbfdff;
+    background: #f7f9fc;
   }
 
   .desktopRoomPane {
-    border-right: 1px solid #dfe5ec;
+    border-right: 0;
+  }
+
+  .desktopRoomPaneResizeHandle {
+    position: relative;
+    z-index: 4;
+    display: block;
+    width: 8px;
+    min-width: 8px;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: col-resize;
+    touch-action: none;
+  }
+
+  .desktopRoomPaneResizeHandle::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 3px;
+    width: 1px;
+    background: #dfe5ec;
+    transition: width 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+  }
+
+  .desktopRoomPaneResizeHandle:hover::before,
+  .desktopRoomPaneResizeHandle:focus-visible::before,
+  .desktopRoomPaneResizeHandle.dragging::before {
+    width: 3px;
+    background: var(--accent-color);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-color) 18%, transparent);
+  }
+
+  .desktopRoomPaneResizeHandle:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: -2px;
   }
 
   .desktopUtilityPane {
@@ -2022,34 +2551,33 @@
     display: flex;
   }
 
-  
 
-  
 
-  
 
-  
 
-  
 
-  
 
-  
 
-  
 
-  
+
+
+
+
+
+
+
+
+
 
   .desktopPaneHeader {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
-    padding: 12px 10px 10px;
+    padding: 10px 12px 12px;
     border-bottom: 0;
   }
 
-  
+
 
   .desktopPaneAction,
   .desktopQuickButton,
@@ -2069,25 +2597,27 @@
   .desktopPrimaryAction,
   .desktopScheduleAction {
     width: 100%;
-    min-height: 38px;
-    border-radius: 6px;
+    min-height: 40px;
+    border-radius: 8px;
     font: inherit;
-    font-size: 13px;
-    font-weight: 700;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0;
     cursor: pointer;
-    box-shadow: none;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
   }
 
   .desktopPrimaryAction {
-    border: 1px solid #d9e1eb;
+    grid-column: 1 / -1;
+    border: 1px solid #cfd9e6;
     background: #ffffff;
-    color: #1f2937;
+    color: #111827;
   }
 
   .desktopScheduleAction {
-    border: 1px solid transparent;
-    background: #1677ff;
-    color: #ffffff;
+    border: 1px solid #c8dcff;
+    background: #eef5ff;
+    color: #155fb8;
   }
 
   .desktopPrimaryAction:hover {
@@ -2097,7 +2627,9 @@
   }
 
   .desktopScheduleAction:hover {
-    background: #0f6bdd;
+    background: #dcecff;
+    border-color: #9bc3ff;
+    color: #0f55a4;
   }
 
   .desktopPaneAction:hover,
@@ -2112,23 +2644,35 @@
   .desktopQuickActions {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-    padding: 10px 10px 12px;
-    border-bottom: 1px solid #dfe5ec;
+    gap: 6px;
+    padding: 10px 12px 8px;
+    border-bottom: 1px solid #e4ebf3;
+    background: #f7f9fc;
   }
 
   .desktopQuickButton {
-    min-height: 38px;
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 0 8px;
+    border-color: #d5dee9;
+    border-radius: 8px;
     background: #ffffff;
+    color: #162235;
+    font-size: 12px;
+    font-weight: 800;
   }
 
   .desktopRoomSectionTitle {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 18px 6px;
-    font-size: 13px;
-    color: #475569;
+    padding: 10px 14px 7px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #64748b;
   }
 
   .desktopRoomList {
@@ -2140,34 +2684,36 @@
 
   .desktopRoomItem {
     width: 100%;
-    min-height: 62px;
+    min-height: 58px;
     display: grid;
-    grid-template-columns: 44px minmax(0, 1fr) auto;
+    grid-template-columns: 38px minmax(0, 1fr) auto;
     align-items: center;
-    gap: 10px;
-    padding: 8px 10px;
-    margin-bottom: 4px;
+    gap: 9px;
+    padding: 8px 9px;
+    margin-bottom: 5px;
     text-align: left;
-    border: 1px solid transparent;
-    border-radius: 8px;
-    background: transparent;
+    border: 1px solid #edf2f7;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.72);
     color: #111827;
     cursor: pointer;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
   }
 
   .desktopRoomItem:hover,
   .desktopRoomItem.active {
-    background: #eaf3ff;
+    background: #ffffff;
     border-color: #d2e4ff;
+    box-shadow: 0 5px 14px rgba(31, 91, 160, 0.08);
   }
 
   .desktopRoomItem.active {
-    box-shadow: inset 3px 0 0 #1677ff;
+    box-shadow: inset 3px 0 0 #1677ff, 0 5px 14px rgba(31, 91, 160, 0.08);
   }
 
   .desktopRoomAvatar {
-    width: 44px;
-    height: 44px;
+    width: 38px;
+    height: 38px;
     border-radius: 50%;
     display: inline-flex;
     align-items: center;
@@ -2175,7 +2721,7 @@
     overflow: hidden;
     background: linear-gradient(135deg, #3b82f6, #5f8ff5);
     color: #ffffff;
-    font-size: 19px;
+    font-size: 14px;
     font-weight: 800;
   }
 
@@ -2206,7 +2752,7 @@
 
   .desktopRoomLast {
     font-size: 12px;
-    color: #475569;
+    color: #64748b;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -2237,9 +2783,9 @@
     background: #1677ff;
   }
 
-  
 
-  
+
+
 
   .desktopUtilityTabs .active {
     color: #1677ff;
@@ -2268,13 +2814,13 @@
     color: #475569;
   }
 
-  
 
-  
 
-  
 
-  
+
+
+
+
 
   .desktopResultHeader,
   .desktopSectionHeader {
@@ -2287,7 +2833,7 @@
     font-size: 13px;
   }
 
-  
+
 
   .desktopResultList {
     display: flex;
@@ -2396,19 +2942,19 @@
     cursor: pointer;
   }
 
-  
 
-  
 
-  
 
-  
 
-  
 
-  
 
-  
+
+
+
+
+
+
+
 
   .header {
     gap: 10px;
@@ -2429,6 +2975,7 @@
   .inviteButton,
   .pinButton,
   .notificationToggle,
+  .deleteRoomButton,
   .personalMemoButton,
   .desktopPanelToggle {
     width: auto;
@@ -2575,6 +3122,7 @@
 :global([data-theme="dark"]) .inviteButton,
 :global([data-theme="dark"]) .pinButton,
 :global([data-theme="dark"]) .notificationToggle,
+:global([data-theme="dark"]) .deleteRoomButton,
 :global([data-theme="dark"]) .personalMemoButton,
 :global([data-theme="dark"]) .desktopPanelToggle {
   color: var(--text-secondary);
@@ -2599,14 +3147,24 @@
   background: var(--bg-tertiary);
 }
 
-:global([data-theme="dark"]) .desktopRoomItem:hover,
-:global([data-theme="dark"]) .desktopRoomItem.active,
 :global([data-theme="dark"]) .desktopResultItem:hover,
 :global([data-theme="dark"]) .desktopResultItem:focus-visible,
 :global([data-theme="dark"]) .desktopNoticeItem,
 :global([data-theme="dark"]) .messageWrapper.own .message {
   border-color: rgba(125, 211, 252, 0.32);
-  background: var(--accent-color-soft);
+  background: rgba(14, 116, 144, 0.72);
+  color: #f8fdff;
+}
+
+:global([data-theme="dark"]) .messageWrapper.own .messageText,
+:global([data-theme="dark"]) .messageWrapper.own .messageLink,
+:global([data-theme="dark"]) .messageWrapper.own .fileLink,
+:global([data-theme="dark"]) .messageWrapper.own .fileDownloadBtn {
+  color: #f8fdff;
+}
+
+:global([data-theme="dark"]) .messageWrapper.own .messageLink {
+  text-decoration-color: rgba(248, 253, 255, 0.78);
 }
 
 :global([data-theme="dark"]) .desktopRoomItem.active {
@@ -2620,14 +3178,18 @@
 :global([data-theme="dark"]) .desktopPrimaryAction,
 :global([data-theme="dark"]) .desktopQuickButton {
   border-color: var(--border-color);
-  background: var(--bg-secondary);
+  background: rgba(255, 255, 255, 0.04);
   color: var(--text-primary);
 }
 
+:global([data-theme="dark"]) .desktopQuickActions {
+  background: var(--bg-primary);
+}
+
 :global([data-theme="dark"]) .desktopScheduleAction {
-  border-color: transparent;
-  background: var(--accent-color);
-  color: #052536;
+  border-color: rgba(125, 211, 252, 0.28);
+  background: rgba(14, 116, 144, 0.34);
+  color: #e0f7ff;
 }
 
 :global([data-theme="dark"]) .desktopPrimaryAction:hover,
@@ -2638,8 +3200,20 @@
 }
 
 :global([data-theme="dark"]) .desktopScheduleAction:hover {
-  background: var(--accent-color);
-  color: #052536;
+  background: rgba(14, 116, 144, 0.58);
+  color: #ffffff;
+}
+
+:global([data-theme="dark"]) .desktopRoomItem {
+  border-color: rgba(148, 163, 184, 0.16);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+:global([data-theme="dark"]) .desktopRoomItem:hover,
+:global([data-theme="dark"]) .desktopRoomItem.active {
+  border-color: rgba(125, 211, 252, 0.28);
+  background: rgba(14, 116, 144, 0.18);
+  color: var(--text-primary);
 }
 
 :global([data-theme="dark"]) .desktopMuted {
@@ -2655,4 +3229,713 @@
 
 :global([data-theme="dark"]) .message {
   border-color: var(--border-color);
+}
+
+/* 2026-08-07 デスクトップ3カラム・チャット専用画面 */
+.desktopLandingMain {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  background: var(--bg-secondary);
+}
+
+.desktopSummaryPane {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .container {
+    grid-template-columns: var(--desktop-room-pane-width, clamp(330px, 25vw, 424px)) 8px minmax(0, 1fr);
+  }
+
+  .container.withDesktopSidePanel {
+    grid-template-columns: var(--desktop-room-pane-width, clamp(330px, 25vw, 424px)) 8px minmax(0, 1fr) minmax(340px, 380px);
+  }
+
+  .desktopPaneHeader {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 7px;
+  }
+
+  .desktopScheduleAction {
+    padding: 0 5px;
+  }
+
+  .desktopScheduleAction.active {
+    border-color: transparent;
+    background: #38bdf8;
+    color: #062b3c;
+  }
+
+  .desktopRoomMeta {
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 4px;
+    color: #64748b;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+
+  .desktopRoomItem {
+    min-height: 64px;
+  }
+
+  .desktopMuted,
+  .desktopUnread {
+    grid-column: auto;
+  }
+
+  .desktopLandingMain {
+    position: relative;
+    border-left: 0;
+    border-right: 1px solid var(--border-color);
+  }
+
+  .desktopLandingSummaryToggle {
+    position: absolute;
+    top: 16px;
+    right: 18px;
+    min-height: 40px;
+    padding: 0 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-primary);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .desktopLandingSummaryToggle:hover {
+    border-color: rgba(56, 189, 248, 0.55);
+    background: var(--accent-color-soft);
+  }
+
+  .desktopLandingHero {
+    flex: 0 0 min(65vh, 610px);
+    min-height: 420px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 125px 36px 34px;
+    text-align: center;
+  }
+
+  .desktopLandingLogo {
+    width: 132px;
+    height: 76px;
+    object-fit: contain;
+    margin-bottom: 24px;
+    opacity: 0.22;
+    filter: grayscale(1);
+  }
+
+  .desktopLandingHero h1 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: clamp(24px, 2vw, 34px);
+    line-height: 1.35;
+  }
+
+  .desktopLandingHero p {
+    margin: 14px 0 26px;
+    color: var(--text-secondary);
+    font-size: 14px;
+  }
+
+  .desktopLandingActions {
+    width: min(290px, 100%);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .desktopLandingPrimary,
+  .desktopLandingSecondary {
+    min-height: 48px;
+    border-radius: 8px;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  .desktopLandingPrimary {
+    border: 1px solid #38bdf8;
+    background: #38bdf8;
+    color: #062b3c;
+  }
+
+  .desktopLandingSecondary {
+    border: 1px solid var(--border-color);
+    background: transparent;
+    color: var(--text-primary);
+  }
+
+  .desktopLandingSecondary:disabled,
+  .desktopSummaryMetrics button:disabled {
+    cursor: not-allowed;
+    opacity: 0.48;
+  }
+
+  .desktopRecentSection {
+    padding: 0 clamp(30px, 4vw, 54px) 40px;
+  }
+
+  .desktopRecentSection h2 {
+    margin: 0 0 14px;
+    color: var(--text-primary);
+    font-size: 14px;
+  }
+
+  .desktopRecentRooms {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .desktopRecentRoom {
+    min-width: 0;
+    min-height: 82px;
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.025);
+    color: var(--text-primary);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .desktopRecentRoom:hover,
+  .desktopRecentRoom:focus-visible {
+    border-color: rgba(56, 189, 248, 0.55);
+    background: var(--accent-color-soft);
+  }
+
+  .desktopRecentAvatar,
+  .desktopMemberAvatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    overflow: visible;
+    position: relative;
+    background: #3b82f6;
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 800;
+  }
+
+  .desktopRecentAvatar {
+    overflow: hidden;
+  }
+
+  .desktopRecentAvatar img,
+  .desktopMemberAvatar img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+
+  .desktopRecentText {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .desktopRecentText strong,
+  .desktopRecentText span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .desktopRecentText strong {
+    font-size: 13px;
+  }
+
+  .desktopRecentText span,
+  .desktopRecentRoom time {
+    color: var(--text-secondary);
+    font-size: 11px;
+  }
+
+  .desktopRecentRoom time {
+    align-self: start;
+  }
+
+  .desktopSummaryPane {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    background: var(--bg-secondary);
+  }
+
+  .desktopInfoPaneHeader {
+    flex: 0 0 auto;
+    min-height: 76px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .desktopInfoPaneHeader h2 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 18px;
+  }
+
+  .desktopInfoPaneHeader button {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-secondary);
+    font: inherit;
+    font-size: 28px;
+    cursor: pointer;
+  }
+
+  .desktopInfoPaneHeader button:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+  }
+
+  .desktopSummaryMetrics {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 18px 16px;
+  }
+
+  .desktopSummaryMetrics > div,
+  .desktopSummaryMetrics > button {
+    min-height: 72px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 0 18px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text-primary);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .desktopSummaryMetrics > button {
+    cursor: pointer;
+  }
+
+  .desktopSummaryMetrics strong {
+    font-size: 20px;
+  }
+
+  .desktopSummarySection {
+    margin: 0 16px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border-color);
+  }
+
+  .desktopSummarySection h3,
+  .desktopInfoSectionTitle h3 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 14px;
+  }
+
+  .desktopSummaryFiles,
+  .desktopInfoList {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  .desktopSummaryFiles > button,
+  .desktopInfoList > button {
+    width: 100%;
+    min-height: 64px;
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr);
+    align-items: center;
+    gap: 11px;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-primary);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .desktopSummaryFiles > button > span:last-child,
+  .desktopInfoList > button > span:last-child {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .desktopSummaryFiles strong,
+  .desktopInfoList strong,
+  .desktopSummaryFiles small,
+  .desktopInfoList small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .desktopSummaryFiles strong,
+  .desktopInfoList strong {
+    font-size: 12px;
+  }
+
+  .desktopSummaryFiles small,
+  .desktopInfoList small {
+    color: var(--text-secondary);
+    font-size: 10px;
+  }
+
+  .desktopFileBadge,
+  .desktopPinBadge {
+    width: 40px;
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background: #ef4444;
+    color: #ffffff;
+    font-size: 9px;
+    font-weight: 900;
+  }
+
+  .desktopPinBadge {
+    background: #475569;
+  }
+
+  .desktopLandingEmpty {
+    margin: 0;
+    padding: 16px;
+    color: var(--text-secondary);
+    font-size: 12px;
+  }
+
+  .desktopUtilityPane.open {
+    padding: 0 16px 18px;
+  }
+
+  .desktopUtilityPane .desktopInfoPaneHeader {
+    margin: 0 -16px 14px;
+  }
+
+  .desktopInfoCard {
+    flex: 0 0 auto;
+    min-height: 200px;
+    margin-bottom: 14px;
+    padding: 15px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  .desktopUtilityPane > .desktopInfoCard:nth-of-type(1) {
+    min-height: 300px;
+  }
+
+  .desktopInfoSectionTitle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+    color: var(--text-secondary);
+    font-size: 12px;
+  }
+
+  .desktopMemberList {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .desktopMemberRow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-primary);
+  }
+
+  .desktopMemberRow strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+  }
+
+  .desktopOnlineDot {
+    position: absolute;
+    right: -1px;
+    bottom: 1px;
+    width: 10px;
+    height: 10px;
+    border: 2px solid var(--bg-secondary);
+    border-radius: 50%;
+    background: #22c55e;
+  }
+
+  .desktopInfoAction {
+    width: 100%;
+    min-height: 42px;
+    margin-top: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-primary);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .desktopInfoAction:hover,
+  .desktopInfoList > button:hover,
+  .desktopSummaryFiles > button:hover {
+    border-color: rgba(56, 189, 248, 0.55);
+    background: var(--accent-color-soft);
+  }
+
+  .inputArea {
+    min-height: 138px;
+    align-items: flex-end;
+    margin: 0 20px 20px;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+  }
+
+  .inputArea .messageInput {
+    min-height: 92px;
+  }
+
+  .chatMainPane > .header {
+    min-height: 92px;
+  }
+
+  .messageList {
+    background: var(--bg-secondary);
+  }
+}
+
+@media (min-width: 1024px) and (max-width: 1280px) {
+  .container {
+    grid-template-columns: var(--desktop-room-pane-width, 280px) 8px minmax(0, 1fr);
+  }
+
+  .container.withDesktopSidePanel {
+    grid-template-columns: var(--desktop-room-pane-width, 280px) 8px minmax(0, 1fr) 300px;
+  }
+
+  .desktopRecentRooms {
+    grid-template-columns: 1fr;
+  }
+
+  .desktopLandingHero {
+    min-height: 330px;
+  }
+}
+
+:global([data-theme="dark"]) .desktopLandingMain,
+:global([data-theme="dark"]) .desktopSummaryPane,
+:global([data-theme="dark"]) .desktopUtilityPane,
+:global([data-theme="dark"]) .desktopInfoCard {
+  background: var(--bg-secondary);
+}
+
+:global([data-theme="dark"]) .desktopScheduleAction.active {
+  border-color: transparent;
+  background: #38bdf8;
+  color: #062b3c;
+}
+
+/* 行動予定表・工程管理の左ペイン内で開くコンパクトチャット。 */
+.embeddedChatContainer {
+  position: relative;
+  inset: auto;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-secondary);
+}
+
+.embeddedLoading {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background: transparent;
+  font-size: 13px;
+}
+
+.embeddedChatMainPane {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 0;
+}
+
+.embeddedChatMainPane > .embeddedHeader {
+  flex: 0 0 auto;
+  min-height: 62px;
+  gap: 8px;
+  padding: 9px 10px;
+  background: var(--bg-secondary);
+  box-shadow: none;
+}
+
+.embeddedChatMainPane > .embeddedHeader .backButton {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 104px;
+  height: 40px;
+  min-height: 40px;
+  gap: 4px;
+  padding: 0 9px;
+  border-radius: 8px;
+  font-size: 16px;
+}
+
+.embeddedChatMainPane > .embeddedHeader .headerActionLabel {
+  display: inline;
+  font-size: 11px;
+}
+
+.embeddedHeader .roomInfo {
+  min-width: 0;
+}
+
+.embeddedHeader .roomNameContainer,
+.embeddedHeader .roomName {
+  min-width: 0;
+}
+
+.embeddedHeader .roomName {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.embeddedHeader .memberCount,
+.embeddedHeader .statusOnline,
+.embeddedHeader .statusOffline {
+  display: block;
+  overflow: hidden;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.embeddedChatMainPane .messageList {
+  min-height: 0;
+  padding: 10px 9px;
+  gap: 7px;
+  background: var(--bg-secondary);
+}
+
+.embeddedChatMainPane .messageWrapper {
+  max-width: 92%;
+}
+
+.embeddedChatMainPane .message {
+  padding: 8px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.embeddedChatMainPane .inputArea {
+  flex: 0 0 auto;
+  min-height: 0;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 8px;
+  border: 0;
+  border-top: 1px solid var(--border-color);
+  border-radius: 0;
+}
+
+.embeddedChatMainPane .pendingAttachments {
+  max-height: 76px;
+}
+
+.embeddedChatMainPane .pendingAttachment {
+  max-width: 100%;
+  padding: 5px 7px;
+  font-size: 10px;
+}
+
+.embeddedChatMainPane .attachButton {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  padding: 7px;
+}
+
+.embeddedChatMainPane .inputArea .messageInput {
+  min-width: 0;
+  min-height: 40px;
+  max-height: 96px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.embeddedChatMainPane .sendButton {
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+}
+
+.embeddedChatMainPane .replyingBar {
+  padding: 7px 10px;
+}
+
+.embeddedChatMainPane .newMessagesButton {
+  bottom: 74px;
+  padding: 7px 12px;
+  font-size: 11px;
 }

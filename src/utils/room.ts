@@ -1,11 +1,56 @@
 import type { ChatRoom, User } from '../types';
 
+const LOCAL_READ_STATE_KEY_PREFIX = 'artics:room-read:v1:';
+
+function getLocalReadStates(currentUserId: string): Record<string, number> {
+  if (typeof window === 'undefined') return {};
+
+  try {
+    const stored = window.localStorage.getItem(`${LOCAL_READ_STATE_KEY_PREFIX}${currentUserId}`);
+    if (!stored) return {};
+    const parsed = JSON.parse(stored) as Record<string, unknown>;
+    return Object.fromEntries(
+      Object.entries(parsed).filter((entry): entry is [string, number] =>
+        typeof entry[1] === 'number' && Number.isFinite(entry[1])
+      ),
+    );
+  } catch {
+    return {};
+  }
+}
+
+export function markRoomLocallyRead(roomId: string, currentUserId: string, readAt = Date.now()): void {
+  if (typeof window === 'undefined') return;
+
+  try {
+    const readStates = getLocalReadStates(currentUserId);
+    readStates[roomId] = Math.max(readStates[roomId] ?? 0, readAt);
+    window.localStorage.setItem(
+      `${LOCAL_READ_STATE_KEY_PREFIX}${currentUserId}`,
+      JSON.stringify(readStates),
+    );
+  } catch {
+    // localStorage が無効でもサーバー側の既読処理は継続する。
+  }
+}
+
 export function getDirectRoomKey(userIdA: string, userIdB: string): string {
   return [userIdA, userIdB].sort().join('__');
 }
 
 export function getDirectRoomId(userIdA: string, userIdB: string): string {
   return `direct_${getDirectRoomKey(userIdA, userIdB)}`;
+}
+
+export function isDirectRoomForUsers(
+  room: { type?: unknown; members?: unknown },
+  userIdA: string,
+  userIdB: string,
+): boolean {
+  return room.type === 'direct' &&
+    Array.isArray(room.members) &&
+    room.members.includes(userIdA) &&
+    room.members.includes(userIdB);
 }
 
 export function getRoomDisplayName(room: ChatRoom, currentUserId?: string | null): string {
@@ -26,9 +71,24 @@ export function getRoomDisplayName(room: ChatRoom, currentUserId?: string | null
 }
 
 // Cloud Functions が管理する unreadCounts フィールドから自分の未読数を取得
-export function getUnreadCount(room: ChatRoom, currentUserId?: string | null): number {
+export function getUnreadCount(
+  room: ChatRoom,
+  currentUserId?: string | null,
+  activeRoomId?: string | null,
+): number {
   if (!currentUserId) return 0;
-  return room.unreadCounts?.[currentUserId] ?? 0;
+  if (room.id === activeRoomId) return 0;
+
+  const serverUnreadCount = room.unreadCounts?.[currentUserId] ?? 0;
+  if (serverUnreadCount <= 0) return 0;
+
+  const lastMessageAt = room.lastMessage?.timestamp?.getTime();
+  const locallyReadAt = getLocalReadStates(currentUserId)[room.id];
+  if (lastMessageAt !== undefined && locallyReadAt !== undefined && locallyReadAt >= lastMessageAt) {
+    return 0;
+  }
+
+  return serverUnreadCount;
 }
 
 export function getDirectRoomPeerId(room: ChatRoom, currentUserId?: string | null): string | null {

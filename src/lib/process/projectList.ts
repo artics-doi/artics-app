@@ -57,6 +57,7 @@ export function buildProjectTaskSummaries(
   }
 
   for (const task of tasks) {
+    if (task.isArchived) continue;
     const project = projectById.get(task.projectId);
     if (!project) continue;
     const summary = summaries.get(project.id) ?? emptySummary();

@@ -14,20 +14,20 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.syncMemberDetailsOnProfileUpdate = exports.updateStorageUsageOnRoomWrite = exports.updateStorageUsageOnUserWrite = exports.updateStorageUsageOnMessageWrite = exports.normalizeUnreadCountOnReadStateWrite = exports.sendScheduleNotifications = exports.sendPushNotificationOnNewMessage = exports.updateUnreadCountsOnNewMessage = void 0;
+exports.syncMemberDetailsOnProfileUpdate = exports.updateStorageUsageOnRoomWrite = exports.updateStorageUsageOnUserWrite = exports.cleanupDeletingAttachment = exports.updateStorageUsageOnMessageWrite = exports.normalizeUnreadCountOnReadStateWrite = exports.sendScheduleNotifications = exports.sendPushNotificationOnNewMessage = exports.updateUnreadCountsOnNewMessage = void 0;
 const admin = require("firebase-admin");
 const firestore_1 = require("firebase-functions/v2/firestore");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
 const firestore_2 = require("firebase-admin/firestore");
 const storageUsage_1 = require("./storageUsage");
-const unread_1 = require("./unread");
 const fcm_1 = require("./fcm");
 const scheduleTime_1 = require("./scheduleTime");
+const notificationDelivery_1 = require("./notificationDelivery");
 admin.initializeApp();
 const db = admin.firestore();
 const messaging = admin.messaging();
 // メッセージ作成時に未読カウントを更新
-exports.updateUnreadCountsOnNewMessage = (0, firestore_1.onDocumentCreated)('chatRooms/{chatRoomId}/messages/{messageId}', async (event) => {
+exports.updateUnreadCountsOnNewMessage = (0, firestore_1.onDocumentCreated)({ document: 'chatRooms/{chatRoomId}/messages/{messageId}', retry: true }, async (event) => {
     const snapshot = event.data;
     if (!snapshot) {
         console.log('No data associated with the event');
@@ -36,42 +36,54 @@ exports.updateUnreadCountsOnNewMessage = (0, firestore_1.onDocumentCreated)('cha
     const message = snapshot.data();
     const chatRoomId = event.params.chatRoomId;
     const senderId = message.senderId;
-    // チャットルーム情報を取得
     const roomRef = db.collection('chatRooms').doc(chatRoomId);
-    const roomDoc = await roomRef.get();
-    if (!roomDoc.exists) {
-        console.log('Chat room not found');
-        return;
-    }
-    const roomData = roomDoc.data();
-    if (!roomData)
-        return;
-    const members = roomData.members || [];
-    // 送信者以外の未読数を lastReadAt 基準の絶対値で再計算する。
-    // 以前の increment(+1) は normalizeUnreadCountOnReadStateWrite の絶対値上書きと
-    // 並行実行されると二重加算・取りこぼしが起きるため、計算式を一本化した
-    const updateData = {};
-    await Promise.all(members.map(async (memberId) => {
+    const messageRef = snapshot.ref;
+    await db.runTransaction(async (transaction) => {
         var _a;
-        if (memberId === senderId)
+        const [roomDoc, currentMessageDoc] = await Promise.all([
+            transaction.get(roomRef),
+            transaction.get(messageRef),
+        ]);
+        if (!roomDoc.exists || !currentMessageDoc.exists)
             return;
-        const readStateDoc = await roomRef.collection('readStates').doc(memberId).get();
-        const lastReadAt = (_a = readStateDoc.data()) === null || _a === void 0 ? void 0 : _a.lastReadAt;
-        updateData[`unreadCounts.${memberId}`] = await (0, unread_1.computeUnreadCount)(roomRef, memberId, lastReadAt instanceof firestore_2.Timestamp ? lastReadAt : null);
-    }));
-    if (Object.keys(updateData).length > 0) {
-        try {
-            await roomRef.update(updateData);
-            console.log(`Updated unread counts for room ${chatRoomId}`);
-        }
-        catch (error) {
-            console.error('Error updating unread counts:', error);
-        }
-    }
+        const currentMessage = currentMessageDoc.data();
+        if (!currentMessage)
+            return;
+        if (currentMessage.unreadCountApplied === true)
+            return;
+        const members = ((_a = roomDoc.data()) === null || _a === void 0 ? void 0 : _a.members) || [];
+        const recipientIds = members.filter((memberId) => memberId !== senderId);
+        const readStateRefs = recipientIds.map((memberId) => roomRef.collection('readStates').doc(memberId));
+        const readStateDocs = readStateRefs.length > 0
+            ? await transaction.getAll(...readStateRefs)
+            : [];
+        const readBy = new Set(currentMessage.readBy || []);
+        const createdAt = currentMessage.createdAt;
+        const updates = {};
+        recipientIds.forEach((memberId, index) => {
+            var _a, _b;
+            const lastReadAt = (_b = (_a = readStateDocs[index]) === null || _a === void 0 ? void 0 : _a.data()) === null || _b === void 0 ? void 0 : _b.lastReadAt;
+            const wasAlreadyRead = readBy.has(memberId)
+                || (createdAt instanceof firestore_2.Timestamp
+                    && lastReadAt instanceof firestore_2.Timestamp
+                    && lastReadAt.toMillis() >= createdAt.toMillis());
+            if (!wasAlreadyRead) {
+                updates[`unreadCounts.${memberId}`] = firestore_2.FieldValue.increment(1);
+            }
+        });
+        if (Object.keys(updates).length > 0)
+            transaction.update(roomRef, updates);
+        // Eventarc の再配信でも同じメッセージを二重加算しないよう、
+        // ルーム更新と同じトランザクション内で適用済みを記録する。
+        transaction.update(messageRef, {
+            unreadCountApplied: true,
+            unreadCountAppliedAt: firestore_2.FieldValue.serverTimestamp(),
+        });
+    });
 });
 // メッセージ作成時にプッシュ通知を送信
-exports.sendPushNotificationOnNewMessage = (0, firestore_1.onDocumentCreated)('chatRooms/{chatRoomId}/messages/{messageId}', async (event) => {
-    var _a, _b;
+exports.sendPushNotificationOnNewMessage = (0, firestore_1.onDocumentCreated)({ document: 'chatRooms/{chatRoomId}/messages/{messageId}', retry: true }, async (event) => {
+    var _a, _b, _c;
     const snapshot = event.data;
     if (!snapshot) {
         console.log('No data associated with the event');
@@ -82,6 +94,12 @@ exports.sendPushNotificationOnNewMessage = (0, firestore_1.onDocumentCreated)('c
     const senderId = message.senderId;
     const senderName = message.senderName || '不明なユーザー';
     const messageText = message.text || '';
+    const deliveryId = `chat_${chatRoomId}_${event.params.messageId}`;
+    const claim = await (0, notificationDelivery_1.claimDelivery)(db, deliveryId);
+    if (claim === 'already_sent' || claim === 'exhausted')
+        return;
+    if (claim === 'busy')
+        throw new Error('notification-delivery-busy');
     console.log(`New message in room ${chatRoomId} from ${senderName}`);
     // チャットルーム情報を取得
     const chatRoomDoc = await db.collection('chatRooms').doc(chatRoomId).get();
@@ -101,6 +119,7 @@ exports.sendPushNotificationOnNewMessage = (0, firestore_1.onDocumentCreated)('c
     console.log(`Recipients: ${JSON.stringify(recipientIds)}`);
     if (recipientIds.length === 0) {
         console.log('No recipients to notify (memberIds might not include other members)');
+        await (0, notificationDelivery_1.finishDelivery)(db, deliveryId, 'sent');
         return;
     }
     // 各受信者のFCMトークンを取得（ミュート設定を考慮）
@@ -141,6 +160,7 @@ exports.sendPushNotificationOnNewMessage = (0, firestore_1.onDocumentCreated)('c
     }
     if (tokens.length === 0) {
         console.log('No FCM tokens found for recipients');
+        await (0, notificationDelivery_1.finishDelivery)(db, deliveryId, 'sent');
         return;
     }
     console.log(`Sending notification to ${tokens.length} tokens`);
@@ -208,32 +228,59 @@ exports.sendPushNotificationOnNewMessage = (0, firestore_1.onDocumentCreated)('c
                 }
             }
         }
+        await (0, notificationDelivery_1.finishDelivery)(db, deliveryId, 'sent');
     }
     catch (error) {
         console.error('Error sending notifications:', error);
+        await (0, notificationDelivery_1.finishDelivery)(db, deliveryId, 'failed', (_c = error.code) !== null && _c !== void 0 ? _c : 'unknown');
+        throw error;
     }
 });
 exports.sendScheduleNotifications = (0, scheduler_1.onSchedule)({
     schedule: 'every 1 minutes',
     timeZone: 'Asia/Tokyo',
 }, async () => {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e, _f;
     const now = Date.now();
-    const schedulesSnapshot = await db
-        .collection('schedules')
-        .where('notification.enabled', '==', true)
-        .get();
-    for (const scheduleDoc of schedulesSnapshot.docs) {
+    // 通知が発火し得る開始日時の予定と、現在が通知時刻のカスタム通知だけを読む。
+    // enabled=true の全予定を毎分読み続けると、通知済みの過去予定も永続的に課金対象になる。
+    const standardWindowStart = firestore_2.Timestamp.fromMillis(now - 24 * 60 * 60 * 1000);
+    const standardWindowEnd = firestore_2.Timestamp.fromMillis(now + 48 * 60 * 60 * 1000);
+    const customWindowStart = firestore_2.Timestamp.fromMillis(now - scheduleTime_1.SCHEDULE_NOTIFICATION_GRACE_MS);
+    const customWindowEnd = firestore_2.Timestamp.fromMillis(now);
+    const [standardSnapshot, customSnapshot] = await Promise.all([
+        db.collection('schedules')
+            .where('notification.enabled', '==', true)
+            .where('startAt', '>=', standardWindowStart)
+            .where('startAt', '<=', standardWindowEnd)
+            .get(),
+        db.collection('schedules')
+            .where('notification.enabled', '==', true)
+            .where('notification.customAt', '>=', customWindowStart)
+            .where('notification.customAt', '<=', customWindowEnd)
+            .get(),
+    ]);
+    const scheduleDocs = new Map([...standardSnapshot.docs, ...customSnapshot.docs].map((scheduleDoc) => [scheduleDoc.id, scheduleDoc]));
+    let allActiveUserIdsPromise = null;
+    const getAllActiveUserIds = () => {
+        if (!allActiveUserIdsPromise) {
+            allActiveUserIdsPromise = db.collection('users').get().then((snapshot) => (snapshot.docs
+                .filter((userDoc) => {
+                var _a;
+                const lifecycleState = (_a = userDoc.data().lifecycleState) !== null && _a !== void 0 ? _a : 'active';
+                return lifecycleState !== 'deleted' && lifecycleState !== 'disabling';
+            })
+                .map((userDoc) => userDoc.id)));
+        }
+        return allActiveUserIdsPromise;
+    };
+    for (const scheduleDoc of scheduleDocs.values()) {
         const schedule = scheduleDoc.data();
         const timings = (_b = (_a = schedule.notification) === null || _a === void 0 ? void 0 : _a.timings) !== null && _b !== void 0 ? _b : [];
         if (timings.length === 0)
             continue;
         const sentKeys = new Set((_c = schedule.sentNotificationKeys) !== null && _c !== void 0 ? _c : []);
-        const recipientIds = schedule.targetUserIds && schedule.targetUserIds.length > 0
-            ? schedule.targetUserIds
-            : schedule.createdBy
-                ? [schedule.createdBy]
-                : [];
+        const recipientIds = (0, scheduleTime_1.resolveScheduleRecipientIds)(schedule, ((_d = schedule.notification) === null || _d === void 0 ? void 0 : _d.recipientScope) === 'all' ? await getAllActiveUserIds() : []);
         if (recipientIds.length === 0)
             continue;
         for (const timing of timings) {
@@ -246,6 +293,12 @@ exports.sendScheduleNotifications = (0, scheduler_1.onSchedule)({
             const notificationKey = `${scheduleDoc.id}:${timing}:${notifyAtMs}`;
             if (sentKeys.has(notificationKey))
                 continue;
+            const deliveryId = `schedule_${notificationKey}`;
+            const claim = await (0, notificationDelivery_1.claimDelivery)(db, deliveryId);
+            if (claim === 'already_sent' || claim === 'exhausted')
+                continue;
+            if (claim === 'busy')
+                throw new Error('notification-delivery-busy');
             const { tokens, tokenOwners } = await (0, fcm_1.getFcmTokensForUsers)(db, recipientIds);
             if (tokens.length === 0) {
                 console.log(`No FCM tokens found for schedule ${scheduleDoc.id}`);
@@ -253,9 +306,10 @@ exports.sendScheduleNotifications = (0, scheduler_1.onSchedule)({
                     sentNotificationKeys: firestore_2.FieldValue.arrayUnion(notificationKey),
                     updatedAt: firestore_2.FieldValue.serverTimestamp()
                 });
+                await (0, notificationDelivery_1.finishDelivery)(db, deliveryId, 'sent');
                 continue;
             }
-            const targetUsers = ((_d = schedule.targetUserNames) === null || _d === void 0 ? void 0 : _d.length)
+            const targetUsers = ((_e = schedule.targetUserNames) === null || _e === void 0 ? void 0 : _e.length)
                 ? ` / ${schedule.targetUserNames.join('、')}`
                 : '';
             const notificationPayload = {
@@ -294,27 +348,51 @@ exports.sendScheduleNotifications = (0, scheduler_1.onSchedule)({
                     sentNotificationKeys: firestore_2.FieldValue.arrayUnion(notificationKey),
                     updatedAt: firestore_2.FieldValue.serverTimestamp()
                 });
+                await (0, notificationDelivery_1.finishDelivery)(db, deliveryId, 'sent');
             }
             catch (error) {
                 console.error(`Error sending schedule notification ${scheduleDoc.id}:`, error);
+                await (0, notificationDelivery_1.finishDelivery)(db, deliveryId, 'failed', (_f = error.code) !== null && _f !== void 0 ? _f : 'unknown');
+                throw error;
             }
         }
     }
 });
 // readStates の lastReadAt から unreadCounts を正規化
 exports.normalizeUnreadCountOnReadStateWrite = (0, firestore_1.onDocumentWritten)('chatRooms/{chatRoomId}/readStates/{userId}', async (event) => {
-    var _a, _b;
+    var _a;
     const after = (_a = event.data) === null || _a === void 0 ? void 0 : _a.after;
     if (!(after === null || after === void 0 ? void 0 : after.exists))
         return;
     const { chatRoomId, userId } = event.params;
-    const lastReadAt = (_b = after.data()) === null || _b === void 0 ? void 0 : _b.lastReadAt;
+    const eventData = after.data();
+    if (!eventData)
+        return;
+    const lastReadAt = eventData === null || eventData === void 0 ? void 0 : eventData.lastReadAt;
     if (!(lastReadAt instanceof firestore_2.Timestamp))
         return;
+    const eventVersion = typeof eventData.version === 'number' ? eventData.version : 0;
     const roomRef = db.collection('chatRooms').doc(chatRoomId);
-    const unreadCount = await (0, unread_1.computeUnreadCount)(roomRef, userId, lastReadAt);
-    await roomRef.update({
-        [`unreadCounts.${userId}`]: unreadCount
+    const readStateRef = roomRef.collection('readStates').doc(userId);
+    await db.runTransaction(async (transaction) => {
+        var _a, _b;
+        const [roomSnapshot, readStateSnapshot] = await Promise.all([
+            transaction.get(roomRef),
+            transaction.get(readStateRef),
+        ]);
+        if (!roomSnapshot.exists || !readStateSnapshot.exists)
+            return;
+        if (((_b = (_a = readStateSnapshot.data()) === null || _a === void 0 ? void 0 : _a.version) !== null && _b !== void 0 ? _b : 0) !== eventVersion)
+            return;
+        const messages = await transaction.get(roomRef.collection('messages').where('createdAt', '>', lastReadAt));
+        const unreadCount = messages.docs.filter((messageDoc) => {
+            const message = messageDoc.data();
+            return message.senderId !== userId && message.isDeleted !== true;
+        }).length;
+        transaction.update(roomRef, {
+            [`unreadCounts.${userId}`]: unreadCount,
+            [`unreadVersions.${userId}`]: eventVersion,
+        });
     });
 });
 // メッセージ添付の fileSize 差分を storageUsage に反映
@@ -323,6 +401,39 @@ exports.updateStorageUsageOnMessageWrite = (0, firestore_1.onDocumentWritten)('c
     const beforeSize = (0, storageUsage_1.getTrackedFileSize)((_a = event.data) === null || _a === void 0 ? void 0 : _a.before.data());
     const afterSize = (0, storageUsage_1.getTrackedFileSize)((_b = event.data) === null || _b === void 0 ? void 0 : _b.after.data());
     await (0, storageUsage_1.adjustStorageUsage)(db, afterSize - beforeSize);
+});
+exports.cleanupDeletingAttachment = (0, firestore_1.onDocumentUpdated)({ document: 'chatRooms/{chatRoomId}/messages/{messageId}', retry: true }, async (event) => {
+    var _a, _b, _c;
+    const before = (_a = event.data) === null || _a === void 0 ? void 0 : _a.before.data();
+    const afterSnapshot = (_b = event.data) === null || _b === void 0 ? void 0 : _b.after;
+    const after = afterSnapshot === null || afterSnapshot === void 0 ? void 0 : afterSnapshot.data();
+    if (!before || !after || !afterSnapshot)
+        return;
+    if (before.attachmentState === 'deleting' || after.attachmentState !== 'deleting')
+        return;
+    const storagePath = after.storagePath;
+    try {
+        if (typeof storagePath === 'string' && storagePath) {
+            await admin.storage().bucket().file(storagePath).delete({ ignoreNotFound: true });
+        }
+        await afterSnapshot.ref.update({
+            imageURL: null,
+            fileURL: null,
+            storagePath: null,
+            fileSize: null,
+            attachmentState: 'deleted',
+            attachmentError: firestore_2.FieldValue.delete(),
+            updatedAt: firestore_2.FieldValue.serverTimestamp(),
+        });
+    }
+    catch (error) {
+        await afterSnapshot.ref.update({
+            attachmentState: 'failed',
+            attachmentError: (_c = error.code) !== null && _c !== void 0 ? _c : 'attachment-delete-failed',
+            updatedAt: firestore_2.FieldValue.serverTimestamp(),
+        });
+        throw error;
+    }
 });
 // プロフィール画像の fileSize 差分を storageUsage に反映
 exports.updateStorageUsageOnUserWrite = (0, firestore_1.onDocumentWritten)('users/{userId}', async (event) => {
@@ -383,4 +494,6 @@ exports.syncMemberDetailsOnProfileUpdate = (0, firestore_1.onDocumentUpdated)('u
 // これを忘れると functions/src/process/* の関数はビルドは通るがデプロイされない。
 // デプロイ後 `firebase functions:list` に onProjectUpdated が表示されることを確認。
 __exportStar(require("./process"), exports);
+__exportStar(require("./userLifecycle"), exports);
+__exportStar(require("./roomLifecycle"), exports);
 //# sourceMappingURL=index.js.map

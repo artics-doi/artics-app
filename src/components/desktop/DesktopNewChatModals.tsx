@@ -14,7 +14,7 @@ import { db, storage } from '../../lib/firebase';
 import { useToast } from '../../contexts/ToastContext';
 import { useUsers } from '../../hooks/useUsers';
 import type { ChatRoom, User } from '../../types';
-import { getDirectRoomId, getDirectRoomKey } from '../../utils/room';
+import { getDirectRoomId, getDirectRoomKey, isDirectRoomForUsers } from '../../utils/room';
 import { handleGroupImageChange as convertGroupImageToBase64 } from '../../utils/image';
 import { NewChatModal, NewGroupModal } from '../home/modals';
 
@@ -38,6 +38,7 @@ export default function DesktopNewChatModals({
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [groupName, setGroupName] = useState('');
   const [groupImage, setGroupImage] = useState<string | null>(null);
+  const [startingDirectUserId, setStartingDirectUserId] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen || showNewGroup) {
@@ -57,52 +58,67 @@ export default function DesktopNewChatModals({
   }
 
   async function startDirectChat(otherUser: User) {
-    if (!currentUser) return;
+    if (!currentUser || startingDirectUserId) return;
+    setStartingDirectUserId(otherUser.uid);
 
     const directRoomId = getDirectRoomId(currentUser.uid, otherUser.uid);
     const directKey = getDirectRoomKey(currentUser.uid, otherUser.uid);
-    const existingRoom = chatRooms.find(
-      (room) => room.type === 'direct' &&
-        (room.id === directRoomId ||
-          room.directKey === directKey ||
-          (room.members.includes(otherUser.uid) && room.members.includes(currentUser.uid))),
-    );
+    try {
+      const existingRoom = chatRooms.find(
+        (room) => room.type === 'direct' &&
+          (room.id === directRoomId ||
+            room.directKey === directKey ||
+            isDirectRoomForUsers(room, currentUser.uid, otherUser.uid)),
+      );
 
-    if (existingRoom) {
+      if (existingRoom) {
+        onClose();
+        navigate(`/chat/${existingRoom.id}`);
+        return;
+      }
+
+      const newRoom = {
+        name: '',
+        type: 'direct',
+        createdBy: currentUser.uid,
+        deletionState: 'active',
+        members: [currentUser.uid, otherUser.uid],
+        memberDetails: {
+          [currentUser.uid]: {
+            displayName: currentUser.displayName || 'Unknown',
+            photoURL: currentUser.photoURL,
+          },
+          [otherUser.uid]: {
+            displayName: otherUser.displayName,
+            photoURL: otherUser.photoURL,
+          },
+        },
+        directKey,
+        lastMessage: null,
+        unreadCounts: {},
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+
+      const roomRef = doc(db, 'chatRooms', directRoomId);
+      try {
+        await setDoc(roomRef, newRoom);
+      } catch (createError) {
+        const roomSnap = await getDoc(roomRef);
+        const roomData = roomSnap.data();
+        if (!roomSnap.exists() || !roomData || !isDirectRoomForUsers(roomData, currentUser.uid, otherUser.uid)) {
+          throw createError;
+        }
+      }
+
       onClose();
-      navigate(`/chat/${existingRoom.id}`);
-      return;
+      navigate(`/chat/${directRoomId}`);
+    } catch (error) {
+      console.error('1対1チャット開始エラー:', error);
+      showToast('error', 'チャットを開けませんでした。通信状態を確認して、もう一度お試しください');
+    } finally {
+      setStartingDirectUserId(null);
     }
-
-    const newRoom = {
-      name: '',
-      type: 'direct',
-      members: [currentUser.uid, otherUser.uid],
-      memberDetails: {
-        [currentUser.uid]: {
-          displayName: currentUser.displayName || 'Unknown',
-          photoURL: currentUser.photoURL,
-        },
-        [otherUser.uid]: {
-          displayName: otherUser.displayName,
-          photoURL: otherUser.photoURL,
-        },
-      },
-      directKey,
-      lastMessage: null,
-      unreadCounts: {},
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    };
-
-    const roomRef = doc(db, 'chatRooms', directRoomId);
-    const roomSnap = await getDoc(roomRef);
-    if (!roomSnap.exists()) {
-      await setDoc(roomRef, newRoom);
-    }
-
-    onClose();
-    navigate(`/chat/${directRoomId}`);
   }
 
   async function createGroupChat() {
@@ -130,6 +146,8 @@ export default function DesktopNewChatModals({
       const newRoom = {
         name: groupName.trim(),
         type: 'group',
+        createdBy: currentUser.uid,
+        deletionState: 'active',
         photoURL: null,
         photoStoragePath: null,
         photoFileSize: null,
@@ -193,6 +211,7 @@ export default function DesktopNewChatModals({
         onClose={onClose}
         onStartDirectChat={(user) => { void startDirectChat(user); }}
         onShowNewGroup={() => setShowNewGroup(true)}
+        startingUserId={startingDirectUserId}
       />
       <NewGroupModal
         isOpen={showNewGroup}

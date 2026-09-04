@@ -1,12 +1,14 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import {
   getDirectRoomId,
   getDirectRoomKey,
   getDirectRoomPeerId,
+  isDirectRoomForUsers,
   getRoomAvatarLabel,
   getRoomAvatarUrl,
   getRoomDisplayName,
   getUnreadCount,
+  markRoomLocallyRead,
 } from '../../../src/utils/room';
 import type { ChatRoom, User } from '../../../src/types';
 
@@ -43,6 +45,14 @@ describe('getDirectRoomKey / getDirectRoomId', () => {
     expect(getDirectRoomKey('bob', 'alice')).toBe('alice__bob');
     expect(getDirectRoomKey('alice', 'bob')).toBe('alice__bob');
     expect(getDirectRoomId('bob', 'alice')).toBe('direct_alice__bob');
+  });
+});
+
+describe('isDirectRoomForUsers', () => {
+  test('順序に関係なく両方の参加者がいる1対1ルームだけを認識する', () => {
+    expect(isDirectRoomForUsers({ type: 'direct', members: ['bob', 'alice'] }, 'alice', 'bob')).toBe(true);
+    expect(isDirectRoomForUsers({ type: 'group', members: ['alice', 'bob'] }, 'alice', 'bob')).toBe(false);
+    expect(isDirectRoomForUsers({ type: 'direct', members: ['alice'] }, 'alice', 'bob')).toBe(false);
   });
 });
 
@@ -125,6 +135,65 @@ describe('getUnreadCount', () => {
     expect(getUnreadCount(room({ unreadCounts: { alice: 3 } }), undefined)).toBe(0);
     expect(getUnreadCount(room({ unreadCounts: { alice: 3 } }), null)).toBe(0);
     expect(getUnreadCount(room({ unreadCounts: { alice: 3 } }), '')).toBe(0);
+  });
+  test('表示中のルームはサーバー反映待ちでも未読0を返す', () => {
+    expect(getUnreadCount(room({ id: 'room1', unreadCounts: { alice: 2 } }), 'alice', 'room1')).toBe(0);
+  });
+
+  test('端末で既読にした後は新着があるまで未読0を返す', () => {
+    const storage = new Map<string, string>();
+    vi.stubGlobal('window', {
+      localStorage: {
+        getItem: (key: string) => storage.get(key) ?? null,
+        setItem: (key: string, value: string) => storage.set(key, value),
+      },
+    });
+
+    try {
+      markRoomLocallyRead('room1', 'alice', 2_000);
+      expect(getUnreadCount(room({
+        id: 'room1',
+        unreadCounts: { alice: 2 },
+        lastMessage: { text: 'old', senderId: 'bob', senderName: 'Bob', timestamp: new Date(1_000) },
+      }), 'alice')).toBe(0);
+      expect(getUnreadCount(room({
+        id: 'room1',
+        unreadCounts: { alice: 1 },
+        lastMessage: { text: 'new', senderId: 'bob', senderName: 'Bob', timestamp: new Date(3_000) },
+      }), 'alice')).toBe(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  test('端末の既読データが破損していてもサーバー未読数へ安全に戻る', () => {
+    vi.stubGlobal('window', {
+      localStorage: {
+        getItem: () => '{broken-json',
+        setItem: () => undefined,
+      },
+    });
+
+    try {
+      expect(getUnreadCount(room({ unreadCounts: { alice: 2 } }), 'alice')).toBe(2);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  test('端末ストレージへの書き込みが拒否されても既読処理を例外終了しない', () => {
+    vi.stubGlobal('window', {
+      localStorage: {
+        getItem: () => null,
+        setItem: () => { throw new Error('storage disabled'); },
+      },
+    });
+
+    try {
+      expect(() => markRoomLocallyRead('room1', 'alice', 2_000)).not.toThrow();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 

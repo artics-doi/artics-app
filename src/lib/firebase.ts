@@ -3,6 +3,7 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getDatabase } from 'firebase/database';
+import { getFunctions } from 'firebase/functions';
 import { getMessaging, getToken, deleteToken, onMessage, isSupported } from 'firebase/messaging';
 import type { Messaging } from 'firebase/messaging';
 import { doc, deleteDoc } from 'firebase/firestore';
@@ -30,6 +31,8 @@ export const storage = getStorage(app);     // ファイルストレージ
 export const rtdb = getDatabase(app);      // Realtime Database（プレゼンス用）
 
 // Firebase Cloud Messaging（ブラウザ環境のみ）
+export const functions = getFunctions(app);
+
 let messaging: Messaging | null = null;
 
 export const initializeMessaging = async (): Promise<Messaging | null> => {

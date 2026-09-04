@@ -1,0 +1,107 @@
+.titleBar {
+  position: relative;
+  z-index: 10000;
+  flex: 0 0 38px;
+  width: 100%;
+  height: 38px;
+  display: flex;
+  align-items: stretch;
+  background: #202124;
+  color: #f3f4f6;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  user-select: none;
+  -webkit-app-region: drag;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.brand img {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+}
+
+.dragRegion {
+  min-width: 24px;
+  flex: 1;
+}
+
+.controls {
+  display: flex;
+  align-items: stretch;
+  -webkit-app-region: no-drag;
+}
+
+.controls button {
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #e5e7eb;
+  cursor: default;
+}
+
+.controls button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.controls svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.chatCompactButton {
+  width: 46px;
+  margin-right: 4px;
+  color: #38bdf8 !important;
+}
+
+.controls .chatIcon {
+  width: 19px;
+  height: 19px;
+  fill: currentColor;
+  stroke: none;
+}
+
+.chatCompactButton:hover {
+  background: rgba(56, 189, 248, 0.14) !important;
+}
+
+.windowButton {
+  width: 46px;
+}
+
+.closeButton:hover {
+  background: #c42b1c !important;
+  color: #ffffff;
+}
+
+:global([data-theme="light"]) .titleBar {
+  background: #f4f4f4;
+  color: #202124;
+  border-bottom-color: rgba(15, 23, 42, 0.12);
+}
+
+:global([data-theme="light"]) .controls button {
+  color: #202124;
+}
+
+:global([data-theme="light"]) .controls button:hover {
+  background: rgba(15, 23, 42, 0.08);
+}

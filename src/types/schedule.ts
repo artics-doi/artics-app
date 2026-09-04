@@ -22,8 +22,11 @@ export type ScheduleNotificationTiming =
   | 'sameDayMorning'
   | 'custom';
 
+export type ScheduleNotificationRecipientScope = 'targets' | 'all';
+
 export interface ScheduleNotificationSetting {
   enabled: boolean;
+  recipientScope?: ScheduleNotificationRecipientScope;
   timings: ScheduleNotificationTiming[];
   customAt: Date | null;
 }

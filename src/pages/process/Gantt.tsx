@@ -61,13 +61,21 @@ const GANTT_SELECT_EVENT_TAG = Symbol('artics-gantt-disable-single-select');
 
 function GanttTaskBarTemplate({ data }: { data: ITask }) {
   const task = data as ProcessGanttTask;
+  const earlyPercent = task.earlyCompletionSolidPercent;
+  const hasEarlyCompletion = typeof earlyPercent === 'number' && earlyPercent > 0 && earlyPercent < 100;
   return (
     <div
-      className={styles.ganttTaskBarTemplate}
+      className={`${styles.ganttTaskBarTemplate} ${hasEarlyCompletion ? styles.ganttTaskBarEarlyCompleted : ''}`}
       style={ganttStatusColorVariables(task.processStatus) as CSSProperties}
       data-task-id={task.id}
       data-task-status={task.processStatus}
     >
+      {hasEarlyCompletion && (
+        <>
+          <span className={styles.ganttTaskBarActual} style={{ width: `${earlyPercent}%` }} aria-hidden="true" />
+          <span className={styles.ganttTaskBarPlannedRemainder} style={{ left: `${earlyPercent}%` }} aria-hidden="true" />
+        </>
+      )}
       <span className={styles.ganttTaskBarText}>{task.text}</span>
     </div>
   );
@@ -91,15 +99,16 @@ export default function Gantt() {
   const [creatingTask, setCreatingTask] = useState(false);
   const [ganttLayoutVersion, setGanttLayoutVersion] = useState(0);
   const isDark = useIsDarkTheme();
+  const activeTasks = useMemo(() => tasks.filter((task) => !task.isArchived), [tasks]);
 
-  const taskById = useMemo(() => new Map(tasks.map((task) => [task.id, task])), [tasks]);
+  const taskById = useMemo(() => new Map(activeTasks.map((task) => [task.id, task])), [activeTasks]);
   const taskByIdRef = useRef(taskById);
   useEffect(() => {
     taskByIdRef.current = taskById;
   }, [taskById]);
   const ganttData = useMemo(
-    () => toProcessGanttData(tasks, project?.columns ?? [], members),
-    [members, project?.columns, tasks],
+    () => toProcessGanttData(activeTasks, project?.columns ?? [], members),
+    [activeTasks, members, project?.columns],
   );
   const timelineBounds = useMemo(
     () => buildGanttTimelineBounds(ganttData.tasks, new Date()),
@@ -294,10 +303,10 @@ export default function Gantt() {
       </div>
 
       <details className={styles.taskListPanel}>
-        <summary>タスク一覧（{tasks.length}件）</summary>
-        {tasks.length > 0 ? (
+        <summary>タスク一覧（{activeTasks.length}件）</summary>
+        {activeTasks.length > 0 ? (
           <div className={styles.unscheduledList}>
-            {tasks.map((task) => (
+            {activeTasks.map((task) => (
               <button
                 key={task.id}
                 type="button"
@@ -357,7 +366,6 @@ export default function Gantt() {
           }}
           onClose={() => {
             setEditingTask(null);
-            window.setTimeout(refreshGanttLayout, 0);
           }}
         />
       )}

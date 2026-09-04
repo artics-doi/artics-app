@@ -2,10 +2,10 @@
 // Schedule.tsx から機械的に移動（挙動変更なし）。React や Firestore に依存しない。
 
 import type { ScheduleCategoryId, ScheduleEvent, ScheduleEventInput } from '../../types/schedule';
+import { resolveScheduleNotificationCustomAt } from '../../utils/scheduleNotifications';
 import {
   DAY_MS,
   endOfDay,
-  formatDayLabel,
   getCalendarDayDiff,
   isSameDay,
   shiftDateByDayDiff,
@@ -62,20 +62,43 @@ export function eventIntersectsRange(event: ScheduleEvent, start: Date, end: Dat
 }
 
 export function formatEventTime(event: ScheduleEvent): string {
+  const formatMonthDay = (date: Date) => `${date.getMonth() + 1}/${date.getDate()}`;
+  const formatYearMonthDay = (date: Date) => `${date.getFullYear()}/${formatMonthDay(date)}`;
+  const spansYears = Boolean(event.endAt && event.startAt.getFullYear() !== event.endAt.getFullYear());
+  const formatDate = (date: Date) => spansYears ? formatYearMonthDay(date) : formatMonthDay(date);
+
   if (event.allDay) {
     if (event.endAt && !isSameDay(event.startAt, event.endAt)) {
-      return `${formatDayLabel(event.startAt)} - ${formatDayLabel(event.endAt)}`;
+      return `${formatDate(event.startAt)} ～ ${formatDate(event.endAt)}`;
     }
     return '終日';
   }
 
   const start = toTimeInputValue(event.startAt);
-  const end = event.endAt && !isSameDay(event.startAt, event.endAt)
-    ? `${formatDayLabel(event.endAt)} ${toTimeInputValue(event.endAt)}`
-    : event.endAt
-      ? toTimeInputValue(event.endAt)
-      : '';
-  return end ? `${start} - ${end}` : start;
+  if (!event.endAt) return start;
+
+  const end = toTimeInputValue(event.endAt);
+  if (isSameDay(event.startAt, event.endAt)) {
+    return `${formatDate(event.startAt)} ${start} ～ ${end}`;
+  }
+  return `${formatDate(event.startAt)} ${start} ～ ${formatDate(event.endAt)} ${end}`;
+}
+
+export function getEventTargetPreview(targetUserNames: string[], maxVisible = 2): {
+  visibleNames: string[];
+  remainingCount: number;
+} {
+  const names = targetUserNames.map((name) => name.trim()).filter(Boolean);
+  const visibleNames = names.slice(0, Math.max(0, maxVisible));
+  return {
+    visibleNames,
+    remainingCount: Math.max(0, names.length - visibleNames.length),
+  };
+}
+
+export function formatEventTargetsTitle(targetUserNames: string[]): string {
+  const names = targetUserNames.map((name) => name.trim()).filter(Boolean);
+  return names.length > 0 ? `対象：${names.join('、')}` : '対象：未設定';
 }
 
 export function compareSchedules(a: ScheduleEvent, b: ScheduleEvent): number {
@@ -157,7 +180,7 @@ export function getSingleDayEventsForOrder(events: ScheduleEvent[], dateKey: str
     .sort(compareSchedules);
 }
 
-export function copyScheduleToDate(source: ScheduleEvent, targetDate: Date): ScheduleEventInput {
+export function copyScheduleToDate(source: ScheduleEvent, targetDate: Date, savedAt: Date = new Date()): ScheduleEventInput {
   const startAt = shiftDateByDayDiff(source.startAt, targetDate, 0, source.allDay);
   const endDayDiff = source.endAt ? getCalendarDayDiff(source.startAt, source.endAt) : 0;
   const endAt = source.endAt
@@ -168,8 +191,12 @@ export function copyScheduleToDate(source: ScheduleEvent, targetDate: Date): Sch
   const customNotifyDayDiff = source.notification.customAt
     ? getCalendarDayDiff(source.startAt, source.notification.customAt)
     : 0;
-  const customAt = source.notification.customAt
+  const shiftedCustomAt = source.notification.customAt
     ? shiftDateByDayDiff(source.notification.customAt, targetDate, customNotifyDayDiff, false)
+    : null;
+  const timing = source.notification.timings[0];
+  const customAt = timing
+    ? resolveScheduleNotificationCustomAt(timing, shiftedCustomAt, savedAt)
     : null;
 
   return {
@@ -183,6 +210,7 @@ export function copyScheduleToDate(source: ScheduleEvent, targetDate: Date): Sch
     memo: source.memo,
     notification: {
       enabled: source.notification.enabled,
+      recipientScope: source.notification.recipientScope ?? 'targets',
       timings: source.notification.enabled ? source.notification.timings : [],
       customAt: source.notification.enabled ? customAt : null,
     },

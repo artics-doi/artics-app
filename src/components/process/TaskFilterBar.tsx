@@ -61,15 +61,37 @@ export default function TaskFilterBar({
       <label className={styles.compactFilter}>
         <span>ステータス</span>
         <select
-          value={taskFilters.columnId}
-          onChange={(event) => updateTaskFilter('columnId', event.target.value)}
+          value={
+            taskFilters.archiveMode === 'all'
+              ? 'archive:all'
+              : taskFilters.archiveMode === 'archived'
+                ? 'archive:only'
+                : taskFilters.columnId === 'all'
+                  ? 'all'
+                  : `column:${taskFilters.columnId}`
+          }
+          onChange={(event) => {
+            const value = event.target.value;
+            if (value === 'archive:all') {
+              updateTaskFilter('columnId', 'all');
+              updateTaskFilter('archiveMode', 'all');
+            } else if (value === 'archive:only') {
+              updateTaskFilter('columnId', 'all');
+              updateTaskFilter('archiveMode', 'archived');
+            } else {
+              updateTaskFilter('columnId', value === 'all' ? 'all' : value.replace(/^column:/, ''));
+              updateTaskFilter('archiveMode', 'active');
+            }
+          }}
         >
           <option value="all">すべて</option>
           {columns.map((column) => (
-            <option key={column.id} value={column.id}>
+            <option key={column.id} value={`column:${column.id}`}>
               {column.name}
             </option>
           ))}
+          <option value="archive:all">すべて（アーカイブ込み）</option>
+          <option value="archive:only">アーカイブ</option>
         </select>
       </label>
       <label className={styles.compactFilter}>

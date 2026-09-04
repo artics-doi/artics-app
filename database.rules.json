@@ -1,9 +1,21 @@
 {
   "rules": {
+    "accessControl": {
+      ".read": false,
+      ".write": false
+    },
     "status": {
+      ".read": "auth != null && root.child('accessControl').child(auth.uid).child('lifecycleState').val() === 'active'",
       "$userId": {
-        ".read": "auth != null",
-        ".write": "auth != null && auth.uid === $userId"
+        ".write": "auth != null && auth.uid === $userId && root.child('accessControl').child(auth.uid).child('lifecycleState').val() === 'active'"
+      }
+    },
+    "presenceConnections": {
+      "$userId": {
+        ".read": "auth != null && root.child('accessControl').child(auth.uid).child('lifecycleState').val() === 'active'",
+        "$connectionId": {
+          ".write": "auth != null && auth.uid === $userId && root.child('accessControl').child(auth.uid).child('lifecycleState').val() === 'active'"
+        }
       }
     }
   }

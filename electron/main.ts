@@ -8,7 +8,8 @@ import {
   ipcMain,
   shell,
   dialog,
-  nativeTheme
+  nativeTheme,
+  screen,
 } from 'electron';
 import path from 'path';
 import { autoUpdater } from 'electron-updater';
@@ -23,12 +24,34 @@ import {
   isDev,
   openExternalUrl,
 } from './navigationPolicies';
+import { getCompactChatWindowBounds, getWorkspaceWindowBounds, type WindowBounds } from './workspaceWindow';
 
 let store: SimpleStore;
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
 let notificationManager: NotificationManager;
+let unreadBadgeCount = 0;
+let unreadBadgeIconDataUrl: string | null = null;
+let chatCompactMode = false;
+let chatCompactRestoreBounds: WindowBounds | null = null;
+let chatCompactRestoreMaximized = false;
+
+// コンパクトなチャット一覧が崩れずに使える最小幅。
+// Web側の最小幅（320px）より余裕を持たせ、ナビゲーション3列の可読性を保つ。
+const MAIN_WINDOW_MIN_WIDTH = 420;
+
+function getWindowControlsState() {
+  return {
+    maximized: Boolean(mainWindow && !mainWindow.isDestroyed() && mainWindow.isMaximized()),
+    compact: chatCompactMode,
+  };
+}
+
+function sendWindowControlsState() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send('window-controls-state-changed', getWindowControlsState());
+}
 
 async function showMessageBoxWithMainWindow(options: Electron.MessageBoxOptions): Promise<Electron.MessageBoxReturnValue> {
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -48,6 +71,30 @@ function applyTitleBarTheme(theme: 'light' | 'dark') {
   nativeTheme.themeSource = theme;
 }
 
+// タスクバーの未読バッジを反映する。
+// Windows の app.setBadgeCount は無効なので、タスクバーボタンのオーバーレイアイコンを使う。
+// タスクバーボタンは非表示（トレイ常駐）→再表示でオーバーレイが消えるため、show 時に再適用する。
+function applyUnreadBadge() {
+  try {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+
+    if (process.platform === 'win32') {
+      if (unreadBadgeCount > 0 && unreadBadgeIconDataUrl) {
+        const image = nativeImage.createFromDataURL(unreadBadgeIconDataUrl);
+        if (!image.isEmpty()) {
+          mainWindow.setOverlayIcon(image, `${unreadBadgeCount}件の未読メッセージ`);
+          return;
+        }
+      }
+      mainWindow.setOverlayIcon(null, '');
+    } else {
+      app.setBadgeCount(unreadBadgeCount);
+    }
+  } catch (error) {
+    console.error('タスクバーバッジの適用に失敗:', error);
+  }
+}
+
 function createWindow() {
   // 起動時、保存済みテーマをタイトルバーへ即時反映（ウィンドウ生成前に行う）
   applyTitleBarTheme(store.get('theme'));
@@ -58,12 +105,15 @@ function createWindow() {
     : path.join(process.resourcesPath, 'favicon.png');
 
   mainWindow = new BrowserWindow({
+    title: 'Artics',
     width: 1600,
     height: 950,
-    minWidth: 580,
+    minWidth: MAIN_WINDOW_MIN_WIDTH,
     minHeight: 500,
     resizable: true,
     icon: iconPath,
+    frame: false,
+    backgroundColor: store.get('theme') === 'dark' ? '#20202f' : '#ffffff',
     autoHideMenuBar: true, // メニューバーを自動で隠す
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -111,6 +161,7 @@ function createWindow() {
     if (store.get('alwaysOnTop')) {
       mainWindow?.setAlwaysOnTop(true);
     }
+    applyUnreadBadge();
   });
 
   // 閉じるボタンをクリックした時、アプリを終了せずトレイに常駐
@@ -126,10 +177,17 @@ function createWindow() {
     mainWindow = null;
   });
 
+  mainWindow.on('maximize', () => {
+    chatCompactMode = false;
+    sendWindowControlsState();
+  });
+  mainWindow.on('unmaximize', sendWindowControlsState);
+
   // H-11: メインウィンドウが表示されたら通知パネルをクリア
   // （focus ではなく show を使う理由: 別ウィンドウから戻った瞬間に消えるのを防ぐ）
   mainWindow.on('show', () => {
     notificationManager?.clearAll();
+    applyUnreadBadge();
   });
 
 }
@@ -287,6 +345,63 @@ function setupIPC() {
     }
   });
 
+  ipcMain.handle('get-window-controls-state', () => getWindowControlsState());
+
+  ipcMain.handle('window-minimize', () => {
+    mainWindow?.minimize();
+    return true;
+  });
+
+  ipcMain.handle('window-toggle-maximize', () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return getWindowControlsState();
+    if (mainWindow.isMaximized()) {
+      mainWindow.unmaximize();
+    } else {
+      chatCompactMode = false;
+      mainWindow.maximize();
+    }
+    sendWindowControlsState();
+    return getWindowControlsState();
+  });
+
+  ipcMain.handle('window-close', () => {
+    mainWindow?.close();
+    return true;
+  });
+
+  ipcMain.handle('toggle-chat-compact', () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return getWindowControlsState();
+
+    if (chatCompactMode) {
+      chatCompactMode = false;
+      const restoreBounds = chatCompactRestoreBounds;
+      const restoreMaximized = chatCompactRestoreMaximized;
+      chatCompactRestoreBounds = null;
+      chatCompactRestoreMaximized = false;
+      if (restoreBounds) {
+        mainWindow.setBounds(restoreBounds, true);
+      }
+      if (restoreMaximized) mainWindow.maximize();
+    } else {
+      chatCompactRestoreMaximized = mainWindow.isMaximized();
+      chatCompactRestoreBounds = chatCompactRestoreMaximized
+        ? mainWindow.getNormalBounds()
+        : mainWindow.getBounds();
+      if (mainWindow.isMaximized()) mainWindow.unmaximize();
+      const currentBounds = mainWindow.getBounds();
+      const workArea = screen.getDisplayMatching(currentBounds).workArea;
+      mainWindow.setBounds(getCompactChatWindowBounds(currentBounds, workArea), true);
+      chatCompactMode = true;
+      mainWindow.webContents.send('navigate-to-chat-list');
+    }
+
+    // タイトルバー上の操作なのでウィンドウは既に表示中。
+    // show() は「画面を表示したら通知を消す」処理を発火させるため呼ばない。
+    mainWindow.focus();
+    sendWindowControlsState();
+    return getWindowControlsState();
+  });
+
   // 通知ウィンドウを閉じる（IPC経由で確実に閉じる）
   ipcMain.on('close-notification', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
@@ -303,6 +418,25 @@ function setupIPC() {
       // レンダラープロセスにルーム遷移イベントを送信
       mainWindow.webContents.send('navigate-to-room', roomId);
     }
+  });
+
+  // 予定通知から該当予定を開く
+  ipcMain.on('open-schedule', (_event, scheduleId: string) => {
+    if (!scheduleId || !mainWindow || mainWindow.isDestroyed()) return;
+
+    if (!mainWindow.isMaximized()) {
+      const currentBounds = mainWindow.getBounds();
+      const workArea = screen.getDisplayMatching(currentBounds).workArea;
+      const nextBounds = getWorkspaceWindowBounds(currentBounds, workArea);
+      mainWindow.setBounds(nextBounds, true);
+    }
+
+    chatCompactMode = false;
+    sendWindowControlsState();
+
+    mainWindow.show();
+    mainWindow.focus();
+    mainWindow.webContents.send('navigate-to-schedule', scheduleId);
   });
 
   // 全ての通知をクリアしてウィンドウを閉じる
@@ -352,7 +486,7 @@ function setupIPC() {
   });
 
   // 通知を表示（NotificationManagerを使用）
-  ipcMain.handle('show-notification', (_event, options: { title: string; body: string; roomId?: string; kind?: 'chat' | 'schedule' }) => {
+  ipcMain.handle('show-notification', (_event, options: { title: string; body: string; roomId?: string; scheduleId?: string; kind?: 'chat' | 'schedule' }) => {
     const settings = store.get('notificationSettings');
 
     if (!settings.enableNotifications) {
@@ -360,7 +494,7 @@ function setupIPC() {
     }
 
     const body = settings.showMessageContent ? options.body : 'メッセージが届きました';
-    notificationManager.addNotification(options.title, body, options.roomId, options.kind);
+    notificationManager.addNotification(options.title, body, options.roomId, options.kind, options.scheduleId);
     return true;
   });
 
@@ -386,9 +520,44 @@ function setupIPC() {
     return true;
   });
 
+  // タスクバーの未読件数バッジを更新
+  ipcMain.handle('set-unread-badge', (_event, count: number, iconDataUrl: string | null) => {
+    unreadBadgeCount = Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
+    unreadBadgeIconDataUrl = unreadBadgeCount > 0 ? iconDataUrl : null;
+    applyUnreadBadge();
+    return true;
+  });
+
   // Electron環境かどうかを確認
   ipcMain.handle('is-electron', () => {
     return true;
+  });
+
+  // 狭幅のチャット一覧から予定表・工程管理を開く前に、PC用ワークスペース幅を確保する。
+  ipcMain.handle('expand-to-workspace', (event) => {
+    const sourceWindow = BrowserWindow.fromWebContents(event.sender);
+    if (!sourceWindow || sourceWindow.isDestroyed()) return false;
+    if (sourceWindow.isMaximized()) return true;
+
+    const currentBounds = sourceWindow.getBounds();
+    const workArea = screen.getDisplayMatching(currentBounds).workArea;
+    const nextBounds = getWorkspaceWindowBounds(currentBounds, workArea);
+
+    if (
+      nextBounds.x !== currentBounds.x
+      || nextBounds.y !== currentBounds.y
+      || nextBounds.width !== currentBounds.width
+      || nextBounds.height !== currentBounds.height
+    ) {
+      sourceWindow.setBounds(nextBounds, true);
+    }
+
+    chatCompactMode = false;
+    sendWindowControlsState();
+
+    sourceWindow.show();
+    sourceWindow.focus();
+    return nextBounds.width >= 1024;
   });
 
   // 外部リンクをデフォルトブラウザで開く（URL検証付き）

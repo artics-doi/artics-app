@@ -15,11 +15,23 @@ export function useOnlineStatus(userIds: string[]): Record<string, boolean> {
     const unsubscribers: Array<() => void> = [];
 
     userIds.forEach((uid) => {
-      const statusRef = ref(rtdb, `/status/${uid}/online`);
+      const connectionsRef = ref(rtdb, `/presenceConnections/${uid}`);
+      const legacyStatusRef = ref(rtdb, `/status/${uid}/online`);
+      let hasConnectionData = false;
       unsubscribers.push(
-        onValue(statusRef, (snapshot) => {
-          setStatusMap((prev) => ({ ...prev, [uid]: snapshot.val() === true }));
-        })
+        onValue(connectionsRef, (snapshot) => {
+          const connections = snapshot.val() as Record<string, { online?: boolean }> | null;
+          hasConnectionData = connections !== null;
+          const online = connections
+            ? Object.values(connections).some((connection) => connection?.online === true)
+            : false;
+          if (hasConnectionData) setStatusMap((prev) => ({ ...prev, [uid]: online }));
+        }),
+        onValue(legacyStatusRef, (snapshot) => {
+          if (!hasConnectionData) {
+            setStatusMap((prev) => ({ ...prev, [uid]: snapshot.val() === true }));
+          }
+        }),
       );
     });
 

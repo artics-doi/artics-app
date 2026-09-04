@@ -76,8 +76,8 @@ export default function SettingsModal({
       <div className={`${styles.modalContent} ${styles.settingsModalContent}`} onClick={(e) => e.stopPropagation()}>
         <div className={styles.settingsHeader}>
           <div>
-            <span className={styles.settingsEyebrow}>Account settings</span>
             <h2 id="settings-modal-title" onClick={onTitleClick}>設定</h2>
+            <p className={styles.settingsLead}>表示や通知、アプリの情報をまとめて管理します</p>
           </div>
           <button type="button" className={styles.settingsCloseIcon} onClick={onClose} aria-label="閉じる">
             ×
@@ -102,7 +102,6 @@ export default function SettingsModal({
         <div className={styles.settingsSection}>
           <h3>表示と通知</h3>
           <button type="button" className={styles.settingsMenuItem} onClick={onTheme}>
-            <span className={`${styles.settingsItemIcon} ${styles.settingsIconTheme}`} aria-hidden="true" />
             <span className={styles.menuText}>
               <strong>テーマ</strong>
               <small>画面の明るさを切り替えます</small>
@@ -110,7 +109,6 @@ export default function SettingsModal({
             <span className={styles.menuArrow}>›</span>
           </button>
           <button type="button" className={styles.settingsMenuItem} onClick={onNotificationSettings}>
-            <span className={`${styles.settingsItemIcon} ${styles.settingsIconNotification}`} aria-hidden="true" />
             <span className={styles.menuText}>
               <strong>通知設定</strong>
               <small>通知方法と表示内容を管理します</small>
@@ -119,7 +117,6 @@ export default function SettingsModal({
           </button>
           {isElectron && (
             <div className={styles.settingsMenuToggle}>
-              <span className={`${styles.settingsItemIcon} ${styles.settingsIconPin}`} aria-hidden="true" />
               <span className={styles.menuText}>
                 <strong>常に手前に表示</strong>
                 <small>{alwaysOnTop ? '有効' : '無効'}</small>
@@ -139,7 +136,6 @@ export default function SettingsModal({
         <div className={styles.settingsSection}>
           <h3>アプリ情報</h3>
           <button type="button" className={styles.settingsMenuItem} onClick={onReleaseNotes}>
-            <span className={`${styles.settingsItemIcon} ${styles.settingsIconNote}`} aria-hidden="true" />
             <span className={styles.menuText}>
               <strong>更新ノート</strong>
               <small>最近の変更を確認します</small>
@@ -148,7 +144,6 @@ export default function SettingsModal({
           </button>
           {!isElectron && (
             <button type="button" className={styles.settingsMenuItem} onClick={handleForceReload}>
-              <span className={`${styles.settingsItemIcon} ${styles.settingsIconRefresh}`} aria-hidden="true" />
               <span className={styles.menuText}>
                 <strong>強制リロード</strong>
                 <small>キャッシュをクリアして再読み込みします</small>
@@ -190,7 +185,6 @@ export default function SettingsModal({
         <div className={`${styles.settingsSection} ${styles.settingsDangerSection}`}>
           <h3>アカウント操作</h3>
           <button type="button" className={styles.settingsMenuItemLogout} onClick={onLogout}>
-            <span className={`${styles.settingsItemIcon} ${styles.settingsIconLogout}`} aria-hidden="true" />
             <span className={styles.menuText}>
               <strong>ログアウト</strong>
               <small>この端末からサインアウトします</small>

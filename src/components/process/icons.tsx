@@ -122,6 +122,25 @@ export function AlertCircleIcon({ size = 18, ...rest }: IconProps) {
   );
 }
 
+export function ArchiveIcon({ size = 18, ...rest }: IconProps) {
+  return (
+    <svg {...baseProps(size)} {...rest}>
+      <rect x="3" y="4" width="18" height="4" rx="1" />
+      <path d="M5 8v11h14V8" />
+      <path d="M10 12h4" />
+    </svg>
+  );
+}
+
+export function RestoreIcon({ size = 18, ...rest }: IconProps) {
+  return (
+    <svg {...baseProps(size)} {...rest}>
+      <path d="M3 12a9 9 0 1 0 3-6.7" />
+      <polyline points="3 3 3 9 9 9" />
+    </svg>
+  );
+}
+
 export function CloseIcon({ size = 18, ...rest }: IconProps) {
   return (
     <svg {...baseProps(size)} {...rest}>

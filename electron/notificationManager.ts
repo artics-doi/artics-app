@@ -10,6 +10,7 @@ interface NotificationItem {
   title: string;
   body: string;
   roomId?: string;
+  scheduleId?: string;
   kind?: 'chat' | 'schedule';
   timestamp: Date;
 }
@@ -24,11 +25,11 @@ export class NotificationManager {
   private readonly HEADER_HEIGHT = 50; // ヘッダー部分
   private readonly FOOTER_HEIGHT = 68; // OKボタン部分
   private readonly ITEM_HEIGHT = 55; // 各メッセージの高さ
-  private readonly SCHEDULE_ITEM_HEIGHT = 84; // 予定通知は種別バッジ分だけ高くする
+  private readonly SCHEDULE_ITEM_HEIGHT = 132; // 予定名・カテゴリ・日時・対象メンバーを読みやすく表示する
   private readonly MAX_HEIGHT = 500;
   private readonly PADDING = 10;
 
-  addNotification(title: string, body: string, roomId?: string, kind: 'chat' | 'schedule' = 'chat'): void {
+  addNotification(title: string, body: string, roomId?: string, kind: 'chat' | 'schedule' = 'chat', scheduleId?: string): void {
     // H-11: 古い通知（5 分超過）を自動的に間引く
     this.pruneOldNotifications(5 * 60 * 1000);
 
@@ -37,6 +38,7 @@ export class NotificationManager {
       title,
       body,
       roomId,
+      scheduleId,
       kind,
       timestamp: new Date()
     };
@@ -125,10 +127,6 @@ export class NotificationManager {
         }
       });
 
-      this.containerWindow.once('ready-to-show', () => {
-        this.containerWindow?.show();
-      });
-
       this.containerWindow.on('closed', () => {
         this.containerWindow = null;
         this.notifications = []; // ウィンドウが閉じられたら通知もクリア
@@ -145,7 +143,21 @@ export class NotificationManager {
 
     // HTMLコンテンツを更新
     const htmlContent = this.generateHTML();
-    this.containerWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
+    void this.containerWindow
+      .loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`)
+      .then(() => {
+        if (!this.containerWindow || this.containerWindow.isDestroyed()) return;
+        // 通知を連続追加すると先行navigationが中断されるため、最新内容の読込完了後に表示する。
+        this.containerWindow.showInactive();
+        this.containerWindow.moveTop();
+      })
+      .catch((error: unknown) => {
+        const code = (error as { code?: string }).code;
+        // 次の通知によるnavigation差し替えは正常系。最新のloadURL側で表示される。
+        if (code !== 'ERR_ABORTED') {
+          console.error('通知ウィンドウの表示に失敗しました:', error);
+        }
+      });
   }
 
   private generateHTML(): string {
@@ -154,6 +166,7 @@ export class NotificationManager {
       title: n.title,
       body: n.body,
       roomId: n.roomId || '',
+      scheduleId: n.scheduleId || '',
       kind: n.kind || 'chat'
     }))).replace(/</g, '\\u003c');
 
@@ -237,9 +250,24 @@ export class NotificationManager {
           color: #4f3421;
           border: 1px solid rgba(115, 83, 42, 0.16);
           border-left: 4px solid #b9822f;
+          padding: 9px 10px;
         }
         .message-item.schedule:hover {
           background: #ffeed1;
+        }
+        .message-item.schedule .message-sender {
+          color: #2f2419;
+          font-size: 14px;
+          font-weight: 700;
+          margin-bottom: 6px;
+        }
+        .message-item.schedule .message-text {
+          color: #5c432b;
+          font-size: 11px;
+          line-height: 1.65;
+          white-space: pre-line;
+          overflow: visible;
+          text-overflow: clip;
         }
         .message-item:last-child {
           margin-bottom: 0;
@@ -329,7 +357,9 @@ export class NotificationManager {
           item.appendChild(sender);
           item.appendChild(body);
           item.onclick = () => {
-            if (notif.roomId && window.notificationAPI) {
+            if (notif.scheduleId && window.notificationAPI) {
+              window.notificationAPI.openSchedule(notif.scheduleId);
+            } else if (notif.roomId && window.notificationAPI) {
               window.notificationAPI.openRoom(notif.roomId);
             } else if (window.notificationAPI) {
               window.notificationAPI.openMainWindow();

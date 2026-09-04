@@ -49,12 +49,20 @@ export default function EffortReport() {
   const [hoursPerBusinessDay, setHoursPerBusinessDay] = useState(DEFAULT_HOURS_PER_BUSINESS_DAY);
   const [hoursPerDayInput, setHoursPerDayInput] = useState(String(DEFAULT_HOURS_PER_BUSINESS_DAY));
   const [generating, setGenerating] = useState(false);
+  const period = useMemo(() => buildFiscalYearPeriod(fiscalYear), [fiscalYear]);
+  const scheduleRangeEnd = useMemo(
+    () => new Date(period.end.getFullYear(), period.end.getMonth(), period.end.getDate() + 1),
+    [period],
+  );
 
   const activeProjects = useProjects(currentUser, 'active');
   const archivedProjects = useProjects(currentUser, 'archived');
   const { members } = useProcessMembers(currentUser);
   const { tasks, loading: tasksLoading } = useAllProcessTasks(currentUser);
-  const { schedules, loading: schedulesLoading } = useSchedules(currentUser);
+  const { schedules, loading: schedulesLoading } = useSchedules(currentUser, {
+    startAt: period.start,
+    endAt: scheduleRangeEnd,
+  });
 
   const projects = useMemo(
     () => uniqueById([...activeProjects.projects, ...archivedProjects.projects]),
@@ -74,7 +82,6 @@ export default function EffortReport() {
   );
 
   const memberById = useMemo(() => new Map(members.map((member) => [member.id, member])), [members]);
-  const period = buildFiscalYearPeriod(fiscalYear);
   const loading = activeProjects.loading || archivedProjects.loading || tasksLoading || schedulesLoading;
   const errors = report.issues.filter((issue) => issue.severity === 'error');
   const warnings = report.issues.filter((issue) => issue.severity === 'warning');

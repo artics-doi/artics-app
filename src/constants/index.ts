@@ -35,7 +35,7 @@ export const SECONDARY_REACTION_EMOJIS = [
 export const REACTION_EMOJIS = [...PRIMARY_REACTION_EMOJIS, ...SECONDARY_REACTION_EMOJIS];
 
 // ファイルアップロード
-export const MAX_FILE_SIZE = 30 * 1024 * 1024; // 30MB
+export const MAX_FILE_SIZE = 25 * 1024 * 1024; // Storage rulesと同じ25MB
 
 // トースト表示時間（ミリ秒）（M-19: 2 秒 → 3 秒に延長して読み取りやすく）
 export const TOAST_DURATION = 3000;

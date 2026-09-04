@@ -37,10 +37,13 @@ function makeTask(partial: Partial<Task>): Task {
     assigneeIds: [],
     startDate: null,
     endDate: null,
+    completedDate: null,
+    completionChecked: false,
     description: '',
     order: 'a0',
     ganttOrder: 'a0',
     archived: false,
+    isArchived: false,
     createdBy: 'u',
     createdByName: 'U',
     createdAt: null,
@@ -67,6 +70,14 @@ describe('buildProjectTaskSummaries', () => {
   test('タスクがないプロジェクトは0件で初期化する', () => {
     const summaries = buildProjectTaskSummaries([makeProject({ id: 'p1' })], []);
     expect(summaries.get('p1')).toEqual({ todo: 0, doing: 0, done: 0, hold: 0, total: 0 });
+  });
+
+  test('個別アーカイブ済みタスクは件数に含めない', () => {
+    const summaries = buildProjectTaskSummaries([makeProject({ id: 'p1' })], [
+      makeTask({ id: 'active' }),
+      makeTask({ id: 'archived', isArchived: true }),
+    ]);
+    expect(summaries.get('p1')?.total).toBe(1);
   });
 
   test('列名ベースの補助判定も使う', () => {

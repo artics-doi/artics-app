@@ -20,16 +20,17 @@ import { db } from '../lib/firebase';
 import type { ChatRoom } from '../types';
 
 export function useChatRooms(currentUser: FirebaseUser | null) {
+  const currentUserId = currentUser?.uid ?? null;
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUserId) return;
 
     // インデックス不要のシンプルなクエリ
     const q = query(
       collection(db, 'chatRooms'),
-      where('members', 'array-contains', currentUser.uid)
+      where('members', 'array-contains', currentUserId)
     );
 
     const unsubscribe = onSnapshot(
@@ -53,8 +54,8 @@ export function useChatRooms(currentUser: FirebaseUser | null) {
         });
         // クライアント側ソート: お気に入り優先 → 更新日時降順
         rooms.sort((a, b) => {
-          const aFav = a.favorites?.includes(currentUser.uid) ? 1 : 0;
-          const bFav = b.favorites?.includes(currentUser.uid) ? 1 : 0;
+          const aFav = a.favorites?.includes(currentUserId) ? 1 : 0;
+          const bFav = b.favorites?.includes(currentUserId) ? 1 : 0;
           if (aFav !== bFav) return bFav - aFav;
           const timeA = a.updatedAt?.getTime() || 0;
           const timeB = b.updatedAt?.getTime() || 0;
@@ -70,7 +71,7 @@ export function useChatRooms(currentUser: FirebaseUser | null) {
     );
 
     return () => unsubscribe();
-  }, [currentUser]);
+  }, [currentUserId]);
 
   // 既存ユーザー向け: メモルームがなければ自動作成
   const memoCreatedRef = useRef(false);

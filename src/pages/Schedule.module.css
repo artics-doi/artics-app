@@ -2,7 +2,7 @@
   height: 100vh;
   height: 100dvh;
   display: grid;
-  grid-template-columns: minmax(250px, 330px) minmax(0, 1fr);
+  grid-template-columns: var(--desktop-room-pane-width, 330px) 8px minmax(0, 1fr);
   overflow: hidden;
   background: #ffffff;
   color: #0f172a;
@@ -12,42 +12,90 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: #fbfdff;
+  background: #f7f9fc;
 }
 
 .sidebar {
   border-right: 1px solid #dfe5ec;
 }
 
+.sidebarResizeHandle {
+  position: relative;
+  z-index: 4;
+  width: 8px;
+  min-width: 8px;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.sidebarResizeHandle::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 3px;
+  width: 1px;
+  background: var(--border-color);
+  transition: width 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+}
+
+.sidebarResizeHandle:hover::before,
+.sidebarResizeHandle:focus-visible::before,
+.sidebarResizeHandle.dragging::before {
+  width: 3px;
+  background: var(--accent-color);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-color) 18%, transparent);
+}
+
+.sidebarResizeHandle:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: -2px;
+}
+
 .sidebarActions {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-  padding: 12px 10px 10px;
+  padding: 10px 12px 12px;
 }
 
 .sidebarPrimary,
 .sidebarSecondary,
 .sidebarQuickActions button {
   min-height: 38px;
-  border-radius: 6px;
+  border-radius: 8px;
   border: 1px solid #d9e1eb;
   background: #ffffff;
   color: #1f2937;
   font: inherit;
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
   cursor: pointer;
 }
 
 .sidebarPrimary {
-  background: #1677ff;
-  border-color: transparent;
-  color: #ffffff;
+  min-height: 40px;
+  border-color: #c8dcff;
+  background: #eef5ff;
+  color: #155fb8;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
 }
 
 .sidebarPrimary.active {
-  box-shadow: none;
+  border-color: transparent;
+  background: #1677ff;
+  color: #ffffff;
+}
+
+.sidebarSecondary {
+  grid-column: 1 / -1;
+  min-height: 40px;
+  border-color: #cfd9e6;
+  color: #111827;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
 }
 
 .sidebarSecondary:hover,
@@ -60,9 +108,20 @@
 .sidebarQuickActions {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  padding: 10px 10px 12px;
-  border-bottom: 1px solid #dfe5ec;
+  gap: 6px;
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid #e4ebf3;
+  background: #f7f9fc;
+}
+
+.sidebarQuickActions button {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 8px;
+  border-color: #d5dee9;
 }
 
 .sidebarQuickActions button:disabled {
@@ -74,8 +133,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 18px 6px;
+  padding: 10px 14px 7px;
   font-size: 13px;
+  font-weight: 700;
   color: #475569;
 }
 
@@ -86,31 +146,41 @@
   padding: 0 10px 14px;
 }
 
+.embeddedChatSlot {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-top: 1px solid var(--border-color);
+}
+
 .roomItem {
   width: 100%;
-  min-height: 62px;
+  min-height: 58px;
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) auto;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 4px;
-  padding: 8px 10px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: transparent;
+  gap: 9px;
+  margin-bottom: 5px;
+  padding: 8px 9px;
+  border: 1px solid #edf2f7;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.72);
   color: #111827;
   text-align: left;
   cursor: pointer;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
 }
 
 .roomItem:hover {
-  background: #eaf3ff;
+  background: #ffffff;
   border-color: #d2e4ff;
+  box-shadow: 0 5px 14px rgba(31, 91, 160, 0.08);
 }
 
 .roomAvatar {
-  width: 44px;
-  height: 44px;
+  width: 38px;
+  height: 38px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -283,6 +353,35 @@
 .segmented .selected {
   background: #eaf3ff;
   color: #0f6bdd;
+}
+
+.categoryFilterBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 18px;
+  border-bottom: 1px solid #dfe5ec;
+  background: #fbfdff;
+}
+
+.categoryFilterBar button {
+  min-height: 30px;
+  border: 1px solid #d9e1eb;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #334155;
+  padding: 0 11px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.categoryFilterBar button:hover,
+.categoryFilterActive {
+  border-color: #93c5fd !important;
+  background: #eaf3ff !important;
+  color: #0f6bdd !important;
 }
 
 .loading {
@@ -459,6 +558,15 @@
   box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.18);
 }
 
+.focusedScheduleEvent {
+  position: relative;
+  z-index: 5;
+  outline: 3px solid #38bdf8;
+  outline-offset: 1px;
+  box-shadow: 0 0 0 5px rgba(56, 189, 248, 0.24) !important;
+  filter: brightness(1.08);
+}
+
 .dayEvents {
   flex: 1;
   min-height: 0;
@@ -536,6 +644,63 @@
   letter-spacing: 0.01em;
 }
 
+.eventFooter {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.eventFooter:empty {
+  display: none;
+}
+
+.eventFooter em {
+  flex: 1;
+  width: auto;
+}
+
+.eventParticipants {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.eventAvatarStack {
+  display: flex;
+  align-items: center;
+}
+
+.eventAvatar {
+  width: 19px;
+  height: 19px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--schedule-tag-text) 44%, transparent);
+  border-radius: 50%;
+  background: var(--schedule-border);
+  color: var(--schedule-tag-text);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.eventAvatar + .eventAvatar {
+  margin-left: -4px;
+}
+
+.eventParticipantMore {
+  color: #8a817a;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
 .notionEventBar {
   z-index: 2;
   min-width: 0;
@@ -545,7 +710,7 @@
   flex-direction: column;
   align-items: flex-start;
   justify-content: center;
-  gap: 3px;
+  gap: 5px;
   margin: 0 3px var(--schedule-card-gap);
   padding: 6px 9px;
   border: 1px solid var(--schedule-border);
@@ -736,6 +901,47 @@
   background: #f3f4f6;
 }
 
+.scheduleContextMenu {
+  position: fixed;
+  z-index: 1200;
+  width: 164px;
+  display: grid;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 16px 38px rgba(15, 23, 42, 0.18);
+}
+
+.scheduleContextMenu button {
+  min-height: 34px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #1f2937;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: left;
+  padding: 0 10px;
+  cursor: pointer;
+}
+
+.scheduleContextMenu button:hover {
+  background: #eff6ff;
+  color: #0f5ec7;
+}
+
+.scheduleContextMenu .contextDelete {
+  color: #b91c1c;
+}
+
+.scheduleContextMenu .contextDelete:hover {
+  background: #fff1f2;
+  color: #b91c1c;
+}
+
 .modalOverlay {
   position: fixed;
   inset: 0;
@@ -760,6 +966,59 @@
   box-shadow: 0 20px 50px rgba(15, 23, 42, 0.22);
 }
 
+/* 通知設定を開いても保存操作まで一画面に収める、予定フォーム専用の密度調整 */
+.scheduleFormModal {
+  width: min(760px, 100%);
+  gap: 10px;
+  padding: 14px 18px;
+}
+
+.scheduleFormModal .field {
+  gap: 4px;
+}
+
+.scheduleFormModal .field input,
+.scheduleFormModal .field select {
+  min-height: 34px;
+  padding-block: 6px;
+}
+
+.scheduleFormModal .field textarea {
+  min-height: 54px;
+  padding-block: 6px;
+}
+
+.scheduleFormModal .selectedUsers {
+  min-height: 30px;
+  padding-block: 5px;
+}
+
+.scheduleFormModal .userChecks {
+  max-height: 76px;
+  padding-block: 5px;
+}
+
+.scheduleFormModal .notificationAudience {
+  gap: 7px;
+}
+
+.scheduleFormModal .notificationAudience legend {
+  margin-bottom: 5px;
+}
+
+.scheduleFormModal .notificationAudienceOptions > label {
+  gap: 8px;
+  padding: 8px 10px;
+}
+
+.scheduleFormModal .notificationAudienceOptions span {
+  gap: 2px;
+}
+
+.scheduleFormModal .notificationAudienceOptions small {
+  line-height: 1.3;
+}
+
 .modalHeader {
   display: flex;
   align-items: center;
@@ -780,6 +1039,107 @@
   background: #f1f5f9;
   color: #334155;
   font-size: 20px;
+  cursor: pointer;
+}
+
+.schedulePreview {
+  width: min(500px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 22px;
+  border: 1px solid #dbe3ec;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
+}
+
+.previewHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.previewBadge {
+  display: inline-flex;
+  width: fit-content;
+  padding: 4px 9px;
+  border-radius: 6px;
+  background: #dcfce7;
+  color: #15803d;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.previewHeader button {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.schedulePreview h2 {
+  margin: 0;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 22px;
+  line-height: 1.35;
+}
+
+.previewDetails {
+  display: grid;
+  margin: 0;
+}
+
+.previewDetails > div {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 16px;
+  padding: 11px 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.previewDetails dt,
+.previewDetails dd {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.previewDetails dt {
+  color: #64748b;
+  font-weight: 700;
+}
+
+.previewDetails dd {
+  min-width: 0;
+  color: #1e293b;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.previewActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.previewEditButton {
+  min-height: 38px;
+  padding: 0 16px;
+  border: 1px solid #1686e8;
+  border-radius: 6px;
+  background: #1686e8;
+  color: #ffffff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
   cursor: pointer;
 }
 
@@ -808,6 +1168,14 @@
 
 .field textarea {
   resize: vertical;
+}
+
+.placeholderSelect {
+  color: #94a3b8 !important;
+}
+
+.field select option {
+  color: #111827;
 }
 
 .fieldHeader {
@@ -1059,6 +1427,78 @@
   accent-color: #1677ff;
 }
 
+.notificationAudience {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.notificationAudience legend {
+  margin-bottom: 8px;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.notificationAudienceOptions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.notificationAudienceOptions > label {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.notificationAudienceOptions input {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  accent-color: #1686e8;
+}
+
+.notificationAudienceOptions span {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.notificationAudienceOptions strong {
+  color: #1e293b;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.notificationAudienceOptions small {
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.notificationAudienceOptions .notificationAudienceSelected {
+  border-color: #1686e8;
+  background: #eff8ff;
+  box-shadow: 0 0 0 1px rgba(22, 134, 232, 0.12);
+}
+
+.notificationAudienceHint {
+  margin: 0;
+  color: #a16207;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .userChecks {
   max-height: 104px;
   display: flex;
@@ -1223,6 +1663,7 @@
 
 :global([data-theme="dark"]) .sidebarQuickActions {
   border-bottom-color: var(--border-color);
+  background: var(--bg-primary);
 }
 
 :global([data-theme="dark"]) .sidebarPrimary,
@@ -1230,17 +1671,24 @@
 :global([data-theme="dark"]) .sidebarQuickActions button,
 :global([data-theme="dark"]) .iconButton,
 :global([data-theme="dark"]) .todayButton,
+:global([data-theme="dark"]) .categoryFilterBar button,
 :global([data-theme="dark"]) .segmented button {
   border-color: var(--border-color);
-  background: var(--bg-secondary);
+  background: rgba(255, 255, 255, 0.04);
   color: var(--text-primary);
 }
 
-:global([data-theme="dark"]) .sidebarPrimary,
+:global([data-theme="dark"]) .sidebarPrimary.active,
 :global([data-theme="dark"]) .addButton {
   border-color: transparent;
   background: var(--accent-color);
   color: #052536;
+}
+
+:global([data-theme="dark"]) .sidebarPrimary:not(.active) {
+  border-color: rgba(125, 211, 252, 0.28);
+  background: rgba(14, 116, 144, 0.34);
+  color: #e0f7ff;
 }
 
 :global([data-theme="dark"]) .sidebarSecondary:hover,
@@ -1248,6 +1696,8 @@
 :global([data-theme="dark"]) .roomItem:hover,
 :global([data-theme="dark"]) .iconButton:hover,
 :global([data-theme="dark"]) .todayButton:hover,
+:global([data-theme="dark"]) .categoryFilterBar button:hover,
+:global([data-theme="dark"]) .categoryFilterActive,
 :global([data-theme="dark"]) .segmented button:hover,
 :global([data-theme="dark"]) .segmented .selected {
   border-color: rgba(125, 211, 252, 0.36);
@@ -1259,6 +1709,7 @@
 :global([data-theme="dark"]) .roomLast,
 :global([data-theme="dark"]) .loading,
 :global([data-theme="dark"]) .weekday,
+:global([data-theme="dark"]) .eventParticipantMore,
 :global([data-theme="dark"]) .eventChip em,
 :global([data-theme="dark"]) .notionEventBar em,
 :global([data-theme="dark"]) .selectedUsers > span,
@@ -1276,9 +1727,24 @@
   color: var(--text-primary);
 }
 
+:global([data-theme="dark"]) .roomItem {
+  border-color: rgba(148, 163, 184, 0.16);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+:global([data-theme="dark"]) .roomItem:hover {
+  border-color: rgba(125, 211, 252, 0.28);
+  background: rgba(14, 116, 144, 0.18);
+}
+
 :global([data-theme="dark"]) .muted {
   background: var(--bg-tertiary);
   color: var(--text-tertiary);
+}
+
+:global([data-theme="dark"]) .categoryFilterBar {
+  border-color: var(--border-color);
+  background: var(--bg-secondary);
 }
 
 :global([data-theme="dark"]) .header,
@@ -1410,9 +1876,35 @@
 }
 
 :global([data-theme="dark"]) .modal,
+:global([data-theme="dark"]) .schedulePreview,
 :global([data-theme="dark"]) .timePopover {
   border: 1px solid var(--border-color);
   background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+:global([data-theme="dark"]) .schedulePreview h2,
+:global([data-theme="dark"]) .previewDetails > div {
+  border-color: var(--border-color);
+}
+
+:global([data-theme="dark"]) .previewHeader button,
+:global([data-theme="dark"]) .previewEditButton {
+  border-color: rgba(56, 189, 248, 0.58);
+  background: var(--accent-color-soft);
+  color: var(--accent-color-strong);
+}
+
+:global([data-theme="dark"]) .previewBadge {
+  background: rgba(34, 197, 94, 0.16);
+  color: #86efac;
+}
+
+:global([data-theme="dark"]) .previewDetails dt {
+  color: var(--text-secondary);
+}
+
+:global([data-theme="dark"]) .previewDetails dd {
   color: var(--text-primary);
 }
 
@@ -1429,10 +1921,73 @@
   color: var(--text-primary);
 }
 
+:global([data-theme="dark"]) .field select option {
+  background: var(--bg-input);
+  color: var(--text-primary);
+}
+
+:global([data-theme="dark"]) .field select option:disabled,
+:global([data-theme="dark"]) .placeholderSelect {
+  color: var(--text-tertiary) !important;
+}
+
+:global([data-theme="dark"]) .scheduleContextMenu {
+  border-color: var(--border-color);
+  background: var(--bg-secondary);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.34);
+}
+
+:global([data-theme="dark"]) .scheduleContextMenu button {
+  color: var(--text-primary);
+}
+
+:global([data-theme="dark"]) .scheduleContextMenu button:hover {
+  background: var(--accent-color-soft);
+  color: var(--accent-color-strong);
+}
+
+:global([data-theme="dark"]) .scheduleContextMenu .contextDelete {
+  color: var(--danger-color);
+}
+
+:global([data-theme="dark"]) .scheduleContextMenu .contextDelete:hover {
+  background: var(--danger-soft);
+  color: var(--danger-color);
+}
+
 :global([data-theme="dark"]) .field,
 :global([data-theme="dark"]) .inlineCheck,
+:global([data-theme="dark"]) .notificationAudience legend,
 :global([data-theme="dark"]) .modalHeader button {
   color: var(--text-secondary);
+}
+
+:global([data-theme="dark"]) .notificationAudienceOptions > label {
+  border-color: var(--border-color);
+  background: var(--bg-input);
+}
+
+:global([data-theme="dark"]) .notificationAudienceOptions strong {
+  color: var(--text-primary);
+}
+
+:global([data-theme="dark"]) .notificationAudienceOptions small {
+  color: var(--text-secondary);
+}
+
+:global([data-theme="dark"]) .notificationAudienceOptions .notificationAudienceSelected {
+  border-color: var(--accent-color);
+  background: var(--accent-color-soft);
+}
+
+:global([data-theme="dark"]) .notificationAudienceHint {
+  color: #fbbf24;
+}
+
+@media (max-width: 720px) {
+  .notificationAudienceOptions {
+    grid-template-columns: 1fr;
+  }
 }
 
 :global([data-theme="dark"]) .selectedUsers,
@@ -1482,11 +2037,21 @@
 
 @media (max-width: 1100px) {
   .container {
-    grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
+    grid-template-columns: var(--desktop-room-pane-width, 300px) 8px minmax(0, 1fr);
   }
 
   .sidebar {
     grid-row: 1;
+  }
+}
+
+@media (max-width: 1023px) {
+  .container {
+    grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
+  }
+
+  .sidebarResizeHandle {
+    display: none;
   }
 }
 
@@ -1549,4 +2114,537 @@
     display: grid;
     grid-template-columns: repeat(3, 1fr);
   }
+}
+
+/* =============================================================================
+   スマホ向け予定表（max-width: 640px）
+   既存の @media (max-width: 760px) より後ろに置き、後勝ちで打ち返す。
+   ============================================================================= */
+
+/* 既定（デスクトップ）では非表示。JS 分岐で描画されないが安全側でも隠す */
+.mobileFab {
+  display: none;
+}
+
+/* --- 共通: 予定行 --- */
+.mobileAgendaRow {
+  width: 100%;
+  min-height: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 0;
+  border-bottom: 1px solid #edf2f7;
+  background: #ffffff;
+  color: #111827;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.mobileAgendaRow:hover,
+.mobileAgendaRow:active {
+  background: #f8fbff;
+}
+
+.mobileAgendaBar {
+  width: 3px;
+  height: 26px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* tone クラスの pastel background を打ち消し、カテゴリ色バーにする */
+.mobileAgendaRow .mobileAgendaBar {
+  background: var(--schedule-tag-text, #6b625c);
+}
+
+.mobileAgendaTime {
+  width: 40px;
+  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.mobileAgendaTitle {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #111827;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.mobileAgendaCategory {
+  flex-shrink: 0;
+  max-width: 4.5em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+/* tone クラスの background をタグ用変数で打ち返す */
+.mobileAgendaRow .mobileAgendaCategory {
+  background: var(--schedule-tag-bg, #e4e1dc);
+  color: var(--schedule-tag-text, #6b625c);
+}
+
+.mobileAgendaList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.mobileAgendaList li {
+  margin: 0;
+  padding: 0;
+}
+
+.mobileDayListHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px 6px;
+}
+
+.mobileDayListHeader h2 {
+  margin: 0;
+  color: #111827;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.mobileDayListToday {
+  color: #0f6bdd;
+}
+
+.mobileDayListCount {
+  flex-shrink: 0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.mobileDayEmpty {
+  margin: 0;
+  padding: 10px 12px 14px;
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* --- 月ビュー: ドットカレンダー --- */
+.mobileMonthView {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+  background: #ffffff;
+}
+
+.mobileDotWeekdays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  border-bottom: 1px solid #edf2f7;
+  background: #fbfdff;
+}
+
+.mobileDotWeekday {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  color: #6b625c;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.mobileDotGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  border-bottom: 1px solid #edf2f7;
+}
+
+.mobileDotCell {
+  min-width: 0;
+  min-height: 44px;
+  height: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 2px 0;
+  border: 0;
+  border-right: 1px solid #f1f5f9;
+  border-bottom: 1px solid #f1f5f9;
+  background: #ffffff;
+  color: #111827;
+  font: inherit;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.mobileDotCell:nth-child(7n) {
+  border-right: 0;
+}
+
+.mobileDotDayNumber {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.mobileDotOutside {
+  color: #94a3b8;
+}
+
+.mobileDotOutside .mobileDotDayNumber {
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.mobileDotToday .mobileDotDayNumber {
+  background: #1677ff;
+  color: #ffffff;
+}
+
+.mobileDotSelected {
+  background: #eaf3ff;
+}
+
+.mobileDotSelected:not(.mobileDotToday) .mobileDotDayNumber {
+  box-shadow: inset 0 0 0 1.5px #2f6feb;
+}
+
+.mobileDotRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 8px;
+  max-width: 100%;
+  padding: 0 2px;
+  overflow: hidden;
+}
+
+.mobileDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* tone の pastel ではなくタグ色でドットを塗る */
+.mobileDotRow .mobileDot {
+  background: var(--schedule-tag-text, #6b625c);
+}
+
+.mobileDotOverflow {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.mobileDayList {
+  flex: 1;
+  min-height: 0;
+}
+
+/* --- 週 / 今日: 縦アジェンダ --- */
+.mobileAgendaView {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+  background: #ffffff;
+}
+
+.mobileAgendaSection {
+  border-bottom: 1px solid #edf2f7;
+}
+
+.mobileAgendaSection:last-child {
+  border-bottom: 0;
+}
+
+/* --- ヘッダー 2 段 / 絞り込み / FAB --- */
+/* isNarrow 時のマーカー。詳細レイアウトは 640px メディアクエリ側 */
+.mobileHeader {
+  box-sizing: border-box;
+}
+
+.mobileHeaderRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+
+.mobileHeaderNav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.filterToggleButton {
+  position: relative;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: 1px solid #d9e1eb;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #1f2937;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.filterToggleButton:hover {
+  background: #eaf3ff;
+  border-color: #bcd7ff;
+  color: #0f6bdd;
+}
+
+.filterBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #1677ff;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+@media (max-width: 640px) {
+  /* 760px 側の縦積みを 2 段レイアウトで打ち返す */
+  .header.mobileHeader {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 8px;
+    padding: 10px 12px;
+    min-height: 0;
+  }
+
+  .header.mobileHeader h1 {
+    font-size: 17px;
+    line-height: 1.2;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobileHeaderRow .segmented {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .mobileHeaderRow .segmented button {
+    flex: 1;
+    min-width: 0;
+    min-height: 36px;
+    padding: 0 6px;
+    font-size: 12px;
+  }
+
+  .mobileHeaderNav .iconButton,
+  .mobileHeaderNav .todayButton {
+    min-height: 36px;
+  }
+
+  /* デスクトップ用「予定を追加」は非表示（FAB に置換） */
+  .addButton {
+    display: none;
+  }
+
+  /* 760px の横スクロール用 minmax を打ち返す（万一デスクトップ経路が残っても） */
+  .calendar {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+
+  .notionWeekdays,
+  .notionWeek {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+
+  .mobileFab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    right: 16px;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    z-index: 40;
+    width: 56px;
+    height: 56px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: #1677ff;
+    color: #ffffff;
+    box-shadow: 0 6px 16px rgba(22, 119, 255, 0.35);
+    cursor: pointer;
+  }
+
+  .mobileFab svg {
+    width: 26px;
+    height: 26px;
+  }
+
+  .mobileFab:hover,
+  .mobileFab:active {
+    background: #0f6bdd;
+  }
+
+  .categoryFilterBar {
+    padding: 8px 12px;
+  }
+
+  .categoryFilterBar button {
+    min-height: 32px;
+  }
+}
+
+/* --- ダークモード（スマホ部品） --- */
+:global([data-theme="dark"]) .mobileAgendaRow {
+  border-bottom-color: var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+:global([data-theme="dark"]) .mobileAgendaRow:hover,
+:global([data-theme="dark"]) .mobileAgendaRow:active {
+  background: var(--bg-hover);
+}
+
+:global([data-theme="dark"]) .mobileAgendaTime,
+:global([data-theme="dark"]) .mobileDayListCount,
+:global([data-theme="dark"]) .mobileDayEmpty,
+:global([data-theme="dark"]) .mobileDotOverflow,
+:global([data-theme="dark"]) .mobileDotWeekday {
+  color: var(--text-secondary);
+}
+
+:global([data-theme="dark"]) .mobileAgendaTitle,
+:global([data-theme="dark"]) .mobileDayListHeader h2 {
+  color: var(--text-primary);
+}
+
+:global([data-theme="dark"]) .mobileDayListToday {
+  color: var(--accent-color-strong);
+}
+
+:global([data-theme="dark"]) .mobileMonthView,
+:global([data-theme="dark"]) .mobileAgendaView {
+  background: var(--bg-secondary);
+}
+
+:global([data-theme="dark"]) .mobileDotWeekdays {
+  border-bottom-color: var(--border-color);
+  background: var(--bg-primary);
+}
+
+:global([data-theme="dark"]) .mobileDotGrid {
+  border-bottom-color: var(--border-color);
+}
+
+:global([data-theme="dark"]) .mobileDotCell {
+  border-right-color: var(--border-color);
+  border-bottom-color: var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+:global([data-theme="dark"]) .mobileDotOutside,
+:global([data-theme="dark"]) .mobileDotOutside .mobileDotDayNumber {
+  color: var(--text-tertiary);
+}
+
+:global([data-theme="dark"]) .mobileDotToday .mobileDotDayNumber {
+  background: var(--accent-color);
+  color: #052536;
+}
+
+:global([data-theme="dark"]) .mobileDotSelected {
+  background: var(--accent-color-soft);
+}
+
+:global([data-theme="dark"]) .mobileDotSelected:not(.mobileDotToday) .mobileDotDayNumber {
+  box-shadow: inset 0 0 0 1.5px var(--accent-color);
+}
+
+:global([data-theme="dark"]) .mobileAgendaSection {
+  border-bottom-color: var(--border-color);
+}
+
+:global([data-theme="dark"]) .filterToggleButton {
+  border-color: var(--border-color);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+}
+
+:global([data-theme="dark"]) .filterToggleButton:hover {
+  border-color: rgba(125, 211, 252, 0.36);
+  background: var(--accent-color-soft);
+  color: var(--accent-color-strong);
+}
+
+:global([data-theme="dark"]) .filterBadge {
+  background: var(--accent-color);
+  color: #052536;
+}
+
+:global([data-theme="dark"]) .mobileFab {
+  background: var(--accent-color);
+  color: #052536;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+}
+
+:global([data-theme="dark"]) .mobileFab:hover,
+:global([data-theme="dark"]) .mobileFab:active {
+  background: var(--accent-color-strong);
+  color: #ffffff;
 }

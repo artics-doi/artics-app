@@ -27,10 +27,10 @@ export function getProcessColor(colorIndex: number) {
 // id は固定文字列にして、タスクの columnId と対応づける。
 export function createDefaultColumns(): ProjectColumn[] {
   return [
-    { id: 'todo', name: '未着手', order: 0 },
-    { id: 'doing', name: '進行中', order: 1 },
-    { id: 'done', name: '完了', order: 2 },
-    { id: 'hold', name: '保留', order: 3 },
+    { id: 'todo', name: '未着手', order: 0, kind: 'todo' },
+    { id: 'doing', name: '進行中', order: 1, kind: 'doing' },
+    { id: 'done', name: '完了', order: 2, kind: 'done' },
+    { id: 'hold', name: '保留', order: 3, kind: 'hold' },
   ];
 }
 

@@ -1,4 +1,10 @@
+import { isAllowedHttpsUrl } from '../lib/security/resourceTarget';
+
 export async function downloadFile(url: string, fileName: string): Promise<void> {
+  if (!isAllowedHttpsUrl(url)) {
+    throw new Error('Blocked unsafe download URL');
+  }
+
   try {
     const response = await fetch(url);
     if (!response.ok) throw new Error(`Download failed: ${response.status}`);
@@ -15,6 +21,6 @@ export async function downloadFile(url: string, fileName: string): Promise<void>
     }, 100);
   } catch (error) {
     console.error('ファイルダウンロードエラー:', error);
-    window.open(url, '_blank');
+    window.open(url, '_blank', 'noopener,noreferrer');
   }
 }

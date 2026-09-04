@@ -15,6 +15,30 @@
         { "fieldPath": "projectId", "order": "ASCENDING" },
         { "fieldPath": "order", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "schedules",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "notification.enabled", "order": "ASCENDING" },
+        { "fieldPath": "startAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "schedules",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "notification.enabled", "order": "ASCENDING" },
+        { "fieldPath": "notification.customAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "userDeletionOperations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "state", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

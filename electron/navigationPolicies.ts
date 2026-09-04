@@ -2,18 +2,18 @@
 
 import { app, shell } from 'electron';
 
-const ALLOWED_NAS_PREFIXES = ['\\\\Nas-1\\', '\\\\Nas-3\\'];
+const ALLOWED_NAS_HOSTS = new Set(['nas-1', 'nas-3']);
 
 export function isAllowedNasPath(targetPath: string): boolean {
-  return ALLOWED_NAS_PREFIXES.some((prefix) =>
-    targetPath.toLowerCase().startsWith(prefix.toLowerCase())
-  );
+  if (!targetPath.startsWith('\\\\')) return false;
+  const host = targetPath.slice(2).split('\\', 1)[0]?.toLowerCase();
+  return Boolean(host && ALLOWED_NAS_HOSTS.has(host));
 }
 
 // 開発モードかどうか
 export const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
-const ALLOWED_EXTERNAL_PROTOCOLS = ['https:', 'http:', 'mailto:'];
+const ALLOWED_EXTERNAL_PROTOCOLS = ['https:'];
 
 export async function openExternalUrl(url: string): Promise<boolean> {
   try {

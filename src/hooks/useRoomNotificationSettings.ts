@@ -13,14 +13,15 @@ import {
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 
-export function useRoomNotificationSettings() {
+export function useRoomNotificationSettings(enabled = true) {
   const { currentUser } = useAuth();
+  const currentUserId = currentUser?.uid ?? null;
   const [mutedRooms, setMutedRooms] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
   // Firestoreからミュート設定を購読
   useEffect(() => {
-    if (!currentUser) {
+    if (!currentUserId || !enabled) {
       // ログアウト時に購読対象がなくなるため state をリセット
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setMutedRooms(new Set());
@@ -28,7 +29,7 @@ export function useRoomNotificationSettings() {
       return;
     }
 
-    const settingsRef = collection(db, 'users', currentUser.uid, 'notificationSettings');
+    const settingsRef = collection(db, 'users', currentUserId, 'notificationSettings');
 
     const unsubscribe = onSnapshot(settingsRef, (snapshot) => {
       const muted = new Set<string>();
@@ -46,7 +47,7 @@ export function useRoomNotificationSettings() {
     });
 
     return () => unsubscribe();
-  }, [currentUser]);
+  }, [currentUserId, enabled]);
 
   // ルームのミュート状態を確認
   const isRoomMuted = useCallback((roomId: string): boolean => {
@@ -55,9 +56,9 @@ export function useRoomNotificationSettings() {
 
   // ミュート状態をトグル
   const toggleMute = useCallback(async (roomId: string): Promise<void> => {
-    if (!currentUser) return;
+    if (!currentUserId) return;
 
-    const settingRef = doc(db, 'users', currentUser.uid, 'notificationSettings', roomId);
+    const settingRef = doc(db, 'users', currentUserId, 'notificationSettings', roomId);
     const isMuted = mutedRooms.has(roomId);
 
     try {
@@ -77,7 +78,7 @@ export function useRoomNotificationSettings() {
       console.error('[useRoomNotificationSettings] トグルエラー:', error);
       throw error;
     }
-  }, [currentUser, mutedRooms]);
+  }, [currentUserId, mutedRooms]);
 
   return {
     mutedRooms,

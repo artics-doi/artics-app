@@ -58,13 +58,20 @@ export default function GroupEditModal({
     onSavingGroupChange(true);
     try {
       let photoURL = chatRoom.photoURL ?? null;
+      let photoStoragePath = chatRoom.photoStoragePath ?? null;
+      let photoFileSize = chatRoom.photoFileSize ?? null;
 
       if (editGroupImage && editGroupImage.startsWith('data:')) {
         const response = await fetch(editGroupImage);
         const blob = await response.blob();
         const timestamp = Date.now();
-        const storageRef = ref(storage, `groupImages/${roomId}_${timestamp}`);
-        await uploadBytes(storageRef, blob);
+        photoStoragePath = `groupImages/${roomId}/group_${timestamp}`;
+        photoFileSize = blob.size;
+        const storageRef = ref(storage, photoStoragePath);
+        await uploadBytes(storageRef, blob, {
+          cacheControl: 'public, max-age=604800',
+          contentType: blob.type || 'image/jpeg',
+        });
         photoURL = await getDownloadURL(storageRef);
       }
 
@@ -72,6 +79,8 @@ export default function GroupEditModal({
       await updateDoc(doc(db, 'chatRooms', roomId), {
         name: trimmedName,
         photoURL,
+        photoStoragePath,
+        photoFileSize,
         updatedAt: serverTimestamp()
       });
 

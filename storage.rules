@@ -2,10 +2,29 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
+    // 重要: Storage ルールから Firestore を参照できるのは「1 回の評価で最大 2 ドキュメント」
+    // という公式上限がある（cross-service rules の制限）。この上限を超えると本番でのみ
+    // 全アップロードが拒否される（emulator は上限を再現しない）。
+    // また、firestore.get / firestore.exists を使うルールにはサービスエージェントへの
+    // roles/firebaserules.firestoreServiceAgent 付与が必要。CLI は対話実行時のみ付与を提案する。
+    // そのため各 match の評価で参照する Firestore ドキュメントは 1 つに抑える:
+    // - チャット系パス: chatRooms/{roomId} のみ（lifecycleState 判定は Firestore ルール側が担う）
+    // - profileImages: users/{uid} のみ
     function signedIn() {
       return request.auth != null;
     }
 
+    function isActiveUserData(data) {
+      return !('lifecycleState' in data) || data.lifecycleState == 'active';
+    }
+
+    // users/{uid} を 1 get だけで参照する。ドキュメントが無い場合は get がエラー → 拒否。
+    function activeUser() {
+      return signedIn() &&
+        isActiveUserData(firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data);
+    }
+
+    // 管理者判定はトークンのみで行い、Firestore を読まない
     function isAdmin() {
       return signedIn() &&
         'admin' in request.auth.token &&
@@ -24,32 +43,52 @@ service firebase.storage {
       return firestore.exists(roomPath(roomId));
     }
 
+    // チャット系パスでは users を参照しない（参照上限対策。旧ルールで実績のある形）
     function isRoomMember(roomId) {
       return signedIn() &&
         roomExists(roomId) &&
         request.auth.uid in firestore.get(roomPath(roomId)).data.members;
     }
 
+    function roomAcceptsWrites(roomId) {
+      return roomExists(roomId) &&
+        firestore.get(roomPath(roomId)).data.get('deletionState', 'active') == 'active';
+    }
+
+    function validFileUpload() {
+      return request.resource.size <= 25 * 1024 * 1024 &&
+        request.resource.contentType.matches('^(image|video|audio|text)/.*|^application/(pdf|zip|x-zip-compressed|msword|vnd\\.openxmlformats-officedocument.*|vnd\\.ms-.*|octet-stream)$');
+    }
+
+    function validImageUpload(maxBytes) {
+      return request.resource.size <= maxBytes && request.resource.contentType.matches('^image/.*');
+    }
+
     match /chatFiles/{roomId}/{filePath=**} {
-      allow read, write, delete: if isAdmin() || isRoomMember(roomId);
+      allow read, delete: if isAdmin() || isRoomMember(roomId);
+      allow create, update: if (isAdmin() || isRoomMember(roomId)) && roomAcceptsWrites(roomId) && validFileUpload();
     }
 
     match /chatImages/{roomId}/{filePath=**} {
-      allow read, write, delete: if isAdmin() || isRoomMember(roomId);
+      allow read, delete: if isAdmin() || isRoomMember(roomId);
+      allow create, update: if (isAdmin() || isRoomMember(roomId)) && roomAcceptsWrites(roomId) && validImageUpload(10 * 1024 * 1024);
     }
 
     match /groupImages/{roomId}/{filePath=**} {
-      allow read, write, delete: if isAdmin() || isRoomMember(roomId);
+      allow read, delete: if isAdmin() || isRoomMember(roomId);
+      allow create, update: if (isAdmin() || isRoomMember(roomId)) && roomAcceptsWrites(roomId) && validImageUpload(5 * 1024 * 1024);
     }
 
     match /profileImages/{userId} {
-      allow read: if signedIn();
-      allow write, delete: if isAdmin() || isSelf(userId);
+      allow read: if activeUser();
+      allow delete: if isAdmin() || (isSelf(userId) && activeUser());
+      allow create, update: if (isAdmin() || (isSelf(userId) && activeUser())) && validImageUpload(5 * 1024 * 1024);
     }
 
     match /profileImages/{userId}/{filePath=**} {
-      allow read: if signedIn();
-      allow write, delete: if isAdmin() || isSelf(userId);
+      allow read: if activeUser();
+      allow delete: if isAdmin() || (isSelf(userId) && activeUser());
+      allow create, update: if (isAdmin() || (isSelf(userId) && activeUser())) && validImageUpload(5 * 1024 * 1024);
     }
   }
 }

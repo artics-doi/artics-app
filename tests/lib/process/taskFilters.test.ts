@@ -17,10 +17,13 @@ function makeTask(partial: Partial<Task>): Task {
     assigneeIds: [],
     startDate: null,
     endDate: null,
+    completedDate: null,
+    completionChecked: false,
     description: '',
     order: 'a0',
     ganttOrder: 'a0',
     archived: false,
+    isArchived: false,
     createdBy: 'u',
     createdByName: 'U',
     createdAt: null,
@@ -101,6 +104,14 @@ describe('taskMatchesFilters', () => {
     expect(taskMatchesFilters(missingTask, { ...EMPTY_TASK_FILTERS, dateFilter: 'complete' })).toBe(false);
     expect(taskMatchesFilters(missingTask, { ...EMPTY_TASK_FILTERS, dateFilter: 'missing' })).toBe(true);
     expect(taskMatchesFilters(missingTask, { ...EMPTY_TASK_FILTERS, missingOnly: true })).toBe(true);
+  });
+
+  test('個別アーカイブは既定で除外し、込み表示とアーカイブ表示を切り替える', () => {
+    const archivedTask = makeTask({ id: 'archived', isArchived: true });
+    expect(taskMatchesFilters(archivedTask, EMPTY_TASK_FILTERS)).toBe(false);
+    expect(taskMatchesFilters(archivedTask, { ...EMPTY_TASK_FILTERS, archiveMode: 'all' })).toBe(true);
+    expect(taskMatchesFilters(archivedTask, { ...EMPTY_TASK_FILTERS, archiveMode: 'archived' })).toBe(true);
+    expect(taskMatchesFilters(completeTask, { ...EMPTY_TASK_FILTERS, archiveMode: 'archived' })).toBe(false);
   });
 });
 

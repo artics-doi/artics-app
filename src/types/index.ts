@@ -7,6 +7,9 @@ export interface User {
   displayName: string;
   photoURL: string | null;
   createdAt: Date;
+  lifecycleState?: 'active' | 'disabling' | 'deleted';
+  lifecycleVersion?: number;
+  activeOperationId?: string;
 }
 
 // チャットルーム
@@ -14,8 +17,12 @@ export interface ChatRoom {
   id: string;
   name: string;                    // グループ名（1対1の場合は空）
   type: 'direct' | 'group' | 'memo'; // 1対1 or グループ or メモ
+  createdBy?: string;               // direct/group の作成者。旧データは members[0] で補完
+  deletionState?: 'active' | 'deleting' | 'delete_failed';
   directKey?: string;              // 1対1チャットの重複防止キー
   photoURL?: string | null;        // グループ画像URL
+  photoStoragePath?: string | null; // グループ画像のFirebase Storage path
+  photoFileSize?: number | null;    // グループ画像のStorage上の実サイズ
   members: string[];               // メンバーのUID配列
   memberDetails: {                 // メンバーの詳細情報
     [uid: string]: {

@@ -32,7 +32,7 @@ describe('createInitialForm', () => {
     const form = createInitialForm(d(2026, 6, 11));
     expect(form).toEqual({
       title: '',
-      categoryId: 'vacation',
+      categoryId: '',
       targetUserIds: [],
       startDate: '2026-06-11',
       startTime: '09:00',
@@ -41,7 +41,8 @@ describe('createInitialForm', () => {
       allDay: true,
       memo: '',
       notifyEnabled: false,
-      notifyTiming: 'sameDayMorning',
+      notifyRecipientScope: 'targets',
+      notifyTiming: 'atStart',
       customNotifyDate: '2026-06-11',
       customNotifyTime: '08:30',
     });
@@ -57,7 +58,17 @@ describe('createInitialForm', () => {
     expect(form.endTime).toBe('17:30');
     expect(form.allDay).toBe(false);
     expect(form.notifyEnabled).toBe(true);
-    expect(form.notifyTiming).toBe('previousDayEvening');
+    expect(form.notifyRecipientScope).toBe('targets');
+    expect(form.notifyTiming).toBe('atStart');
+  });
+
+  test('全員通知の設定を編集時に引き継ぐ', () => {
+    const form = createInitialForm(
+      d(2026, 6, 11),
+      event({ notification: { enabled: true, recipientScope: 'all', timings: ['atStart'], customAt: null } }),
+    );
+    expect(form.notifyEnabled).toBe(true);
+    expect(form.notifyRecipientScope).toBe('all');
   });
 
   test('終日イベントの編集時は時刻がデフォルトに戻る', () => {

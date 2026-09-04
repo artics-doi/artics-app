@@ -16,6 +16,11 @@ interface UpdateCheckResult {
   error?: boolean;
 }
 
+interface WindowControlsState {
+  maximized: boolean;
+  compact: boolean;
+}
+
 // レンダラープロセスに公開するAPI
 const electronAPI = {
   // アプリバージョンを取得
@@ -39,7 +44,7 @@ const electronAPI = {
   },
 
   // 通知を表示（roomIdを含む）
-  showNotification: (options: { title: string; body: string; roomId?: string; kind?: 'chat' | 'schedule' }): Promise<boolean> => {
+  showNotification: (options: { title: string; body: string; roomId?: string; scheduleId?: string; kind?: 'chat' | 'schedule' }): Promise<boolean> => {
     return ipcRenderer.invoke('show-notification', options);
   },
 
@@ -58,10 +63,32 @@ const electronAPI = {
     return ipcRenderer.invoke('set-titlebar-theme', theme);
   },
 
+  // タスクバーの未読件数バッジを更新（count が 0 のときは iconDataUrl に null を渡す）
+  setUnreadBadge: (count: number, iconDataUrl: string | null): Promise<boolean> => {
+    return ipcRenderer.invoke('set-unread-badge', count, iconDataUrl);
+  },
+
   // Electron環境かどうかを確認
   isElectron: (): Promise<boolean> => {
     return ipcRenderer.invoke('is-electron');
   },
+
+  // 予定表・工程管理を表示できる幅までメインウィンドウを広げる
+  expandToWorkspace: (): Promise<boolean> => {
+    return ipcRenderer.invoke('expand-to-workspace');
+  },
+
+  getWindowControlsState: (): Promise<WindowControlsState> => {
+    return ipcRenderer.invoke('get-window-controls-state');
+  },
+
+  minimizeWindow: (): Promise<boolean> => ipcRenderer.invoke('window-minimize'),
+
+  toggleMaximizeWindow: (): Promise<WindowControlsState> => ipcRenderer.invoke('window-toggle-maximize'),
+
+  closeWindow: (): Promise<boolean> => ipcRenderer.invoke('window-close'),
+
+  toggleChatCompact: (): Promise<WindowControlsState> => ipcRenderer.invoke('toggle-chat-compact'),
 
   // 外部リンクを開く
   openExternal: (url: string): Promise<boolean> => {
@@ -97,6 +124,30 @@ const electronAPI = {
     return () => {
       ipcRenderer.removeListener('navigate-to-room', listener);
     };
+  },
+
+  // 予定遷移のリスナー
+  onNavigateToSchedule: (callback: (scheduleId: string) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, scheduleId: string) => {
+      callback(scheduleId);
+    };
+    ipcRenderer.on('navigate-to-schedule', listener);
+
+    return () => {
+      ipcRenderer.removeListener('navigate-to-schedule', listener);
+    };
+  },
+
+  onNavigateToChatList: (callback: () => void) => {
+    const listener = () => callback();
+    ipcRenderer.on('navigate-to-chat-list', listener);
+    return () => ipcRenderer.removeListener('navigate-to-chat-list', listener);
+  },
+
+  onWindowControlsStateChanged: (callback: (state: WindowControlsState) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, state: WindowControlsState) => callback(state);
+    ipcRenderer.on('window-controls-state-changed', listener);
+    return () => ipcRenderer.removeListener('window-controls-state-changed', listener);
   }
 };
 

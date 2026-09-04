@@ -30,10 +30,13 @@ function task(overrides: Partial<Task>): Task {
     assigneeIds: [],
     startDate: null,
     endDate: null,
+    completedDate: null,
+    completionChecked: false,
     description: '',
     order: 'a0',
     ganttOrder: 'a0',
     archived: false,
+    isArchived: false,
     createdBy: 'u1',
     createdByName: 'User',
     createdAt: null,
@@ -77,6 +80,29 @@ describe('process gantt adapter', () => {
 
     expect(result.tasks).toHaveLength(0);
     expect(result.unscheduledTasks[0].id).toBe('unscheduled');
+  });
+
+  it('予定終了日より早い完了日はガントバーの通常色割合に変換する', () => {
+    const result = toProcessGanttData(
+      [
+        task({
+          id: 'early-completed',
+          columnId: 'done',
+          startDate: new Date(2026, 5, 15),
+          endDate: new Date(2026, 5, 24),
+          completedDate: new Date(2026, 5, 20),
+        }),
+      ],
+      columns,
+      members,
+    );
+
+    expect(result.tasks[0]).toMatchObject({
+      processStatus: 'done',
+      completedDate: new Date(2026, 5, 20),
+      plannedEndDate: new Date(2026, 5, 24),
+    });
+    expect(result.tasks[0].earlyCompletionSolidPercent).toBeCloseTo(60);
   });
 
   it('保留列のタスクは保留ステータスとガント色クラスに変換する', () => {

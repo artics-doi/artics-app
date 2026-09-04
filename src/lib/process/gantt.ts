@@ -20,6 +20,9 @@ export interface ProcessGanttTask extends ITask {
   processStatus: 'todo' | 'doing' | 'done' | 'hold';
   ganttOrder: string;
   css: string;
+  completedDate?: Date | null;
+  plannedEndDate?: Date;
+  earlyCompletionSolidPercent?: number | null;
 }
 
 export interface GanttAdapterResult {
@@ -56,6 +59,22 @@ function assigneeTextOf(task: Task, memberById: Map<string, ProcessMember>): str
   return task.assigneeIds.map((id) => memberById.get(id)?.name ?? '不明な担当者').join(', ');
 }
 
+export function earlyCompletionSolidPercent(range: { start: Date; end: Date }, completedDate: Date | null): number | null {
+  if (!completedDate) return null;
+  const completed = startOfDay(completedDate);
+  if (completed.getTime() >= startOfDay(range.end).getTime()) return null;
+
+  const rangeStart = startOfDay(range.start);
+  const rangeEnd = startOfDay(range.end);
+  const clampedCompleted = completed.getTime() < rangeStart.getTime() ? rangeStart : completed;
+  const totalDays = Math.max(1, Math.round((rangeEnd.getTime() - rangeStart.getTime()) / 86400000) + 1);
+  const completedDays = Math.max(
+    1,
+    Math.round((clampedCompleted.getTime() - rangeStart.getTime()) / 86400000) + 1,
+  );
+  return Math.min(100, Math.max(0, (completedDays / totalDays) * 100));
+}
+
 export function toProcessGanttData(
   tasks: readonly Task[],
   columns: readonly ProjectColumn[],
@@ -75,6 +94,7 @@ export function toProcessGanttData(
     const column = columnOf(task, columns);
     const columnName = column?.name ?? columnNameOf(task, columns);
     const processStatus = taskStatusFromColumn(column);
+    const earlyPercent = earlyCompletionSolidPercent(range, task.completedDate);
     ganttTasks.push({
       id: task.id,
       sourceTaskId: task.id,
@@ -91,6 +111,9 @@ export function toProcessGanttData(
       processStatus,
       ganttOrder: task.ganttOrder,
       css: `articsGanttTask-${processStatus}`,
+      completedDate: task.completedDate,
+      plannedEndDate: startOfDay(range.end),
+      earlyCompletionSolidPercent: earlyPercent,
       open: false,
     });
   }

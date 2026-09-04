@@ -13,6 +13,7 @@ interface NewChatModalProps {
   onClose: () => void;
   onStartDirectChat: (user: User) => void;
   onShowNewGroup: () => void;
+  startingUserId?: string | null;
 }
 
 type Step = 'select-type' | 'select-user';
@@ -23,6 +24,7 @@ export default function NewChatModal({
   onClose,
   onStartDirectChat,
   onShowNewGroup,
+  startingUserId = null,
 }: NewChatModalProps) {
   const { modalProps } = useModal({ isOpen, onClose });
   const [step, setStep] = useState<Step>('select-type');
@@ -108,9 +110,21 @@ export default function NewChatModal({
                     type="button"
                     className={styles.userItem}
                     onClick={() => onStartDirectChat(user)}
+                    disabled={startingUserId !== null}
+                    aria-busy={startingUserId === user.uid}
                   >
-                    <span className={styles.userAvatar} aria-hidden="true"></span>
-                    <span className={styles.userName}>{user.displayName}</span>
+                    <span className={styles.userAvatar} aria-hidden="true">
+                      {user.photoURL ? (
+                        <img src={user.photoURL} alt="" className={styles.userAvatarImage} />
+                      ) : (
+                        <span className={styles.userAvatarInitial}>
+                          {user.displayName.trim().slice(0, 1).toUpperCase() || 'U'}
+                        </span>
+                      )}
+                    </span>
+                    <span className={styles.userName}>
+                      {startingUserId === user.uid ? 'チャットを開いています…' : user.displayName}
+                    </span>
                   </button>
                 ))
               )}

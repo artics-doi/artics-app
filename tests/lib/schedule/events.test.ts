@@ -5,7 +5,9 @@ import {
   copyScheduleToDate,
   eventIntersectsDay,
   eventIntersectsRange,
+  formatEventTargetsTitle,
   formatEventTime,
+  getEventTargetPreview,
   getDayMultiLaneCount,
   getEventDurationDays,
   getSingleDayEventsForOrder,
@@ -63,17 +65,42 @@ describe('期間判定', () => {
 describe('formatEventTime', () => {
   test('終日単日は「終日」、終日複数日は日付範囲', () => {
     expect(formatEventTime(event())).toBe('終日');
-    expect(formatEventTime(event({ endAt: d(2026, 6, 12) }))).toBe('6月10日 - 6月12日');
+    expect(formatEventTime(event({ endAt: d(2026, 6, 12) }))).toBe('6/10 ～ 6/12');
+    expect(formatEventTime(event({ startAt: d(2026, 12, 31), endAt: d(2027, 1, 1) }))).toBe(
+      '2026/12/31 ～ 2027/1/1',
+    );
   });
 
-  test('時刻指定は HH:mm 範囲、日またぎは終了側に日付つき', () => {
+  test('時刻指定は開始日を明示し、日またぎは両側の日付を表示する', () => {
     expect(formatEventTime(event({ allDay: false, startAt: d(2026, 6, 10, 9), endAt: d(2026, 6, 10, 12) }))).toBe(
-      '09:00 - 12:00',
+      '6/10 09:00 ～ 12:00',
     );
     expect(formatEventTime(event({ allDay: false, startAt: d(2026, 6, 10, 22), endAt: d(2026, 6, 11, 1) }))).toBe(
-      '22:00 - 6月11日 01:00',
+      '6/10 22:00 ～ 6/11 01:00',
+    );
+    expect(formatEventTime(event({ allDay: false, startAt: d(2026, 12, 31, 22), endAt: d(2027, 1, 1, 13) }))).toBe(
+      '2026/12/31 22:00 ～ 2027/1/1 13:00',
     );
     expect(formatEventTime(event({ allDay: false, startAt: d(2026, 6, 10, 9) }))).toBe('09:00');
+  });
+});
+
+describe('getEventTargetPreview', () => {
+  test('対象者は先頭2人と残り人数に分ける', () => {
+    expect(getEventTargetPreview([])).toEqual({ visibleNames: [], remainingCount: 0 });
+    expect(getEventTargetPreview(['岡谷', '安井'])).toEqual({
+      visibleNames: ['岡谷', '安井'],
+      remainingCount: 0,
+    });
+    expect(getEventTargetPreview(['岡谷', '安井', '村尾', '木本'])).toEqual({
+      visibleNames: ['岡谷', '安井'],
+      remainingCount: 2,
+    });
+  });
+
+  test('ツールチップ用は全員を表示し、空の名前は除外する', () => {
+    expect(formatEventTargetsTitle([' 岡谷 ', '', '安井'])).toBe('対象：岡谷、安井');
+    expect(formatEventTargetsTitle(['  '])).toBe('対象：未設定');
   });
 });
 
@@ -199,7 +226,7 @@ describe('copyScheduleToDate', () => {
       notification: { enabled: false, timings: ['sameDayMorning'], customAt: d(2026, 6, 9, 8, 30) },
     });
     const input = copyScheduleToDate(source, d(2026, 6, 20));
-    expect(input.notification).toEqual({ enabled: false, timings: [], customAt: null });
+    expect(input.notification).toEqual({ enabled: false, recipientScope: 'targets', timings: [], customAt: null });
   });
 
   test('カスタム通知は開始日との日数差を維持してシフト', () => {
@@ -209,5 +236,14 @@ describe('copyScheduleToDate', () => {
     });
     const input = copyScheduleToDate(source, d(2026, 6, 20));
     expect(input.notification.customAt).toEqual(d(2026, 6, 22, 8, 30));
+  });
+
+  test('予定保存時すぐの通知はコピー保存時刻へ更新する', () => {
+    const savedAt = d(2026, 6, 15, 14, 20);
+    const source = event({
+      notification: { enabled: true, timings: ['atStart'], customAt: d(2026, 6, 10, 9, 0) },
+    });
+    const input = copyScheduleToDate(source, d(2026, 6, 20), savedAt);
+    expect(input.notification.customAt).toEqual(savedAt);
   });
 });

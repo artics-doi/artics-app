@@ -46,6 +46,8 @@ interface ChatMessageListProps {
   setShowReadDetail: Dispatch<SetStateAction<{ messageId: string; readBy: string[] } | null>>;
   setPreviewImage: Dispatch<SetStateAction<{ url: string; fileName: string } | null>>;
   copyMessageText: (text: string) => void;
+  openScheduleFromMessage: (message: ExtendedMessage) => void;
+  openTaskFromMessage: (message: ExtendedMessage) => void;
   togglePin: (messageId: string) => void;
   openDeleteMessageConfirm: (messageId: string) => void;
   saveEdit: (messageId: string) => void;
@@ -86,6 +88,8 @@ export default function ChatMessageList({
   setShowReadDetail,
   setPreviewImage,
   copyMessageText,
+  openScheduleFromMessage,
+  openTaskFromMessage,
   togglePin,
   openDeleteMessageConfirm,
   saveEdit,
@@ -208,6 +212,8 @@ export default function ChatMessageList({
                           className={`${styles.messageMenu} ${menuPosition.vertical === 'below' ? styles.menuBelow : ''}`}
                           data-menu-horizontal={menuPosition.horizontal}
                           onClick={(e) => e.stopPropagation()}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onPointerUp={(e) => e.stopPropagation()}
                         >
                           <button onClick={() => {
                             setReplyingTo(message);
@@ -220,6 +226,22 @@ export default function ChatMessageList({
                             <button onClick={() => copyMessageText(message.text)}>
                               コピー
                             </button>
+                          )}
+                          {!message.isDeleted && message.text && (
+                            <>
+                              <button onClick={() => {
+                                openScheduleFromMessage(message);
+                                setShowMessageMenu(null);
+                              }}>
+                                予定に追加
+                              </button>
+                              <button onClick={() => {
+                                openTaskFromMessage(message);
+                                setShowMessageMenu(null);
+                              }}>
+                                タスクに追加
+                              </button>
+                            </>
                           )}
                           <button onClick={() => {
                             setMenuPosition(calculateMenuPosition(message.id));

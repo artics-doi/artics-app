@@ -55,7 +55,7 @@ export function useProjects(currentUser: FirebaseUser | null, status: ProjectSta
           snapshot.docs
             .map((item) => toProject(item.id, item.data()))
             // pendingDelete のものは削除処理中なので一覧から隠す
-            .filter((p) => p.pendingDelete !== true),
+            .filter((p) => p.pendingDelete !== true && p.lifecycleState !== 'deleting'),
         );
         setLoading(false);
         setError(null);
@@ -111,14 +111,25 @@ export function useProjects(currentUser: FirebaseUser | null, status: ProjectSta
     [currentUser],
   );
 
-  // 削除リクエスト: pendingDelete:true を立てるだけ。物理削除は Cloud Function。
+  // 削除リクエストはversion付き状態遷移として記録し、物理削除はCloud Functionが行う。
   const requestDeleteProject = useCallback(
     async (projectId: string) => {
       if (!currentUser) throw new Error('ログインが必要です');
       console.info('[Process] requestDeleteProject', { projectId, by: currentUser.uid });
-      await updateDoc(doc(db, PROCESS_COLLECTIONS.projects, projectId), {
-        pendingDelete: true,
-        updatedAt: serverTimestamp(),
+      const projectRef = doc(db, PROCESS_COLLECTIONS.projects, projectId);
+      await runTransaction(db, async (tx) => {
+        const snapshot = await tx.get(projectRef);
+        if (!snapshot.exists()) throw new Error('プロジェクトが見つかりません');
+        const data = snapshot.data();
+        const lifecycleState = data.lifecycleState ?? 'active';
+        const lifecycleVersion = typeof data.lifecycleVersion === 'number' ? data.lifecycleVersion : 0;
+        if (lifecycleState !== 'active') throw new Error('プロジェクトは既に削除処理中です');
+        tx.update(projectRef, {
+          lifecycleState: 'deleting',
+          lifecycleVersion: lifecycleVersion + 1,
+          operationId: crypto.randomUUID(),
+          updatedAt: serverTimestamp(),
+        });
       });
     },
     [currentUser],

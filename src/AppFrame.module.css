@@ -1,0 +1,20 @@
+.webContent {
+  min-height: 100vh;
+}
+
+.electronContent {
+  position: relative;
+  width: 100%;
+  height: calc(100vh - 38px);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.electronContent > * {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+}

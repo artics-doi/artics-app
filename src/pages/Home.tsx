@@ -1,11 +1,10 @@
 // ホーム画面（チャット一覧）
 
-import { useState, useMemo, useRef } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   collection,
   query,
-  where,
   orderBy,
   limit,
   serverTimestamp,
@@ -14,9 +13,6 @@ import {
   getDoc,
   setDoc,
   updateDoc,
-  deleteDoc,
-  deleteField,
-  writeBatch,
   arrayUnion,
   arrayRemove
 } from 'firebase/firestore';
@@ -33,31 +29,51 @@ import { useNotificationDiagnostics } from '../hooks/useNotificationDiagnostics'
 import { useRoomNotificationSettings } from '../hooks/useRoomNotificationSettings';
 import { useUsers } from '../hooks/useUsers';
 import { useInviteMembers } from '../hooks/useInviteMembers';
-import { useHomeModals } from '../hooks/useHomeModals';
+import { useHomeModals, type HomeModalName } from '../hooks/useHomeModals';
 import { useChatRooms } from '../hooks/useChatRooms';
+import { useSchedules } from '../hooks/useSchedules';
+import { useAllProcessTasks } from '../hooks/process/useAllProcessTasks';
+import { useProjects } from '../hooks/process/useProjects';
 import { useTheme } from '../hooks/useTheme';
 import { useReleaseNotes } from '../hooks/useReleaseNotes';
 import { useStorageUsage } from '../hooks/useStorageUsage';
 import { useAppVersion } from '../hooks/useAppVersion';
 import { useAlwaysOnTop } from '../hooks/useAlwaysOnTop';
-import { ChatRoomList } from '../components/home';
+import { ChatRoomList, MobileTabBar } from '../components/home';
 import type { User } from '../types';
-import { getDirectRoomId, getDirectRoomKey, getRoomDisplayName, getUnreadCount } from '../utils/room';
+import { getDirectRoomId, getDirectRoomKey, getRoomDisplayName, getUnreadCount, isDirectRoomForUsers } from '../utils/room';
 import { handleGroupImageChange as convertGroupImageToBase64 } from '../utils/image';
-import { SEARCH_LIMIT_PER_ROOM, SEARCH_RESULTS_LIMIT, FIRESTORE_BATCH_LIMIT } from '../constants';
+import { SEARCH_LIMIT_PER_ROOM, SEARCH_RESULTS_LIMIT } from '../constants';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import {
+  searchMessages as searchGlobalMessages,
+  searchSchedules,
+  searchTasks,
+  sortGlobalSearchResults,
+  type GlobalSearchResult,
+  type SearchableMessage,
+} from '../lib/search/globalSearch';
 import styles from './Home.module.css';
 import { SettingsModal, ThemeModal, ProfileEditModal, NotificationSettingsModal, ReleaseNotesModal, ReleaseNotesEditModal, StorageEditModal, SearchModal, NewChatModal, NewGroupModal, InviteMemberModal, DeleteRoomConfirmModal, UsersListModal, UserManagementModal, UserEditModal, DeleteUserConfirmModal } from '../components/home/modals';
+import { requestUserDeletion, watchUserDeletion } from '../lib/userLifecycle/client';
+import { canDeleteChatRoom } from '../lib/chat/roomDeletion';
+import { deleteChatRoom } from '../lib/chat/roomDeletionClient';
 
 export default function Home() {
   const { currentUser, isAdmin, logout } = useAuth();
-  const { chatRooms, loading } = useChatRooms(currentUser);
   const { modals, openModal, closeModal } = useHomeModals();
+  const { chatRooms, loading } = useChatRooms(currentUser);
+  const searchUser = modals.showSearch ? currentUser : null;
+  const { schedules } = useSchedules(searchUser);
+  const { tasks: allProcessTasks } = useAllProcessTasks(searchUser);
+  const { projects: activeProjects } = useProjects(searchUser, 'active');
+  const { projects: archivedProjects } = useProjects(searchUser, 'archived');
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<{ roomId: string; roomName: string; messageId: string; text: string; senderName: string; timestamp: Date }[]>([]);
+  const [searchResults, setSearchResults] = useState<GlobalSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [inviteRoomId, setInviteRoomId] = useState<string | null>(null);
   const [deleteRoomId, setDeleteRoomId] = useState<string | null>(null);
+  const [startingDirectUserId, setStartingDirectUserId] = useState<string | null>(null);
   // M-16: 削除実行中フラグ
   const [isDeletingRoom, setIsDeletingRoom] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
@@ -82,10 +98,16 @@ export default function Home() {
   const [selectedUserForEdit, setSelectedUserForEdit] = useState<User | null>(null);
   const [editUserName, setEditUserName] = useState('');
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [userDeletionState, setUserDeletionState] = useState<string | null>(null);
+  const userDeletionUnsubscribeRef = useRef<(() => void) | null>(null);
 
   const { showToast } = useToast();
   const navigate = useNavigate();
   const { users, fetchUsers } = useUsers();
+
+  useEffect(() => () => {
+    userDeletionUnsubscribeRef.current?.();
+  }, []);
   const {
     selectedUsers: inviteSelectedUsers,
     setSelectedUsers: setInviteSelectedUsers,
@@ -119,53 +141,67 @@ export default function Home() {
 
   // 1対1チャットを作成または開く
   async function startDirectChat(otherUser: User) {
-    if (!currentUser) return;
+    if (!currentUser || startingDirectUserId) return;
+    setStartingDirectUserId(otherUser.uid);
     const directRoomId = getDirectRoomId(currentUser.uid, otherUser.uid);
     const directKey = getDirectRoomKey(currentUser.uid, otherUser.uid);
 
-    // 既存のチャットルームを探す
-    const existingRoom = chatRooms.find(
-      room => room.type === 'direct' &&
-        (room.id === directRoomId || room.directKey === directKey ||
-        (room.members.includes(otherUser.uid) &&
-        room.members.includes(currentUser.uid)
-        ))
-    );
+    try {
+      const existingRoom = chatRooms.find(
+        room => room.type === 'direct' &&
+          (room.id === directRoomId || room.directKey === directKey ||
+            isDirectRoomForUsers(room, currentUser.uid, otherUser.uid))
+      );
 
-    if (existingRoom) {
-      navigate(`/chat/${existingRoom.id}`);
-      return;
-    }
+      if (existingRoom) {
+        closeModal('showNewChat');
+        navigate(`/chat/${existingRoom.id}`);
+        return;
+      }
 
-    // 新しいチャットルームを作成
-    const newRoom = {
-      name: '',
-      type: 'direct',
-      members: [currentUser.uid, otherUser.uid],
-      memberDetails: {
-        [currentUser.uid]: {
-          displayName: currentUser.displayName || 'Unknown',
-          photoURL: currentUser.photoURL
+      const newRoom = {
+        name: '',
+        type: 'direct',
+        createdBy: currentUser.uid,
+        deletionState: 'active',
+        members: [currentUser.uid, otherUser.uid],
+        memberDetails: {
+          [currentUser.uid]: {
+            displayName: currentUser.displayName || 'Unknown',
+            photoURL: currentUser.photoURL
+          },
+          [otherUser.uid]: {
+            displayName: otherUser.displayName,
+            photoURL: otherUser.photoURL
+          }
         },
-        [otherUser.uid]: {
-          displayName: otherUser.displayName,
-          photoURL: otherUser.photoURL
-        }
-      },
-      directKey,
-      lastMessage: null,
-      unreadCounts: {},
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    };
+        directKey,
+        lastMessage: null,
+        unreadCounts: {},
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
 
-    const roomRef = doc(db, 'chatRooms', directRoomId);
-    const roomSnap = await getDoc(roomRef);
-    if (!roomSnap.exists()) {
-      await setDoc(roomRef, newRoom);
+      const roomRef = doc(db, 'chatRooms', directRoomId);
+      try {
+        // 存在しないルームへの事前 read はルールで拒否されるため、まず create を試す。
+        await setDoc(roomRef, newRoom);
+      } catch (createError) {
+        // 購読反映前に既存ルームが見つからなかった競合時だけ、既存文書を確認して開く。
+        const roomSnap = await getDoc(roomRef);
+        const roomData = roomSnap.data();
+        if (!roomSnap.exists() || !roomData || !isDirectRoomForUsers(roomData, currentUser.uid, otherUser.uid)) {
+          throw createError;
+        }
+      }
+      closeModal('showNewChat');
+      navigate(`/chat/${directRoomId}`);
+    } catch (error) {
+      console.error('1対1チャット開始エラー:', error);
+      showToast('error', 'チャットを開けませんでした。通信状態を確認して、もう一度お試しください');
+    } finally {
+      setStartingDirectUserId(null);
     }
-    navigate(`/chat/${directRoomId}`);
-    closeModal('showNewChat');
   }
 
   // グループチャットを作成
@@ -194,6 +230,8 @@ export default function Home() {
       const newRoom = {
         name: groupName.trim(),
         type: 'group',
+        createdBy: currentUser.uid,
+        deletionState: 'active',
         photoURL: null,
         photoStoragePath: null,
         photoFileSize: null,
@@ -419,37 +457,41 @@ export default function Home() {
     }
 
     try {
-      // 参加していた全ルームから members / memberDetails / unreadCounts を取り除く。
-      // 放置すると削除済みユーザーがメンバーとして残り続ける
-      const joinedRoomsSnapshot = await getDocs(
-        query(collection(db, 'chatRooms'), where('members', 'array-contains', userToDelete.uid))
+      setUserDeletionState('requested');
+      const operation = await requestUserDeletion(
+        userToDelete.uid,
+        userToDelete.lifecycleVersion ?? 0,
+        appVersion,
       );
-      const roomDocs = joinedRoomsSnapshot.docs;
-      for (let i = 0; i < roomDocs.length; i += FIRESTORE_BATCH_LIMIT) {
-        const batch = writeBatch(db);
-        roomDocs.slice(i, i + FIRESTORE_BATCH_LIMIT).forEach((roomDoc) => {
-          batch.update(roomDoc.ref, {
-            members: arrayRemove(userToDelete.uid),
-            [`memberDetails.${userToDelete.uid}`]: deleteField(),
-            [`unreadCounts.${userToDelete.uid}`]: deleteField()
-          });
-        });
-        await batch.commit();
-      }
-
-      // Firestoreからユーザードキュメントを削除
-      await deleteDoc(doc(db, 'users', userToDelete.uid));
-
-      closeModal('showDeleteUserConfirm');
-      setUserToDelete(null);
-      showToast('success', 'ユーザーを削除しました（Firebase Authからの削除は管理コンソールで行ってください）');
+      userDeletionUnsubscribeRef.current?.();
+      userDeletionUnsubscribeRef.current = watchUserDeletion(operation.operationId, (current) => {
+        setUserDeletionState(current.state);
+        if (current.state === 'completed') {
+          userDeletionUnsubscribeRef.current?.();
+          userDeletionUnsubscribeRef.current = null;
+          closeModal('showDeleteUserConfirm');
+          setUserToDelete(null);
+          setUserDeletionState(null);
+          void fetchUsers();
+          showToast('success', 'ユーザーの削除が完了しました');
+        } else if (current.state === 'failed') {
+          userDeletionUnsubscribeRef.current?.();
+          userDeletionUnsubscribeRef.current = null;
+          setUserDeletionState(null);
+          showToast('error', `ユーザー削除が停止しました: ${current.errorCode ?? 'unknown'}`);
+        }
+      });
     } catch (error) {
       console.error('ユーザー削除エラー:', error);
-      showToast('error', 'ユーザーの削除に失敗しました');
+      setUserDeletionState(null);
+      const code = (error as { code?: string }).code;
+      showToast('error', code?.includes('failed-precondition')
+        ? 'ユーザー削除を開始できません。アプリ更新または管理設定を確認してください'
+        : 'ユーザーの削除開始に失敗しました');
     }
   }
 
-  // メッセージ検索
+  // 全体検索
   async function searchMessages() {
     if (!currentUser || !searchQuery.trim()) return;
 
@@ -457,11 +499,8 @@ export default function Home() {
     setSearchResults([]);
 
     try {
-      const results: { roomId: string; roomName: string; messageId: string; text: string; senderName: string; timestamp: Date }[] = [];
-      const normalizedQuery = searchQuery.toLowerCase();
-
-      // チャットルームのメッセージを検索（メモは /memo/ 配下が正路のため対象外）
-      const targetRooms = chatRooms.filter((room) => room.type !== 'memo');
+      const searchableMessages: SearchableMessage[] = [];
+      const targetRooms = chatRooms;
       const snapshots = await Promise.all(
         targetRooms.map((room) =>
           getDocs(query(
@@ -474,27 +513,29 @@ export default function Home() {
 
       snapshots.forEach((messagesSnapshot, index) => {
         const room = targetRooms[index];
-        messagesSnapshot.forEach((doc) => {
-          const data = doc.data();
+        messagesSnapshot.forEach((messageDoc) => {
+          const data = messageDoc.data();
           const text = data.text || '';
-
-          // キーワードが含まれているか確認（大文字小文字を区別しない）
-          if (text.toLowerCase().includes(normalizedQuery)) {
-            results.push({
-              roomId: room.id,
-              roomName: getRoomDisplayName(room, currentUser?.uid),
-              messageId: doc.id,
-              text: text,
-              senderName: data.senderName || '',
-              timestamp: data.createdAt?.toDate() || data.timestamp?.toDate() || new Date()
-            });
-          }
+          searchableMessages.push({
+            id: messageDoc.id,
+            roomId: room.id,
+            roomName: getRoomDisplayName(room, currentUser.uid),
+            roomType: room.type,
+            text,
+            senderName: data.senderName || '',
+            timestamp: data.createdAt?.toDate() || data.timestamp?.toDate() || new Date(0),
+          });
         });
       });
 
-      // 新しい順にソート
-      results.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-      setSearchResults(results.slice(0, SEARCH_RESULTS_LIMIT));
+      const projectNameById = new Map(
+        [...activeProjects, ...archivedProjects].map((project) => [project.id, project.name]),
+      );
+      setSearchResults(sortGlobalSearchResults([
+        ...searchGlobalMessages(searchableMessages, searchQuery),
+        ...searchSchedules(schedules, searchQuery),
+        ...searchTasks(allProcessTasks, searchQuery, projectNameById),
+      ], SEARCH_RESULTS_LIMIT));
     } catch (error) {
       console.error('検索エラー:', error);
       showToast('error', '検索に失敗しました');
@@ -540,39 +581,28 @@ export default function Home() {
     openModal('showDeleteConfirm');
   }
 
-  // チャットルームを削除（M-16: 実行中 spinner）
+  // チャットルームをサーバー側で完全削除（M-16: 実行中 spinner）
   async function deleteRoom() {
     if (!deleteRoomId || isDeletingRoom) return;
-    if (!isAdmin) {
-      showToast('error', '管理者権限が必要です');
+    const targetRoom = chatRooms.find((room) => room.id === deleteRoomId);
+    if (!targetRoom || !canDeleteChatRoom(targetRoom, currentUser?.uid)) {
+      showToast('error', 'このルームを削除する権限がありません');
       return;
     }
 
     setIsDeletingRoom(true);
     try {
-      // メッセージを全て削除（500件ずつのバッチ。一括並列だと大量メッセージで
-      // 書き込みレート制限や部分失敗が起き、中途半端な状態で止まる）
-      const messagesSnapshot = await getDocs(
-        collection(db, 'chatRooms', deleteRoomId, 'messages')
-      );
-      const messageDocs = messagesSnapshot.docs;
-      for (let i = 0; i < messageDocs.length; i += FIRESTORE_BATCH_LIMIT) {
-        const batch = writeBatch(db);
-        messageDocs.slice(i, i + FIRESTORE_BATCH_LIMIT).forEach((msgDoc) => {
-          batch.delete(msgDoc.ref);
-        });
-        await batch.commit();
-      }
-
-      // チャットルームを削除
-      await deleteDoc(doc(db, 'chatRooms', deleteRoomId));
+      const result = await deleteChatRoom(deleteRoomId);
 
       closeModal('showDeleteConfirm');
       setDeleteRoomId(null);
+      showToast('success', result.status === 'already-deleted' ? 'ルームはすでに削除されています' : 'ルームを削除しました');
     } catch (error: unknown) {
       console.error('チャットルーム削除エラー:', error);
-      const errorMessage = error instanceof Error ? error.message : '不明なエラー';
-      showToast('error', `チャットルームの削除に失敗しました: ${errorMessage}`);
+      const code = (error as { code?: string }).code ?? '';
+      showToast('error', code.includes('permission-denied')
+        ? 'このルームを削除する権限がありません'
+        : 'ルームの完全削除に失敗しました。もう一度お試しください');
     } finally {
       setIsDeletingRoom(false);
     }
@@ -584,6 +614,11 @@ export default function Home() {
     setProfileImage(currentUser?.photoURL || null);
     closeModal('showSettings');
     openModal('showProfile');
+  }
+
+  function closeSettingsChildModal(name: HomeModalName) {
+    closeModal(name);
+    openModal('showSettings');
   }
 
   // プロフィール画像を選択
@@ -648,6 +683,26 @@ export default function Home() {
     }
   }
 
+  // スマホ幅のタブバー / FAB とヘッダーで同じ導線を共有する
+  const openNewChat = () => {
+    openModal('showNewChat');
+    void fetchUsers();
+  };
+
+  const openUsersList = () => {
+    openModal('showUsers');
+    void fetchUsers();
+  };
+
+  const openMemoRoom = () => {
+    const memoRoom = chatRooms.find(r => r.type === 'memo');
+    if (memoRoom) navigate(`/memo/${memoRoom.id}`, { state: { from: '/' } });
+  };
+
+  const openSchedule = () => {
+    navigate('/schedule', { state: { allowNarrowSchedule: true } });
+  };
+
   const inviteRoom = inviteRoomId
     ? chatRooms.find((room) => room.id === inviteRoomId) ?? null
     : null;
@@ -661,34 +716,62 @@ export default function Home() {
     <div className={styles.container}>
       {/* ヘッダー */}
       <header className={styles.header}>
+        {/* スマホ幅用のスリムヘッダー。移動系は下部タブバーと FAB に任せ、ここは検索と設定だけ */}
+        <div className={styles.mobileHeaderBar}>
+          <span className={styles.mobileHeaderTitle}>ArticsChat</span>
+          <div className={styles.mobileHeaderActions}>
+            <button
+              type="button"
+              className={styles.mobileHeaderButton}
+              onClick={() => openModal('showSearch')}
+              title="検索"
+              aria-label="検索"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <circle cx="11" cy="11" r="8" />
+                <path d="M21 21l-4.35-4.35" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className={styles.mobileHeaderButton}
+              onClick={() => openModal('showSettings')}
+              title="設定"
+              aria-label="設定"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </svg>
+            </button>
+          </div>
+        </div>
         <div className={styles.headerButtons}>
           <button
             className={styles.scheduleButton}
-            onClick={() => navigate('/schedule')}
-            title="行動予定表"
+            onClick={openSchedule}
+            title="行動予定表（Beta）"
           >
-            行動予定表
+            行動予定表（Beta）
           </button>
           <button
             className={styles.newChatButton}
-            onClick={() => { openModal('showNewChat'); void fetchUsers(); }}
+            onClick={openNewChat}
             title="チャット作成"
           >
             チャット作成
           </button>
           <button
             className={styles.usersButton}
-            onClick={() => { openModal('showUsers'); void fetchUsers(); }}
+            onClick={openUsersList}
             title="ユーザー"
           >
             ユーザー
           </button>
           <button
             className={styles.memoButton}
-            onClick={() => {
-              const memoRoom = chatRooms.find(r => r.type === 'memo');
-              if (memoRoom) navigate(`/memo/${memoRoom.id}`, { state: { from: '/' } });
-            }}
+            onClick={openMemoRoom}
             title="メモ"
             aria-label="メモ"
           >
@@ -740,6 +823,28 @@ export default function Home() {
         onToggleFavorite={toggleFavorite}
         onInvite={openInviteModal}
         onDelete={openDeleteConfirm}
+        canDeleteRoom={(room) => canDeleteChatRoom(room, currentUser?.uid)}
+      />
+
+      {/* スマホ幅のみ表示（CSS で切替）。チャット作成の FAB と下部タブバー */}
+      <button
+        type="button"
+        className={styles.fab}
+        onClick={openNewChat}
+        title="チャット作成"
+        aria-label="チャット作成"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+      </button>
+      <MobileTabBar
+        activeTab="chat"
+        onSelectChat={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+        onSelectSchedule={openSchedule}
+        onSelectMemo={openMemoRoom}
+        onSelectMembers={openUsersList}
       />
 
       {/* 新規チャットモーダル */}
@@ -749,6 +854,7 @@ export default function Home() {
         onClose={() => closeModal('showNewChat')}
         onStartDirectChat={startDirectChat}
         onShowNewGroup={() => openModal('showNewGroup')}
+        startingUserId={startingDirectUserId}
       />
 
       {/* グループ作成モーダル */}
@@ -792,7 +898,7 @@ export default function Home() {
         profileImage={profileImage}
         savingProfile={savingProfile}
         currentUserEmail={currentUser?.email}
-        onClose={() => closeModal('showProfile')}
+        onClose={() => closeSettingsChildModal('showProfile')}
         onProfileNameChange={setProfileName}
         onProfileImageChange={handleProfileImageChange}
         onSave={saveProfile}
@@ -811,7 +917,7 @@ export default function Home() {
       <ThemeModal
         isOpen={modals.showTheme}
         theme={theme}
-        onClose={() => closeModal('showTheme')}
+        onClose={() => closeSettingsChildModal('showTheme')}
         onToggleTheme={toggleTheme}
       />
 
@@ -824,7 +930,7 @@ export default function Home() {
         onClose={() => { closeModal('showSearch'); setSearchResults([]); }}
         onSearchQueryChange={setSearchQuery}
         onSearch={searchMessages}
-        onResultClick={(roomId, messageId) => navigate(`/chat/${roomId}?messageId=${messageId}`)}
+        onResultClick={(result) => navigate(result.path)}
       />
 
       {/* メンバー招待モーダル */}
@@ -864,7 +970,7 @@ export default function Home() {
       <ReleaseNotesModal
         isOpen={modals.showReleaseNotes}
         releaseNotes={releaseNotes}
-        onClose={() => closeModal('showReleaseNotes')}
+        onClose={() => closeSettingsChildModal('showReleaseNotes')}
       />
 
       {/* 更新ノート編集モーダル */}
@@ -887,7 +993,7 @@ export default function Home() {
         mutedRooms={chatRooms
           .filter((r) => mutedRooms.has(r.id))
           .map((r) => ({ id: r.id, name: getRoomDisplayName(r, currentUser?.uid) }))}
-        onClose={() => closeModal('showNotificationSettings')}
+        onClose={() => closeSettingsChildModal('showNotificationSettings')}
         onUpdateSettings={updateNotificationSettings}
         onRefreshDiagnostics={refreshNotificationDiagnostics}
         onRequestPermission={requestPermissionAndRegister}
@@ -922,6 +1028,7 @@ export default function Home() {
         userName={userToDelete?.displayName}
         onClose={() => closeModal('showDeleteUserConfirm')}
         onDelete={deleteUser}
+        deletionState={userDeletionState}
       />
     </div>
   );

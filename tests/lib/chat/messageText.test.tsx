@@ -31,9 +31,10 @@ describe('renderMessageText', () => {
     expect(out).toContain(' を見て');
   });
 
-  test('URL は空白で区切られ、複数あればそれぞれリンク化される', () => {
+  test('HTTPSだけをリンク化しHTTPはプレーンテキストにする', () => {
     const out = html(renderMessageText('a https://a.example b http://b.example c', noopToast));
-    expect(out.match(/<a /g)).toHaveLength(2);
+    expect(out.match(/<a /g)).toHaveLength(1);
+    expect(out).toContain('http://b.example');
   });
 
   test('@メンションは span でハイライトされる', () => {

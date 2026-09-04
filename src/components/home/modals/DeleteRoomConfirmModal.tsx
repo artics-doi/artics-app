@@ -40,7 +40,7 @@ export default function DeleteRoomConfirmModal({
     if (roomType === 'group') {
       return {
         title: 'グループを削除',
-        description: `${roomName ? `「${roomName}」` : 'このグループ'} を完全に削除します。すべてのメッセージとメンバー情報が失われ、元に戻せません。`,
+        description: `${roomName ? `「${roomName}」` : 'このグループ'} を完全に削除します。すべてのメッセージ、添付ファイル、メンバー情報が失われ、元に戻せません。`,
         confirmLabel: '削除',
       };
     }
@@ -53,7 +53,7 @@ export default function DeleteRoomConfirmModal({
     }
     return {
       title: 'チャットルームを削除',
-      description: 'このチャットルームを削除しますか？すべてのメッセージが削除され、元に戻すことはできません。',
+      description: `${roomName ? `「${roomName}」` : 'このチャットルーム'} を完全に削除します。すべてのメッセージと添付ファイルが失われ、元に戻せません。`,
       confirmLabel: '削除',
     };
   })();

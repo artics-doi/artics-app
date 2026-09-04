@@ -1,5 +1,5 @@
 // 行動予定表の通知タイミング計算。index.ts から機械的に移動（挙動変更なし）。
-// クライアント側 src/utils/scheduleNotifications.ts と同じ仕様（前日17時 / 当日8時30分）。
+// クライアント側 src/utils/scheduleNotifications.ts と同じ仕様。
 
 import type { Timestamp } from 'firebase-admin/firestore';
 
@@ -24,6 +24,7 @@ export interface ScheduleData {
   createdBy?: string;
   notification?: {
     enabled?: boolean;
+    recipientScope?: 'targets' | 'all';
     timings?: ScheduleNotificationTiming[];
     customAt?: Timestamp | null;
   };
@@ -32,6 +33,12 @@ export interface ScheduleData {
 
 export const SCHEDULE_NOTIFICATION_GRACE_MS = 2 * 60 * 1000;
 
+export function resolveScheduleRecipientIds(schedule: ScheduleData, allActiveUserIds: string[] = []): string[] {
+  if (schedule.notification?.recipientScope === 'all') return allActiveUserIds;
+  if (schedule.targetUserIds?.length) return schedule.targetUserIds;
+  return schedule.createdBy ? [schedule.createdBy] : [];
+}
+
 function withTime(date: Date, hours: number, minutes: number): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate(), hours, minutes, 0, 0);
 }
@@ -39,6 +46,8 @@ function withTime(date: Date, hours: number, minutes: number): Date {
 export function getScheduleNotificationTime(schedule: ScheduleData, timing: ScheduleNotificationTiming): Date | null {
   const startAt = schedule.startAt?.toDate();
   if (!startAt) return null;
+  // 新規・更新した予定は customAt に保存時刻を保持する。旧データは開始時刻へフォールバックする。
+  if (timing === 'atStart') return schedule.notification?.customAt?.toDate() ?? startAt;
   if (timing === 'custom') return schedule.notification?.customAt?.toDate() ?? null;
 
   if (schedule.allDay !== false) {
@@ -52,8 +61,6 @@ export function getScheduleNotificationTime(schedule: ScheduleData, timing: Sche
   }
 
   switch (timing) {
-    case 'atStart':
-      return startAt;
     case 'fiveMinutesBefore':
       return new Date(startAt.getTime() - 5 * 60 * 1000);
     case 'fifteenMinutesBefore':

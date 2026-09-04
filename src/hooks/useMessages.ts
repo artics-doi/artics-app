@@ -51,6 +51,8 @@ export function useMessages(roomId: string | undefined) {
   const [oldestMessageDate, setOldestMessageDate] = useState<Timestamp | null>(null);
   const messageListRef = useRef<HTMLDivElement>(null);
   const olderMessagesRef = useRef<ExtendedMessage[]>([]);
+  const generationRef = useRef(0);
+  const loadingMoreRef = useRef(false);
 
   useEffect(() => {
     olderMessagesRef.current = olderMessages;
@@ -58,6 +60,9 @@ export function useMessages(roomId: string | undefined) {
 
   // ルーム切替時に pending をクリア（前のルームの送信中メッセージを引きずらない）
   useEffect(() => {
+    generationRef.current += 1;
+    loadingMoreRef.current = false;
+    setLoadingMore(false);
     setPendingMessages([]);
     setOlderMessages([]);
     setLiveMessages([]);
@@ -77,6 +82,7 @@ export function useMessages(roomId: string | undefined) {
 
   useEffect(() => {
     if (!roomId) return;
+    const generation = generationRef.current;
 
     // ページネーションの状態をリセット
     setHasMoreMessages(true);
@@ -90,6 +96,7 @@ export function useMessages(roomId: string | undefined) {
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (generation !== generationRef.current) return;
       const msgs: ExtendedMessage[] = [];
       snapshot.forEach((doc) => {
         const data = doc.data();
@@ -146,18 +153,22 @@ export function useMessages(roomId: string | undefined) {
 
   // 過去のメッセージを追加読み込み
   const loadMoreMessages = useCallback(async () => {
-    if (!roomId || !oldestMessageDate || loadingMore || !hasMoreMessages) return;
+    if (!roomId || !oldestMessageDate || loadingMoreRef.current || !hasMoreMessages) return;
 
+    const targetRoomId = roomId;
+    const generation = generationRef.current;
+    loadingMoreRef.current = true;
     setLoadingMore(true);
     try {
       const q = query(
-        collection(db, 'chatRooms', roomId, 'messages'),
+        collection(db, 'chatRooms', targetRoomId, 'messages'),
         orderBy('createdAt', 'desc'),
         startAfter(oldestMessageDate),
         limit(PAGE_SIZE)
       );
 
       const snapshot = await getDocs(q);
+      if (generation !== generationRef.current) return;
       const olderMsgs: ExtendedMessage[] = [];
       snapshot.forEach((doc) => {
         const data = doc.data();
@@ -178,9 +189,12 @@ export function useMessages(roomId: string | undefined) {
     } catch (error) {
       console.error('追加読み込みエラー:', error);
     } finally {
-      setLoadingMore(false);
+      if (generation === generationRef.current) {
+        loadingMoreRef.current = false;
+        setLoadingMore(false);
+      }
     }
-  }, [roomId, oldestMessageDate, loadingMore, hasMoreMessages]);
+  }, [roomId, oldestMessageDate, hasMoreMessages]);
 
   // スクロール位置を監視して上端で追加読み込み
   const handleScroll = useCallback(() => {

@@ -1,26 +1,18 @@
 import { useEffect, useRef } from 'react';
 import { SEARCH_DEBOUNCE_MS } from '../../../constants';
+import type { GlobalSearchResult } from '../../../lib/search/globalSearch';
 import styles from '../../../pages/Home.module.css';
 import useModal from '../../../hooks/useModal';
-
-interface SearchResult {
-  roomId: string;
-  roomName: string;
-  messageId: string;
-  text: string;
-  senderName: string;
-  timestamp: Date;
-}
 
 interface SearchModalProps {
   isOpen: boolean;
   searchQuery: string;
-  searchResults: SearchResult[];
+  searchResults: GlobalSearchResult[];
   searching: boolean;
   onClose: () => void;
   onSearchQueryChange: (query: string) => void;
   onSearch: () => void;
-  onResultClick: (roomId: string, messageId: string) => void;
+  onResultClick: (result: GlobalSearchResult) => void;
 }
 
 export default function SearchModal({
@@ -69,7 +61,7 @@ export default function SearchModal({
       aria-labelledby="search-modal-title"
     >
       <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-        <h2 id="search-modal-title">メッセージ検索</h2>
+        <h2 id="search-modal-title">全体検索</h2>
 
         <div className={styles.searchInputArea}>
           <input
@@ -97,18 +89,22 @@ export default function SearchModal({
           ) : (
             searchResults.map((result, index) => (
               <div
-                key={`${result.roomId}-${result.messageId}-${index}`}
+                key={`${result.kind}-${result.id}-${index}`}
                 className={styles.searchResultItem}
                 onClick={() => {
-                  onResultClick(result.roomId, result.messageId);
+                  onResultClick(result);
                   handleClose();
                 }}
               >
                 <div className={styles.searchResultHeader}>
-                  <span className={styles.searchResultRoom}>{result.roomName}</span>
+                  <span className={styles.searchResultRoom}>
+                    {result.kind === 'chat' ? 'チャット' : result.kind === 'memo' ? 'メモ' : result.kind === 'schedule' ? '予定' : 'タスク'}
+                    {' / '}
+                    {result.title}
+                  </span>
                   <span className={styles.searchResultTime}>{formatSearchTime(result.timestamp)}</span>
                 </div>
-                <p className={styles.searchResultSender}>{result.senderName}</p>
+                <p className={styles.searchResultSender}>{result.subtitle}</p>
                 <p className={styles.searchResultText}>{result.text}</p>
               </div>
             ))

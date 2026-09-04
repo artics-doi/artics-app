@@ -10,7 +10,9 @@ import {
   query,
   serverTimestamp,
   updateDoc,
+  where,
   writeBatch,
+  type QueryConstraint,
   type Timestamp,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -23,6 +25,7 @@ type FirestoreSchedule = Omit<ScheduleEvent, 'id' | 'startAt' | 'endAt' | 'creat
   updatedAt?: Timestamp;
   notification?: {
     enabled?: boolean;
+    recipientScope?: ScheduleNotificationSetting['recipientScope'];
     timings?: ScheduleNotificationSetting['timings'];
     customAt?: Timestamp | null;
   };
@@ -33,10 +36,16 @@ function timestampToDate(value: Timestamp | null | undefined): Date | null {
 }
 
 function serializeNotification(notification: ScheduleNotificationSetting) {
+  const timing = notification.timings[0];
   return {
     enabled: notification.enabled,
+    recipientScope: notification.recipientScope ?? 'targets',
     timings: notification.enabled ? notification.timings : [],
-    customAt: notification.enabled && notification.customAt ? notification.customAt : null,
+    customAt: notification.enabled && timing === 'atStart'
+      ? serverTimestamp()
+      : notification.enabled && notification.customAt
+        ? notification.customAt
+        : null,
   };
 }
 
@@ -53,6 +62,7 @@ function toScheduleEvent(id: string, data: FirestoreSchedule): ScheduleEvent {
     memo: data.memo || '',
     notification: {
       enabled: data.notification?.enabled ?? false,
+      recipientScope: data.notification?.recipientScope ?? 'targets',
       timings: data.notification?.timings || [],
       customAt: timestampToDate(data.notification?.customAt),
     },
@@ -66,33 +76,71 @@ function toScheduleEvent(id: string, data: FirestoreSchedule): ScheduleEvent {
   };
 }
 
-export function useSchedules(currentUser: FirebaseUser | null) {
-  const [schedules, setSchedules] = useState<ScheduleEvent[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+export interface UseSchedulesOptions {
+  subscribe?: boolean;
+  startAt?: Date;
+  endAt?: Date;
+  notificationEnabled?: boolean;
+  orderByStartAt?: boolean;
+}
+
+type ScheduleSnapshotState = {
+  key: string | null;
+  schedules: ScheduleEvent[];
+  error: Error | null;
+};
+
+export function useSchedules(
+  currentUser: FirebaseUser | null,
+  options: UseSchedulesOptions = {},
+) {
+  const {
+    subscribe = true,
+    startAt,
+    endAt,
+    notificationEnabled,
+    orderByStartAt = true,
+  } = options;
+  const startAtMs = startAt?.getTime() ?? null;
+  const endAtMs = endAt?.getTime() ?? null;
+  const currentUserId = currentUser?.uid ?? null;
+  const queryKey = currentUserId && subscribe
+    ? [currentUserId, startAtMs ?? 'all', endAtMs ?? 'all', notificationEnabled ?? 'all', orderByStartAt].join(':')
+    : null;
+  const [snapshotState, setSnapshotState] = useState<ScheduleSnapshotState>({
+    key: null,
+    schedules: [],
+    error: null,
+  });
 
   useEffect(() => {
-    if (!currentUser) {
-      return;
-    }
+    if (!currentUserId || !subscribe || !queryKey) return;
 
-    const q = query(collection(db, 'schedules'), orderBy('startAt', 'asc'));
+    const constraints: QueryConstraint[] = [];
+    if (notificationEnabled !== undefined) {
+      constraints.push(where('notification.enabled', '==', notificationEnabled));
+    }
+    if (startAtMs !== null) constraints.push(where('startAt', '>=', new Date(startAtMs)));
+    if (endAtMs !== null) constraints.push(where('startAt', '<', new Date(endAtMs)));
+    if (orderByStartAt) constraints.push(orderBy('startAt', 'asc'));
+
+    const q = query(collection(db, 'schedules'), ...constraints);
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        setSchedules(snapshot.docs.map((item) => toScheduleEvent(item.id, item.data() as FirestoreSchedule)));
-        setLoading(false);
-        setError(null);
+        const schedules = snapshot.docs
+          .map((item) => toScheduleEvent(item.id, item.data() as FirestoreSchedule))
+          .sort((left, right) => left.startAt.getTime() - right.startAt.getTime());
+        setSnapshotState({ key: queryKey, schedules, error: null });
       },
       (error) => {
         console.error('行動予定表の取得エラー:', error);
-        setError(error);
-        setLoading(false);
+        setSnapshotState({ key: queryKey, schedules: [], error });
       },
     );
 
     return () => unsubscribe();
-  }, [currentUser]);
+  }, [currentUserId, endAtMs, notificationEnabled, orderByStartAt, queryKey, startAtMs, subscribe]);
 
   const createSchedule = useCallback(async (input: ScheduleEventInput) => {
     if (!currentUser) throw new Error('ログインが必要です');
@@ -160,9 +208,9 @@ export function useSchedules(currentUser: FirebaseUser | null) {
   }, [currentUser]);
 
   return {
-    schedules: currentUser ? schedules : [],
-    loading: currentUser ? loading : false,
-    error: currentUser ? error : null,
+    schedules: queryKey && snapshotState.key === queryKey ? snapshotState.schedules : [],
+    loading: Boolean(queryKey && snapshotState.key !== queryKey),
+    error: queryKey && snapshotState.key === queryKey ? snapshotState.error : null,
     createSchedule,
     updateSchedule,
     deleteSchedule,

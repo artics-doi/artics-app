@@ -3,9 +3,9 @@ import { onDocumentCreated, onDocumentUpdated, onDocumentWritten } from 'firebas
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { adjustStorageUsage, getTrackedFileSize, getTrackedPhotoFileSize } from './storageUsage';
-import { computeUnreadCount } from './unread';
 import { deleteInvalidTokens, getFcmTokensForUsers, isInvalidRegistrationToken } from './fcm';
-import { getScheduleNotificationTime, SCHEDULE_NOTIFICATION_GRACE_MS, type ScheduleData } from './scheduleTime';
+import { getScheduleNotificationTime, resolveScheduleRecipientIds, SCHEDULE_NOTIFICATION_GRACE_MS, type ScheduleData } from './scheduleTime';
+import { claimDelivery, finishDelivery } from './notificationDelivery';
 
 admin.initializeApp();
 
@@ -14,7 +14,7 @@ const messaging = admin.messaging();
 
 // メッセージ作成時に未読カウントを更新
 export const updateUnreadCountsOnNewMessage = onDocumentCreated(
-  'chatRooms/{chatRoomId}/messages/{messageId}',
+  { document: 'chatRooms/{chatRoomId}/messages/{messageId}', retry: true },
   async (event) => {
     const snapshot = event.data;
     if (!snapshot) {
@@ -26,49 +26,54 @@ export const updateUnreadCountsOnNewMessage = onDocumentCreated(
     const chatRoomId = event.params.chatRoomId;
     const senderId = message.senderId;
 
-    // チャットルーム情報を取得
     const roomRef = db.collection('chatRooms').doc(chatRoomId);
-    const roomDoc = await roomRef.get();
-    if (!roomDoc.exists) {
-      console.log('Chat room not found');
-      return;
-    }
+    const messageRef = snapshot.ref;
+    await db.runTransaction(async (transaction) => {
+      const [roomDoc, currentMessageDoc] = await Promise.all([
+        transaction.get(roomRef),
+        transaction.get(messageRef),
+      ]);
+      if (!roomDoc.exists || !currentMessageDoc.exists) return;
 
-    const roomData = roomDoc.data();
-    if (!roomData) return;
+      const currentMessage = currentMessageDoc.data();
+      if (!currentMessage) return;
+      if (currentMessage.unreadCountApplied === true) return;
 
-    const members: string[] = roomData.members || [];
-
-    // 送信者以外の未読数を lastReadAt 基準の絶対値で再計算する。
-    // 以前の increment(+1) は normalizeUnreadCountOnReadStateWrite の絶対値上書きと
-    // 並行実行されると二重加算・取りこぼしが起きるため、計算式を一本化した
-    const updateData: { [key: string]: number } = {};
-    await Promise.all(members.map(async (memberId) => {
-      if (memberId === senderId) return;
-
-      const readStateDoc = await roomRef.collection('readStates').doc(memberId).get();
-      const lastReadAt = readStateDoc.data()?.lastReadAt;
-      updateData[`unreadCounts.${memberId}`] = await computeUnreadCount(
-        roomRef,
-        memberId,
-        lastReadAt instanceof Timestamp ? lastReadAt : null
+      const members: string[] = roomDoc.data()?.members || [];
+      const recipientIds = members.filter((memberId) => memberId !== senderId);
+      const readStateRefs = recipientIds.map((memberId) =>
+        roomRef.collection('readStates').doc(memberId),
       );
-    }));
-
-    if (Object.keys(updateData).length > 0) {
-      try {
-        await roomRef.update(updateData);
-        console.log(`Updated unread counts for room ${chatRoomId}`);
-      } catch (error) {
-        console.error('Error updating unread counts:', error);
-      }
-    }
+      const readStateDocs = readStateRefs.length > 0
+        ? await transaction.getAll(...readStateRefs)
+        : [];
+      const readBy = new Set<string>(currentMessage.readBy || []);
+      const createdAt = currentMessage.createdAt;
+      const updates: Record<string, unknown> = {};
+      recipientIds.forEach((memberId, index) => {
+        const lastReadAt = readStateDocs[index]?.data()?.lastReadAt;
+        const wasAlreadyRead = readBy.has(memberId)
+          || (createdAt instanceof Timestamp
+            && lastReadAt instanceof Timestamp
+            && lastReadAt.toMillis() >= createdAt.toMillis());
+        if (!wasAlreadyRead) {
+          updates[`unreadCounts.${memberId}`] = FieldValue.increment(1);
+        }
+      });
+      if (Object.keys(updates).length > 0) transaction.update(roomRef, updates);
+      // Eventarc の再配信でも同じメッセージを二重加算しないよう、
+      // ルーム更新と同じトランザクション内で適用済みを記録する。
+      transaction.update(messageRef, {
+        unreadCountApplied: true,
+        unreadCountAppliedAt: FieldValue.serverTimestamp(),
+      });
+    });
   }
 );
 
 // メッセージ作成時にプッシュ通知を送信
 export const sendPushNotificationOnNewMessage = onDocumentCreated(
-  'chatRooms/{chatRoomId}/messages/{messageId}',
+  { document: 'chatRooms/{chatRoomId}/messages/{messageId}', retry: true },
   async (event) => {
     const snapshot = event.data;
     if (!snapshot) {
@@ -81,6 +86,10 @@ export const sendPushNotificationOnNewMessage = onDocumentCreated(
     const senderId = message.senderId;
     const senderName = message.senderName || '不明なユーザー';
     const messageText = message.text || '';
+    const deliveryId = `chat_${chatRoomId}_${event.params.messageId}`;
+    const claim = await claimDelivery(db, deliveryId);
+    if (claim === 'already_sent' || claim === 'exhausted') return;
+    if (claim === 'busy') throw new Error('notification-delivery-busy');
 
     console.log(`New message in room ${chatRoomId} from ${senderName}`);
 
@@ -107,6 +116,7 @@ export const sendPushNotificationOnNewMessage = onDocumentCreated(
 
     if (recipientIds.length === 0) {
       console.log('No recipients to notify (memberIds might not include other members)');
+      await finishDelivery(db, deliveryId, 'sent');
       return;
     }
 
@@ -151,6 +161,7 @@ export const sendPushNotificationOnNewMessage = onDocumentCreated(
 
     if (tokens.length === 0) {
       console.log('No FCM tokens found for recipients');
+      await finishDelivery(db, deliveryId, 'sent');
       return;
     }
 
@@ -223,8 +234,11 @@ export const sendPushNotificationOnNewMessage = onDocumentCreated(
           }
         }
       }
+      await finishDelivery(db, deliveryId, 'sent');
     } catch (error) {
       console.error('Error sending notifications:', error);
+      await finishDelivery(db, deliveryId, 'failed', (error as { code?: string }).code ?? 'unknown');
+      throw error;
     }
   }
 );
@@ -236,22 +250,52 @@ export const sendScheduleNotifications = onSchedule(
   },
   async () => {
     const now = Date.now();
-    const schedulesSnapshot = await db
-      .collection('schedules')
-      .where('notification.enabled', '==', true)
-      .get();
+    // 通知が発火し得る開始日時の予定と、現在が通知時刻のカスタム通知だけを読む。
+    // enabled=true の全予定を毎分読み続けると、通知済みの過去予定も永続的に課金対象になる。
+    const standardWindowStart = Timestamp.fromMillis(now - 24 * 60 * 60 * 1000);
+    const standardWindowEnd = Timestamp.fromMillis(now + 48 * 60 * 60 * 1000);
+    const customWindowStart = Timestamp.fromMillis(now - SCHEDULE_NOTIFICATION_GRACE_MS);
+    const customWindowEnd = Timestamp.fromMillis(now);
+    const [standardSnapshot, customSnapshot] = await Promise.all([
+      db.collection('schedules')
+        .where('notification.enabled', '==', true)
+        .where('startAt', '>=', standardWindowStart)
+        .where('startAt', '<=', standardWindowEnd)
+        .get(),
+      db.collection('schedules')
+        .where('notification.enabled', '==', true)
+        .where('notification.customAt', '>=', customWindowStart)
+        .where('notification.customAt', '<=', customWindowEnd)
+        .get(),
+    ]);
+    const scheduleDocs = new Map(
+      [...standardSnapshot.docs, ...customSnapshot.docs].map((scheduleDoc) => [scheduleDoc.id, scheduleDoc]),
+    );
+    let allActiveUserIdsPromise: Promise<string[]> | null = null;
+    const getAllActiveUserIds = () => {
+      if (!allActiveUserIdsPromise) {
+        allActiveUserIdsPromise = db.collection('users').get().then((snapshot) => (
+          snapshot.docs
+            .filter((userDoc) => {
+              const lifecycleState = userDoc.data().lifecycleState ?? 'active';
+              return lifecycleState !== 'deleted' && lifecycleState !== 'disabling';
+            })
+            .map((userDoc) => userDoc.id)
+        ));
+      }
+      return allActiveUserIdsPromise;
+    };
 
-    for (const scheduleDoc of schedulesSnapshot.docs) {
+    for (const scheduleDoc of scheduleDocs.values()) {
       const schedule = scheduleDoc.data() as ScheduleData;
       const timings = schedule.notification?.timings ?? [];
       if (timings.length === 0) continue;
 
       const sentKeys = new Set(schedule.sentNotificationKeys ?? []);
-      const recipientIds = schedule.targetUserIds && schedule.targetUserIds.length > 0
-        ? schedule.targetUserIds
-        : schedule.createdBy
-          ? [schedule.createdBy]
-          : [];
+      const recipientIds = resolveScheduleRecipientIds(
+        schedule,
+        schedule.notification?.recipientScope === 'all' ? await getAllActiveUserIds() : [],
+      );
 
       if (recipientIds.length === 0) continue;
 
@@ -264,6 +308,10 @@ export const sendScheduleNotifications = onSchedule(
 
         const notificationKey = `${scheduleDoc.id}:${timing}:${notifyAtMs}`;
         if (sentKeys.has(notificationKey)) continue;
+        const deliveryId = `schedule_${notificationKey}`;
+        const claim = await claimDelivery(db, deliveryId);
+        if (claim === 'already_sent' || claim === 'exhausted') continue;
+        if (claim === 'busy') throw new Error('notification-delivery-busy');
 
         const { tokens, tokenOwners } = await getFcmTokensForUsers(db, recipientIds);
         if (tokens.length === 0) {
@@ -272,6 +320,7 @@ export const sendScheduleNotifications = onSchedule(
             sentNotificationKeys: FieldValue.arrayUnion(notificationKey),
             updatedAt: FieldValue.serverTimestamp()
           });
+          await finishDelivery(db, deliveryId, 'sent');
           continue;
         }
 
@@ -317,8 +366,11 @@ export const sendScheduleNotifications = onSchedule(
             sentNotificationKeys: FieldValue.arrayUnion(notificationKey),
             updatedAt: FieldValue.serverTimestamp()
           });
+          await finishDelivery(db, deliveryId, 'sent');
         } catch (error) {
           console.error(`Error sending schedule notification ${scheduleDoc.id}:`, error);
+          await finishDelivery(db, deliveryId, 'failed', (error as { code?: string }).code ?? 'unknown');
+          throw error;
         }
       }
     }
@@ -333,14 +385,32 @@ export const normalizeUnreadCountOnReadStateWrite = onDocumentWritten(
     if (!after?.exists) return;
 
     const { chatRoomId, userId } = event.params;
-    const lastReadAt = after.data()?.lastReadAt;
+    const eventData = after.data();
+    if (!eventData) return;
+    const lastReadAt = eventData?.lastReadAt;
     if (!(lastReadAt instanceof Timestamp)) return;
+    const eventVersion = typeof eventData.version === 'number' ? eventData.version : 0;
 
     const roomRef = db.collection('chatRooms').doc(chatRoomId);
-    const unreadCount = await computeUnreadCount(roomRef, userId, lastReadAt);
-
-    await roomRef.update({
-      [`unreadCounts.${userId}`]: unreadCount
+    const readStateRef = roomRef.collection('readStates').doc(userId);
+    await db.runTransaction(async (transaction) => {
+      const [roomSnapshot, readStateSnapshot] = await Promise.all([
+        transaction.get(roomRef),
+        transaction.get(readStateRef),
+      ]);
+      if (!roomSnapshot.exists || !readStateSnapshot.exists) return;
+      if ((readStateSnapshot.data()?.version ?? 0) !== eventVersion) return;
+      const messages = await transaction.get(
+        roomRef.collection('messages').where('createdAt', '>', lastReadAt),
+      );
+      const unreadCount = messages.docs.filter((messageDoc) => {
+        const message = messageDoc.data();
+        return message.senderId !== userId && message.isDeleted !== true;
+      }).length;
+      transaction.update(roomRef, {
+        [`unreadCounts.${userId}`]: unreadCount,
+        [`unreadVersions.${userId}`]: eventVersion,
+      });
     });
   }
 );
@@ -353,6 +423,39 @@ export const updateStorageUsageOnMessageWrite = onDocumentWritten(
     const afterSize = getTrackedFileSize(event.data?.after.data());
     await adjustStorageUsage(db, afterSize - beforeSize);
   }
+);
+
+export const cleanupDeletingAttachment = onDocumentUpdated(
+  { document: 'chatRooms/{chatRoomId}/messages/{messageId}', retry: true },
+  async (event) => {
+    const before = event.data?.before.data();
+    const afterSnapshot = event.data?.after;
+    const after = afterSnapshot?.data();
+    if (!before || !after || !afterSnapshot) return;
+    if (before.attachmentState === 'deleting' || after.attachmentState !== 'deleting') return;
+    const storagePath = after.storagePath;
+    try {
+      if (typeof storagePath === 'string' && storagePath) {
+        await admin.storage().bucket().file(storagePath).delete({ ignoreNotFound: true });
+      }
+      await afterSnapshot.ref.update({
+        imageURL: null,
+        fileURL: null,
+        storagePath: null,
+        fileSize: null,
+        attachmentState: 'deleted',
+        attachmentError: FieldValue.delete(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    } catch (error) {
+      await afterSnapshot.ref.update({
+        attachmentState: 'failed',
+        attachmentError: (error as { code?: string }).code ?? 'attachment-delete-failed',
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      throw error;
+    }
+  },
 );
 
 // プロフィール画像の fileSize 差分を storageUsage に反映
@@ -432,3 +535,5 @@ export const syncMemberDetailsOnProfileUpdate = onDocumentUpdated(
 // これを忘れると functions/src/process/* の関数はビルドは通るがデプロイされない。
 // デプロイ後 `firebase functions:list` に onProjectUpdated が表示されることを確認。
 export * from './process';
+export * from './userLifecycle';
+export * from './roomLifecycle';

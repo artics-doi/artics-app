@@ -14,13 +14,16 @@ interface BoardColumnProps {
   columns: ProjectColumn[];
   tasks: Task[];
   memberById: Map<string, ProcessMember>;
-  datePreviewByTaskId?: Map<string, Pick<Task, 'startDate' | 'endDate'>>;
+  datePreviewByTaskId?: Map<string, Pick<Task, 'startDate' | 'endDate' | 'completedDate'>>;
   isLocked?: boolean;
+  isDoneColumn: boolean;
   isCreating: boolean;
   onStartCreate: () => void;
   onCancelCreate: () => void;
   onCreateTask: (title: string) => Promise<void>;
   onTaskClick: (task: Task) => void;
+  onTaskCompletedChange: (task: Task, completed: boolean) => void;
+  onTaskArchivedChange: (task: Task, archived: boolean) => Promise<void> | void;
   onRenameColumn: (name: string) => void;
   onDeleteColumn: () => void;
 }
@@ -44,11 +47,14 @@ export default function BoardColumn({
   memberById,
   datePreviewByTaskId,
   isLocked = false,
+  isDoneColumn,
   isCreating,
   onStartCreate,
   onCancelCreate,
   onCreateTask,
   onTaskClick,
+  onTaskCompletedChange,
+  onTaskArchivedChange,
   onRenameColumn,
   onDeleteColumn,
 }: BoardColumnProps) {
@@ -164,7 +170,10 @@ export default function BoardColumn({
               task={task}
               memberById={memberById}
               datePreview={datePreviewByTaskId?.get(task.id)}
+              showCompletionControls={isDoneColumn}
               onClick={() => onTaskClick(task)}
+              onCompletedChange={(completed) => onTaskCompletedChange(task, completed)}
+              onArchivedChange={(archived) => onTaskArchivedChange(task, archived)}
             />
           ))}
         </div>

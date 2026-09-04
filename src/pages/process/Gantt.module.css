@@ -264,7 +264,39 @@
   pointer-events: auto;
 }
 
+.ganttTaskBarEarlyCompleted {
+  background: transparent;
+}
+
+.ganttTaskBarActual,
+.ganttTaskBarPlannedRemainder {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+
+.ganttTaskBarActual {
+  left: 0;
+  background: var(--artics-gantt-task-fill);
+}
+
+.ganttTaskBarPlannedRemainder {
+  right: 0;
+  background:
+    repeating-linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--artics-gantt-task-border) 36%, transparent) 0,
+      color-mix(in srgb, var(--artics-gantt-task-border) 36%, transparent) 1px,
+      color-mix(in srgb, var(--artics-gantt-task-fill) 12%, white) 1px,
+      color-mix(in srgb, var(--artics-gantt-task-fill) 12%, white) 4px
+    ),
+    color-mix(in srgb, var(--artics-gantt-task-fill) 16%, white);
+}
+
 .ganttTaskBarText {
+  position: relative;
+  z-index: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

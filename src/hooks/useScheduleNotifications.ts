@@ -28,7 +28,10 @@ export function useScheduleNotifications(currentUser: FirebaseUser | null) {
   // PWA では Cloud Functions（sendScheduleNotifications）の FCM プッシュが予定通知を
   // 担当する。ローカル通知も出すと同じ予定が二重表示されるため Electron 限定にする
   const isElectron = isElectronEnv();
-  const { schedules } = useSchedules(isElectron ? currentUser : null);
+  const { schedules } = useSchedules(isElectron ? currentUser : null, {
+    notificationEnabled: true,
+    orderByStartAt: false,
+  });
   const { showNotification } = useElectronNotification();
   const sentKeysRef = useRef<Set<string>>(readSentKeys());
 
@@ -40,8 +43,10 @@ export function useScheduleNotifications(currentUser: FirebaseUser | null) {
 
       schedules.forEach((schedule) => {
         if (!schedule.notification.enabled) return;
-        const targetUserIds = schedule.targetUserIds.length > 0 ? schedule.targetUserIds : [schedule.createdBy];
-        if (!targetUserIds.includes(currentUser.uid)) return;
+        if (schedule.notification.recipientScope !== 'all') {
+          const targetUserIds = schedule.targetUserIds.length > 0 ? schedule.targetUserIds : [schedule.createdBy];
+          if (!targetUserIds.includes(currentUser.uid)) return;
+        }
 
         schedule.notification.timings.forEach((timing) => {
           const notifyAt = getScheduleNotificationTime(schedule, timing);
@@ -54,7 +59,14 @@ export function useScheduleNotifications(currentUser: FirebaseUser | null) {
           if (sentKeysRef.current.has(key)) return;
 
           void (async () => {
-            const shown = await showNotification('予定通知', formatScheduleNotificationBody(schedule), key, undefined, 'schedule');
+            const shown = await showNotification(
+              schedule.title,
+              formatScheduleNotificationBody(schedule),
+              key,
+              undefined,
+              'schedule',
+              schedule.id,
+            );
             if (shown) {
               sentKeysRef.current.add(key);
               writeSentKeys(sentKeysRef.current);

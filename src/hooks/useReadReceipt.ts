@@ -16,9 +16,11 @@ import {
   writeBatch,
   arrayUnion,
   serverTimestamp,
+  increment,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import type { ExtendedMessage } from '../types';
+import { markRoomLocallyRead } from '../utils/room';
 
 interface UseReadReceiptArgs {
   roomId: string | undefined;
@@ -48,11 +50,22 @@ export function useReadReceipt({ roomId, messages, currentUser }: UseReadReceipt
   const entryWriteDoneRef = useRef(false);
 
   const updateReadState = useCallback(async (targetRoomId: string, uid: string) => {
-    await setDoc(
-      doc(db, 'chatRooms', targetRoomId, 'readStates', uid),
-      { lastReadAt: serverTimestamp() },
-      { merge: true },
-    );
+    const readStateRef = doc(db, 'chatRooms', targetRoomId, 'readStates', uid);
+    try {
+      await setDoc(
+        readStateRef,
+        {
+          lastReadAt: serverTimestamp(),
+          version: increment(1),
+          eventId: crypto.randomUUID(),
+        },
+        { merge: true },
+      );
+    } catch (error) {
+      // 旧ルールは lastReadAt のみ許可する。新形式が権限拒否された場合だけ段階移行用に再試行する。
+      if ((error as { code?: string })?.code !== 'permission-denied') throw error;
+      await setDoc(readStateRef, { lastReadAt: serverTimestamp() }, { merge: true });
+    }
   }, []);
 
   useEffect(() => {
@@ -64,6 +77,11 @@ export function useReadReceipt({ roomId, messages, currentUser }: UseReadReceipt
     }
 
     if (!currentUser || !roomId) return;
+
+    const latestLoadedMessageAt = messages.reduce(
+      (latest, message) => Math.max(latest, message.createdAt?.getTime?.() ?? 0),
+      0,
+    );
 
     const unreadMessages = messages.filter(
       (msg) =>
@@ -77,6 +95,11 @@ export function useReadReceipt({ roomId, messages, currentUser }: UseReadReceipt
       // 未読ゼロのまま再レンダリングされるたびに書くと Firestore 書き込みが膨らむ
       if (!entryWriteDoneRef.current) {
         entryWriteDoneRef.current = true;
+        markRoomLocallyRead(
+          roomId,
+          currentUser.uid,
+          Math.max(Date.now(), latestLoadedMessageAt),
+        );
         updateReadState(roomId, currentUser.uid).catch((error) => {
           console.error('既読状態更新エラー:', error);
         });
@@ -99,7 +122,17 @@ export function useReadReceipt({ roomId, messages, currentUser }: UseReadReceipt
       try {
         await batch.commit();
         entryWriteDoneRef.current = true;
-        await updateReadState(roomId, currentUser.uid);
+        markRoomLocallyRead(
+          roomId,
+          currentUser.uid,
+          Math.max(Date.now(), latestLoadedMessageAt),
+        );
+        try {
+          await updateReadState(roomId, currentUser.uid);
+        } catch (error) {
+          // readBy の更新は完了済み。補正トリガーだけ失敗しても既読処理を巻き戻さない。
+          console.error('既読状態更新エラー:', error);
+        }
       } catch (error) {
         // 失敗時は処理済みから外して再試行可能にする
         unreadMessages.forEach((msg) => processedReadIdsRef.current.delete(msg.id));

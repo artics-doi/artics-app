@@ -41,12 +41,10 @@ export const SCHEDULE_NOTIFICATION_TIMINGS: Array<{
   id: ScheduleNotificationTiming;
   label: string;
 }> = [
-  { id: 'atStart', label: '開始時刻' },
+  { id: 'atStart', label: '保存時に通知' },
   { id: 'fiveMinutesBefore', label: '5分前' },
   { id: 'fifteenMinutesBefore', label: '15分前' },
   { id: 'thirtyMinutesBefore', label: '30分前' },
   { id: 'oneHourBefore', label: '1時間前' },
-  { id: 'previousDayEvening', label: '前日 17:00' },
-  { id: 'sameDayMorning', label: '当日 8:30' },
   { id: 'custom', label: '任意日時' },
 ];
