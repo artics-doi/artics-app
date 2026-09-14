@@ -165,6 +165,12 @@ service cloud.firestore {
       match /notificationSettings/{roomId} {
         allow read, write, delete: if isSelf(userId) || isAdmin();
       }
+
+      // サーバーだけが作成する工程管理通知。本人以外の購読と通知の偽造を禁止。
+      match /processNotifications/{notificationId} {
+        allow read: if isSelf(userId);
+        allow write: if false;
+      }
     }
 
     match /userDeletionOperations/{operationId} {

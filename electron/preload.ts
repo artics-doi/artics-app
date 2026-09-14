@@ -1,5 +1,6 @@
 // Electron プリロードスクリプト
 import { contextBridge, ipcRenderer } from 'electron';
+import type { NotificationOptions } from './notificationTypes';
 
 // 通知設定の型
 interface NotificationSettings {
@@ -44,7 +45,7 @@ const electronAPI = {
   },
 
   // 通知を表示（roomIdを含む）
-  showNotification: (options: { title: string; body: string; roomId?: string; scheduleId?: string; kind?: 'chat' | 'schedule' }): Promise<boolean> => {
+  showNotification: (options: NotificationOptions): Promise<boolean> => {
     return ipcRenderer.invoke('show-notification', options);
   },
 
@@ -136,6 +137,12 @@ const electronAPI = {
     return () => {
       ipcRenderer.removeListener('navigate-to-schedule', listener);
     };
+  },
+
+  onNavigateToProcessTask: (callback: (target: { projectId: string; taskId: string }) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, target: { projectId: string; taskId: string }) => callback(target);
+    ipcRenderer.on('navigate-to-process-task', listener);
+    return () => ipcRenderer.removeListener('navigate-to-process-task', listener);
   },
 
   onNavigateToChatList: (callback: () => void) => {

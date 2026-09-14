@@ -340,9 +340,9 @@ async function processCleanup(
   let result: { cursor: string | null; done: boolean; count: number };
   let nextStep = step;
 
-  if (step === 'fcmTokens' || step === 'notificationSettings') {
+  if (step === 'fcmTokens' || step === 'notificationSettings' || step === 'processNotifications') {
     result = await deleteSubcollectionPage(userRef, step, cursor);
-    if (result.done) nextStep = step === 'fcmTokens' ? 'notificationSettings' : 'rooms';
+    if (result.done) nextStep = step === 'fcmTokens' ? 'notificationSettings' : step === 'notificationSettings' ? 'processNotifications' : 'rooms';
   } else if (step === 'rooms') {
     result = await cleanQueryPage(
       db.collection('chatRooms').where('members', 'array-contains', operation.targetUid),
@@ -397,7 +397,7 @@ async function processCleanup(
 }
 
 export const processUserDeletion = onDocumentWritten(
-  { document: 'userDeletionOperations/{operationId}', retry: true },
+  { document: 'userDeletionOperations/{operationId}', retry: true, region: 'asia-northeast1', maxInstances: 3 },
   async (event) => {
     const after = event.data?.after;
     if (!after?.exists) return;

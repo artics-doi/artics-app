@@ -6,6 +6,7 @@
 //   変換はこのファイルの to*() 関数だけに集約し、UI 層は常に Date を扱う。
 
 import { serverTimestamp, Timestamp, type DocumentData } from 'firebase/firestore';
+import { normalizeProcessNotification } from './notifications';
 import type {
   Project,
   ProjectColumn,
@@ -118,6 +119,7 @@ export function toMember(id: string, data: DocumentData): ProcessMember {
     colorIndex: asNumber(data.colorIndex),
     order: asNumber(data.order),
     linkedUserId: typeof data.linkedUserId === 'string' ? data.linkedUserId : null,
+    notification: normalizeProcessNotification(data.notification),
   };
 }
 
@@ -234,5 +236,6 @@ export function memberInputToCreateData(input: ProcessMemberInput, order: number
     colorIndex: input.colorIndex,
     linkedUserId: input.linkedUserId,
     order,
+    notification: normalizeProcessNotification(null),
   };
 }

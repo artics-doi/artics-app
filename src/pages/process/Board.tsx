@@ -727,6 +727,9 @@ export default function Board() {
 
   return (
     <div className={styles.page}>
+      {searchParams.get('from') === 'notification' && searchParams.get('task') && !taskById.has(searchParams.get('task')!) && (
+        <p role="status" className={styles.subtitle}>通知のタスクが見つかりません。削除された可能性があります。</p>
+      )}
       <div className={styles.header}>
         <div className={styles.titleGroup}>
           <button

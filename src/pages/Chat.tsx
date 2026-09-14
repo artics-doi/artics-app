@@ -74,6 +74,7 @@ import { isPermissionDeniedError, withoutAttachmentFields } from '../lib/chat/at
 import { getClipboardImageFiles, validatePendingAttachments } from '../lib/chat/pendingAttachments';
 import { canDeleteChatRoom } from '../lib/chat/roomDeletion';
 import { deleteChatRoom } from '../lib/chat/roomDeletionClient';
+import { getArrivingMessages } from '../lib/chat/messageScroll';
 import { buildDate, isValidDate } from '../lib/schedule/calendar';
 import type { ScheduleFormState } from '../lib/schedule/form';
 import styles from './Chat.module.css';
@@ -152,7 +153,7 @@ export default function Chat({ embeddedRoomId, onEmbeddedBack }: ChatProps = {})
   // M-8: メッセージリストが最下部にいるか / 新着件数
   const [isAtBottom, setIsAtBottom] = useState(true);
   const [newMessageCount, setNewMessageCount] = useState(0);
-  const lastMessageCountRef = useRef(0);
+  const previousMessagesRef = useRef<ExtendedMessage[]>([]);
   // スクロール effect から最新の isAtBottom を参照するためのミラー
   const isAtBottomRef = useRef(true);
   useEffect(() => {
@@ -168,18 +169,10 @@ export default function Chat({ embeddedRoomId, onEmbeddedBack }: ChatProps = {})
     if (!el) return;
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
     const atBottom = distanceFromBottom < 30;
+    isAtBottomRef.current = atBottom;
     setIsAtBottom(atBottom);
     if (atBottom) setNewMessageCount(0);
   }, [handleScroll, messageListRef]);
-
-  // 新着メッセージ数の追跡
-  useEffect(() => {
-    const newCount = messages.length - lastMessageCountRef.current;
-    if (newCount > 0 && !isAtBottom) {
-      setNewMessageCount((prev) => prev + newCount);
-    }
-    lastMessageCountRef.current = messages.length;
-  }, [messages.length, isAtBottom]);
 
   // 「最下部にジャンプ」
   const scrollToBottom = useCallback(() => {
@@ -453,20 +446,24 @@ export default function Chat({ embeddedRoomId, onEmbeddedBack }: ChatProps = {})
 
   // 初回読み込み時のみ最下部にスクロール
   const initialScrollDoneRef = useRef(false);
-  const prevMessagesLengthRef = useRef(0);
 
   // ルーム切替時にスクロール関連の記憶をリセット。
   // 漏れると別ルームで初回スクロールが走らず、新着件数も誤検出する
   useEffect(() => {
     initialScrollDoneRef.current = false;
-    prevMessagesLengthRef.current = 0;
-    lastMessageCountRef.current = 0;
+    previousMessagesRef.current = [];
     isAtBottomRef.current = true;
     setIsAtBottom(true);
     setNewMessageCount(0);
   }, [roomId]);
 
   useEffect(() => {
+    const arrivingMessages = getArrivingMessages(previousMessagesRef.current, messages);
+    previousMessagesRef.current = messages;
+    if (!isAtBottomRef.current) {
+      const receivedCount = arrivingMessages.filter((message) => message.senderId !== currentUser?.uid).length;
+      if (receivedCount > 0) setNewMessageCount((count) => count + receivedCount);
+    }
     // 検索パラメータがある場合はスクロールしない
     if (searchParams.get('messageId')) return;
 
@@ -476,16 +473,16 @@ export default function Chat({ embeddedRoomId, onEmbeddedBack }: ChatProps = {})
         messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
       }, 100);
       initialScrollDoneRef.current = true;
-    } else if (messages.length > prevMessagesLengthRef.current) {
+    } else if (arrivingMessages.length > 0) {
       // 新着での自動スクロールは「最下部にいる」か「自分の送信」のときだけ。
       // 過去ログ閲覧中まで強制スクロールすると「N件の新着」ボタンが機能しない
-      const lastMessage = messages[messages.length - 1];
-      if (isAtBottomRef.current || lastMessage?.senderId === currentUser?.uid) {
+      const hasOwnNewMessage = arrivingMessages.some((message) => message.senderId === currentUser?.uid);
+      if (isAtBottomRef.current || hasOwnNewMessage) {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        setNewMessageCount(0);
       }
     }
 
-    prevMessagesLengthRef.current = messages.length;
   }, [messages, currentUser, searchParams]);
 
 

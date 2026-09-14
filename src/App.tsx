@@ -13,6 +13,8 @@ import Memo from './pages/Memo';
 import Schedule from './pages/Schedule';
 import { useGlobalNotification } from './hooks/useGlobalNotification';
 import { useScheduleNotifications } from './hooks/useScheduleNotifications';
+import { useProcessNotifications } from './hooks/useProcessNotifications';
+import { processTaskPath } from './lib/process/notifications';
 import { useFCMToken } from './hooks/useFCMToken';
 import { usePresence } from './hooks/usePresence';
 import { useTaskbarBadge } from './hooks/useTaskbarBadge';
@@ -72,10 +74,14 @@ function ElectronNavigationListener() {
       const cleanupChatList = window.electronAPI.onNavigateToChatList(() => {
         navigate('/chat');
       });
+      const cleanupProcess = window.electronAPI.onNavigateToProcessTask?.(({ projectId, taskId }) => {
+        navigate(processTaskPath(projectId, taskId));
+      });
       return () => {
         cleanupRoom();
         cleanupSchedule();
         cleanupChatList();
+        cleanupProcess?.();
       };
     }
   }, [navigate]);
@@ -88,6 +94,7 @@ function AuthenticatedNotificationListener() {
   const { currentUser } = useAuth();
   usePresence(currentUser?.uid);
   useScheduleNotifications(currentUser);
+  useProcessNotifications(currentUser);
   if (!currentUser) return null;
   return (
     <>

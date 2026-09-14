@@ -1,9 +1,12 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.onProjectUpdated = void 0;
+exports.onProjectUpdated = exports.sendProcessTaskNotification = exports.createProcessTaskNotifications = void 0;
 const admin = require("firebase-admin");
 const firestore_1 = require("firebase-admin/firestore");
 const firestore_2 = require("firebase-functions/v2/firestore");
+var notifications_1 = require("./notifications");
+Object.defineProperty(exports, "createProcessTaskNotifications", { enumerable: true, get: function () { return notifications_1.createProcessTaskNotifications; } });
+Object.defineProperty(exports, "sendProcessTaskNotification", { enumerable: true, get: function () { return notifications_1.sendProcessTaskNotification; } });
 const TASKS_COLLECTION = 'tasks';
 const PAGE_SIZE = 200;
 async function processProjectDeletion(projectRef, projectId, cursor) {

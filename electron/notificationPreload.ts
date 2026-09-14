@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('notificationAPI', {
 
   // 特定の予定を開く
   openSchedule: (scheduleId: string) => ipcRenderer.send('open-schedule', scheduleId),
+  openProcessTask: (projectId: string, taskId: string) => ipcRenderer.send('open-process-task', { projectId, taskId }),
 
   // 全ての通知をクリアしてウィンドウを閉じる
   clearAll: () => ipcRenderer.send('clear-all-notifications')

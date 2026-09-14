@@ -18,7 +18,7 @@ import { db } from '../../lib/firebase';
 import { PROCESS_COLLECTIONS } from '../../constants/process';
 import { memberInputToCreateData, toMember } from '../../lib/process/converters';
 import type { MemberOrderUpdate } from '../../lib/process/memberOrdering';
-import type { ProcessMember, ProcessMemberInput } from '../../types/process';
+import type { ProcessMember, ProcessMemberInput, ProcessNotificationSettings } from '../../types/process';
 
 export function useProcessMembers(currentUser: FirebaseUser | null) {
   const [members, setMembers] = useState<ProcessMember[]>([]);
@@ -88,6 +88,11 @@ export function useProcessMembers(currentUser: FirebaseUser | null) {
     [currentUser],
   );
 
+  const updateNotification = useCallback(async (memberId: string, notification: ProcessNotificationSettings) => {
+    if (!currentUser) throw new Error('ログインが必要です');
+    await updateDoc(doc(db, PROCESS_COLLECTIONS.members, memberId), { notification });
+  }, [currentUser]);
+
   const reorderMembers = useCallback(
     async (updates: readonly MemberOrderUpdate[]) => {
       if (!currentUser) throw new Error('ログインが必要です');
@@ -112,6 +117,7 @@ export function useProcessMembers(currentUser: FirebaseUser | null) {
     error: currentUser ? error : null,
     createMember,
     updateMember,
+    updateNotification,
     deleteMember,
     reorderMembers,
   };

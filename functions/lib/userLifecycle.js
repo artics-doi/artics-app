@@ -309,10 +309,10 @@ async function processCleanup(operationRef, operation, leaseOwner, eventVersion)
     const cursor = (_b = operation.cursor) !== null && _b !== void 0 ? _b : null;
     let result;
     let nextStep = step;
-    if (step === 'fcmTokens' || step === 'notificationSettings') {
+    if (step === 'fcmTokens' || step === 'notificationSettings' || step === 'processNotifications') {
         result = await deleteSubcollectionPage(userRef, step, cursor);
         if (result.done)
-            nextStep = step === 'fcmTokens' ? 'notificationSettings' : 'rooms';
+            nextStep = step === 'fcmTokens' ? 'notificationSettings' : step === 'notificationSettings' ? 'processNotifications' : 'rooms';
     }
     else if (step === 'rooms') {
         result = await cleanQueryPage(db.collection('chatRooms').where('members', 'array-contains', operation.targetUid), cursor, (batch, document) => batch.update(document.ref, {
@@ -359,7 +359,7 @@ async function processCleanup(operationRef, operation, leaseOwner, eventVersion)
         processedCount: firestore_1.FieldValue.increment(result.count),
     });
 }
-exports.processUserDeletion = (0, firestore_2.onDocumentWritten)({ document: 'userDeletionOperations/{operationId}', retry: true }, async (event) => {
+exports.processUserDeletion = (0, firestore_2.onDocumentWritten)({ document: 'userDeletionOperations/{operationId}', retry: true, region: 'asia-northeast1', maxInstances: 3 }, async (event) => {
     var _a, _b;
     const after = (_a = event.data) === null || _a === void 0 ? void 0 : _a.after;
     if (!(after === null || after === void 0 ? void 0 : after.exists))

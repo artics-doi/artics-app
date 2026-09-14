@@ -14,6 +14,10 @@
   ],
   "extraResources": [
     {
+      "from": "electron/FEATHER-LICENSE.txt",
+      "to": "licenses/Feather.txt"
+    },
+    {
       "from": "public/icon-512x512.png",
       "to": "favicon.png"
     }

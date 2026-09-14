@@ -248,6 +248,12 @@ describe('Process rules: tasks', () => {
 });
 
 describe('Process rules: processMembers', () => {
+  it('他の登録メンバーの通知設定を全員が変更できる', async () => {
+    const bobDb = testEnv.authenticatedContext('bob').firestore();
+    await assertSucceeds(updateDoc(doc(bobDb, 'processMembers/mem1'), {
+      notification: { enabled: true, events: ['created', 'doing'] },
+    }));
+  });
   it('ログイン者は read/create/update/delete でき、非ログインは不可', async () => {
     const aliceDb = testEnv.authenticatedContext('alice').firestore();
     const anonDb = testEnv.unauthenticatedContext().firestore();
@@ -259,5 +265,20 @@ describe('Process rules: processMembers', () => {
 
     await assertFails(getDoc(doc(anonDb, 'processMembers/mem1')));
     await assertFails(addDoc(collection(anonDb, 'processMembers'), { name: 'blocked' }));
+  });
+});
+
+describe('Process rules: 本人専用通知受信箱', () => {
+  it('本人のみ読め、本人も含めてクライアントからの偽造・編集・削除は不可', async () => {
+    await testEnv.withSecurityRulesDisabled(async context => {
+      await setDoc(doc(context.firestore(), 'users/alice/processNotifications/n1'), { taskId: 'task1' });
+    });
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+    const bobDb = testEnv.authenticatedContext('bob').firestore();
+    await assertSucceeds(getDoc(doc(aliceDb, 'users/alice/processNotifications/n1')));
+    await assertFails(getDoc(doc(bobDb, 'users/alice/processNotifications/n1')));
+    await assertFails(setDoc(doc(aliceDb, 'users/alice/processNotifications/fake'), { taskId: 'fake' }));
+    await assertFails(updateDoc(doc(aliceDb, 'users/alice/processNotifications/n1'), { taskId: 'fake' }));
+    await assertFails(deleteDoc(doc(aliceDb, 'users/alice/processNotifications/n1')));
   });
 });

@@ -8,7 +8,7 @@
 //   ローカル ID（`local-` 接頭辞）と Firestore ID は別空間。重複表示しないよう
 //   `confirmOptimistic` で local 側を消す。
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from 'react';
 import {
   collection,
   query,
@@ -21,6 +21,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import type { ExtendedMessage } from '../types';
+import { captureMessageAnchor, restoreMessageAnchor, type MessageScrollAnchor } from '../lib/chat/messageScroll';
 
 const PAGE_SIZE = 50;
 
@@ -53,6 +54,13 @@ export function useMessages(roomId: string | undefined) {
   const olderMessagesRef = useRef<ExtendedMessage[]>([]);
   const generationRef = useRef(0);
   const loadingMoreRef = useRef(false);
+  const historyAnchorRef = useRef<MessageScrollAnchor | null>(null);
+
+  useLayoutEffect(() => {
+    const anchor = historyAnchorRef.current;
+    historyAnchorRef.current = null;
+    if (anchor && messageListRef.current) restoreMessageAnchor(messageListRef.current, anchor);
+  }, [olderMessages]);
 
   useEffect(() => {
     olderMessagesRef.current = olderMessages;
@@ -62,6 +70,7 @@ export function useMessages(roomId: string | undefined) {
   useEffect(() => {
     generationRef.current += 1;
     loadingMoreRef.current = false;
+    historyAnchorRef.current = null;
     setLoadingMore(false);
     setPendingMessages([]);
     setOlderMessages([]);
@@ -180,6 +189,9 @@ export function useMessages(roomId: string | undefined) {
       });
 
       olderMsgs.reverse();
+      // 通信中のスクロールも尊重し、追加を描画する直前の閲覧位置を保存する。
+      historyAnchorRef.current = messageListRef.current
+        ? captureMessageAnchor(messageListRef.current) : null;
       setOlderMessages((prev) => mergeMessagesById(olderMsgs, prev));
 
       if (olderMsgs.length > 0 && olderMsgs[0].createdAt) {

@@ -114,7 +114,8 @@ self.addEventListener('push', (event) => {
   const pushData = data.data || data;
 
   // messageId / scheduleNotificationId がない場合はスキップ
-  const notificationId = pushData.messageId || pushData.scheduleNotificationId;
+  const notificationId = pushData.processNotificationId
+    ? `process-${pushData.processNotificationId}` : pushData.messageId || pushData.scheduleNotificationId;
   if (!notificationId) {
     console.log('[firebase-messaging-sw.js] No notification id, ignoring duplicate');
     return;
@@ -157,12 +158,14 @@ self.addEventListener('push', (event) => {
       body: pushData.body || '',
       icon: '/icon-192x192.png',
       badge: '/icon-192x192.png',
-      tag: pushData.scheduleNotificationId
+      tag: pushData.processNotificationId ? notificationId : pushData.scheduleNotificationId
         ? `schedule-${pushData.scheduleId || 'default'}-${notificationId}`
         : `chat-${pushData.chatRoomId || 'default'}-${notificationId}`,
       data: {
         chatRoomId: pushData.chatRoomId,
         scheduleId: pushData.scheduleId,
+        projectId: pushData.projectId,
+        taskId: pushData.taskId,
         url: pushData.url || '/'
       },
       renotify: false  // 同じタグの通知は上書きしない

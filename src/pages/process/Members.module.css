@@ -202,3 +202,43 @@
   color: var(--text-secondary);
   font-size: 14px;
 }
+
+.notificationButton {
+  flex-shrink: 0;
+  border: 1px solid var(--process-card-border);
+  border-radius: 8px;
+  padding: 7px 12px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.notificationEnabled { background: #eee7ff; color: #6239a6; border-color: #a58ad1; }
+.notificationDialog {
+  margin: auto;
+  width: min(520px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  padding: 24px;
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-family: 'Noto Sans JP', sans-serif;
+}
+.notificationDialog::backdrop { background: rgb(0 0 0 / 45%); }
+.notificationDialog h2 { font-size: 18px; margin: 0 0 12px; }
+.notificationDialog p { color: var(--text-secondary); font-size: 13px; line-height: 1.8; margin: 10px 0 18px; }
+.notificationFields { border: 0; padding: 0; margin: 0; }
+.notificationMaster { display: flex; align-items: center; gap: 10px; font-weight: 700; padding: 14px 0; }
+.notificationMaster span { margin-left: auto; color: #9270d7; }
+.notificationEvents { border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 16px; display: grid; gap: 14px; }
+.notificationEvents legend { padding: 0 6px; font-size: 13px; }
+.notificationEvents label { display: flex; gap: 10px; align-items: center; font-size: 14px; }
+.notificationFields input { width: 17px; height: 17px; accent-color: #7755c9; }
+.notificationEvents:disabled { opacity: .5; }
+.notificationActions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+.notificationActions button { padding: 9px 18px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-secondary); color: var(--text-primary); font: inherit; cursor: pointer; }
+.notificationActions button[type='submit'] { background: #7755c9; color: white; }
+.notificationActions button:disabled { opacity: .5; cursor: default; }

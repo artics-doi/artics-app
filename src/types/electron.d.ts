@@ -1,4 +1,5 @@
 // Electron API の型定義
+import type { NotificationOptions } from '../../electron/notificationTypes';
 
 export interface NotificationSettings {
   enableNotifications: boolean;
@@ -32,7 +33,7 @@ export interface ElectronAPI {
   setNotificationSettings: (settings: NotificationSettings) => Promise<boolean>;
 
   // 通知を表示
-  showNotification: (options: { title: string; body: string; roomId?: string; scheduleId?: string; kind?: 'chat' | 'schedule' }) => Promise<boolean>;
+  showNotification: (options: NotificationOptions) => Promise<boolean>;
 
   // 常に手前に表示の状態を取得
   getAlwaysOnTop: () => Promise<boolean>;
@@ -72,6 +73,7 @@ export interface ElectronAPI {
 
   // 予定遷移のリスナー
   onNavigateToSchedule: (callback: (scheduleId: string) => void) => () => void;
+  onNavigateToProcessTask: (callback: (target: { projectId: string; taskId: string }) => void) => () => void;
 
   onNavigateToChatList: (callback: () => void) => () => void;
   onWindowControlsStateChanged: (callback: (state: WindowControlsState) => void) => () => void;

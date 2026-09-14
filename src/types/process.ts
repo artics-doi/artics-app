@@ -89,6 +89,13 @@ export interface ProcessMember {
   colorIndex: number;
   order: number;
   linkedUserId: string | null;
+  notification?: ProcessNotificationSettings;
+}
+
+export type ProcessNotificationEvent = 'created' | 'todo' | 'doing' | 'done' | 'hold';
+export interface ProcessNotificationSettings {
+  enabled: boolean;
+  events: ProcessNotificationEvent[];
 }
 
 // メンバー書き込み用。

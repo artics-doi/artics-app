@@ -1,6 +1,7 @@
 import * as admin from 'firebase-admin';
 import { FieldPath, FieldValue } from 'firebase-admin/firestore';
 import { onDocumentUpdated } from 'firebase-functions/v2/firestore';
+export { createProcessTaskNotifications, sendProcessTaskNotification } from './notifications';
 
 const TASKS_COLLECTION = 'tasks';
 const PAGE_SIZE = 200;

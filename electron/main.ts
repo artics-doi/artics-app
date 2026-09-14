@@ -16,6 +16,7 @@ import { autoUpdater } from 'electron-updater';
 
 import { SimpleStore, type StoreSchema } from './store';
 import { NotificationManager } from './notificationManager';
+import { parseProcessNotification, type NotificationOptions } from './notificationTypes';
 import {
   ELECTRON_ENTRY_HASH,
   getDevServerEntryUrl,
@@ -440,6 +441,23 @@ function setupIPC() {
   });
 
   // 全ての通知をクリアしてウィンドウを閉じる
+  ipcMain.on('open-process-task', (_event, target: { projectId?: unknown; taskId?: unknown }) => {
+    if (!target || typeof target.projectId !== 'string' || !target.projectId || target.projectId.includes('/')
+      || typeof target.taskId !== 'string' || !target.taskId || target.taskId.includes('/')
+      || !mainWindow || mainWindow.isDestroyed()) return;
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    if (!mainWindow.isMaximized()) {
+      const bounds = mainWindow.getBounds();
+      mainWindow.setBounds(getWorkspaceWindowBounds(bounds, screen.getDisplayMatching(bounds).workArea));
+    }
+    chatCompactMode = false;
+    sendWindowControlsState();
+    mainWindow.show();
+    mainWindow.focus();
+    mainWindow.webContents.send('navigate-to-process-task', target);
+  });
+
+  // 全ての通知をクリアしてウィンドウを閉じる
   ipcMain.on('clear-all-notifications', () => {
     notificationManager.clearAll();
   });
@@ -486,15 +504,22 @@ function setupIPC() {
   });
 
   // 通知を表示（NotificationManagerを使用）
-  ipcMain.handle('show-notification', (_event, options: { title: string; body: string; roomId?: string; scheduleId?: string; kind?: 'chat' | 'schedule' }) => {
+  ipcMain.handle('show-notification', (_event, options: NotificationOptions) => {
     const settings = store.get('notificationSettings');
 
     if (!settings.enableNotifications) {
       return false;
     }
 
+    const process = options.kind === 'process' ? parseProcessNotification(options.process) : undefined;
+    if (options.kind === 'process' && !process) return false;
     const body = settings.showMessageContent ? options.body : 'メッセージが届きました';
-    notificationManager.addNotification(options.title, body, options.roomId, options.kind, options.scheduleId);
+    // 内容非表示時は、工程名・タスク名・変更者・状態も伏せる。移動先のIDは保持する。
+    const visibleProcess = process && !settings.showMessageContent
+      ? { ...process, projectName: '', previousStatus: '', nextStatus: '', actorName: '', occurredAt: '' }
+      : process;
+    const title = process && !settings.showMessageContent ? '工程管理の更新があります' : options.title;
+    notificationManager.addNotification(title, body, options.roomId, options.kind, options.scheduleId, visibleProcess);
     return true;
   });
 

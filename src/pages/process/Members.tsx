@@ -21,6 +21,7 @@ import { accentOf } from '../../lib/process/colors';
 import { buildMemberReorderUpdates } from '../../lib/process/memberOrdering';
 import type { ProcessMember, ProcessMemberInput } from '../../types/process';
 import MemberFormModal from '../../components/process/MemberFormModal';
+import ProcessNotificationSettingsModal from '../../components/process/ProcessNotificationSettingsModal';
 import ConfirmModal from '../../components/modals/ConfirmModal';
 import { GripVerticalIcon, PlusIcon, MoreIcon } from '../../components/process/icons';
 import styles from './Members.module.css';
@@ -38,6 +39,7 @@ type SortableMemberRowProps = {
   onEdit: () => void;
   onDelete: () => void;
   onToggleMenu: () => void;
+  onNotification: () => void;
 };
 
 function SortableMemberRow({
@@ -47,6 +49,7 @@ function SortableMemberRow({
   onEdit,
   onDelete,
   onToggleMenu,
+  onNotification,
 }: SortableMemberRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: member.id,
@@ -85,6 +88,11 @@ function SortableMemberRow({
         )}
       </span>
       <div className={styles.spacer} />
+      <button type="button" className={`${styles.notificationButton} ${member.notification?.enabled ? styles.notificationEnabled : ''}`}
+        aria-label={`${member.name} の通知設定（${member.notification?.enabled ? 'ON' : 'OFF'}）`}
+        onClick={onNotification}>
+        通知 {member.notification?.enabled ? 'ON' : 'OFF'}
+      </button>
       <button
         type="button"
         className={styles.menuButton}
@@ -119,11 +127,12 @@ function SortableMemberRow({
 
 export default function Members() {
   const { currentUser } = useAuth();
-  const { members, loading, createMember, updateMember, deleteMember, reorderMembers } =
+  const { members, loading, createMember, updateMember, deleteMember, reorderMembers, updateNotification } =
     useProcessMembers(currentUser);
   const { users, fetchUsers } = useUsers({ includeSelf: true });
 
   const [formOpen, setFormOpen] = useState(false);
+  const [notificationMember, setNotificationMember] = useState<ProcessMember | null>(null);
   const [editing, setEditing] = useState<ProcessMember | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ProcessMember | null>(null);
@@ -187,6 +196,7 @@ export default function Members() {
       </div>
       <p className={styles.subTitle}>
         ここで登録した担当者を、カンバンのタスクやダッシュボードに割り当てられます。
+        通知は登録メンバーのみが対象です。「通知 OFF / ON」から、受け取るアクションを設定できます。
       </p>
 
       {loading ? (
@@ -220,6 +230,7 @@ export default function Members() {
                   }
                   menuOpen={openMenuId === member.id}
                   onEdit={() => openEdit(member)}
+                  onNotification={() => setNotificationMember(member)}
                   onDelete={() => {
                     setDeleteTarget(member);
                     setOpenMenuId(null);
@@ -240,6 +251,12 @@ export default function Members() {
           onSubmit={handleSubmit}
           onClose={() => setFormOpen(false)}
         />
+      )}
+
+      {notificationMember && (
+        <ProcessNotificationSettingsModal member={notificationMember}
+          onSave={settings => updateNotification(notificationMember.id, settings)}
+          onClose={() => setNotificationMember(null)} />
       )}
 
       {deleteTarget && (
