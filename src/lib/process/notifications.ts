@@ -5,6 +5,7 @@ export const PROCESS_NOTIFICATION_EVENTS: { value: ProcessNotificationEvent; lab
   { value: 'todo', label: '未着手へ変更' },
   { value: 'doing', label: '進行中へ変更' },
   { value: 'done', label: '完了へ変更' },
+  { value: 'approved', label: '完了承認（チェックを入れたとき）' },
   { value: 'hold', label: '保留へ変更' },
 ];
 
@@ -13,7 +14,8 @@ export function normalizeProcessNotification(value: unknown): ProcessNotificatio
   const events = Array.isArray(data.events)
     ? PROCESS_NOTIFICATION_EVENTS.map(item => item.value).filter(event => data.events instanceof Array && data.events.includes(event))
     : PROCESS_NOTIFICATION_EVENTS.map(item => item.value);
-  return { enabled: data.enabled === true, events };
+  // 旧enabledは廃止。選択済みアクションは維持し、設定なしは全種類を初期選択する。
+  return { events };
 }
 
 export function processTaskPath(projectId: string, taskId: string): string {

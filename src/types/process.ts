@@ -90,11 +90,11 @@ export interface ProcessMember {
   order: number;
   linkedUserId: string | null;
   notification?: ProcessNotificationSettings;
+  isTaskProgressManager?: boolean;
 }
 
-export type ProcessNotificationEvent = 'created' | 'todo' | 'doing' | 'done' | 'hold';
+export type ProcessNotificationEvent = 'created' | 'todo' | 'doing' | 'done' | 'hold' | 'approved';
 export interface ProcessNotificationSettings {
-  enabled: boolean;
   events: ProcessNotificationEvent[];
 }
 

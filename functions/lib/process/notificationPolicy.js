@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.PROCESS_EVENTS = void 0;
 exports.resolveProcessEvent = resolveProcessEvent;
 exports.processRecipientIds = processRecipientIds;
 exports.processNotificationUrl = processNotificationUrl;
@@ -22,13 +23,17 @@ function resolveProcessEvent(before, after, project) {
         return null;
     if (after.archived === true || after.isArchived === true || (before === null || before === void 0 ? void 0 : before.archived) === true || (before === null || before === void 0 ? void 0 : before.isArchived) === true)
         return null;
-    if (before && before.columnId === after.columnId)
-        return null;
     const columns = (Array.isArray(project.columns) ? project.columns : []).filter((value) => !!value && typeof value.id === 'string' && typeof value.name === 'string');
     const next = columns.find(column => column.id === after.columnId);
     if (!next)
         return null;
     const kind = columnKind(next);
+    if (before && before.columnId === after.columnId) {
+        // 完了列の未チェック→チェックだけを承認とする。解除や承認済みの編集は通知しない。
+        if (kind !== 'done' || before.completionChecked === true || after.completionChecked !== true)
+            return null;
+        return { event: 'approved', previousStatus: '承認前', nextStatus: '完了承認' };
+    }
     if (before && !['todo', 'doing', 'done', 'hold'].includes(kind))
         return null;
     return {
@@ -37,11 +42,20 @@ function resolveProcessEvent(before, after, project) {
         nextStatus: next.name,
     };
 }
-function processRecipientIds(members, event) {
+exports.PROCESS_EVENTS = ['created', 'todo', 'doing', 'done', 'approved', 'hold'];
+function processRecipientIds(members, event, assigneeIds) {
+    if (!exports.PROCESS_EVENTS.includes(event))
+        return [];
+    const assigned = new Set(Array.isArray(assigneeIds) ? assigneeIds.filter(id => typeof id === 'string') : []);
     return [...new Set(members.filter(member => {
             const settings = member.notification;
-            return typeof member.linkedUserId === 'string' && member.linkedUserId.length > 0 && !member.linkedUserId.includes('/')
-                && (settings === null || settings === void 0 ? void 0 : settings.enabled) === true && Array.isArray(settings.events) && settings.events.includes(event);
+            if (typeof member.linkedUserId !== 'string' || !member.linkedUserId || member.linkedUserId.includes('/'))
+                return false;
+            if (member.isTaskProgressManager === true)
+                return true;
+            // assigneeIdsはAuth UIDではなくprocessMembersの文書ID。旧enabledは参照しない。
+            const events = Array.isArray(settings === null || settings === void 0 ? void 0 : settings.events) ? settings.events : exports.PROCESS_EVENTS;
+            return typeof member.id === 'string' && assigned.has(member.id) && events.includes(event);
         }).map(member => member.linkedUserId))];
 }
 function processNotificationUrl(projectId, taskId) {

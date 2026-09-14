@@ -25,16 +25,11 @@ export default function ProcessNotificationSettingsModal({ member, onSave, onClo
         finally { setSaving(false); }
       }}>
         <h2 id="process-notification-title">{member.name}さんの工程管理通知</h2>
-        <p>担当者に関係なく、全プロジェクトのタスクの動きを通知します。<br />この設定は全員が変更できます。</p>
-        {!member.linkedUserId && <p role="status">アプリの登録ユーザーと紐付いていないため、通知を有効にできません。</p>}
+        <p>自分が担当するタスクについて、受け取る通知を選びます。<br />この設定は全員が変更できます。</p>
+        {member.isTaskProgressManager && <p className={styles.managerNotice}>タスク進捗管理者に指定されています。担当や下記の選択に関係なく、全タスクの全6種類の通知を受け取ります。下記の設定は管理者から外れた後に適用されます。</p>}
+        {!member.linkedUserId && <p role="status">アプリの登録ユーザーと紐付いていないため、通知を受け取れません。</p>}
         <fieldset disabled={saving || !member.linkedUserId} className={styles.notificationFields}>
-          <label className={styles.notificationMaster}>
-            <input type="checkbox" checked={draft.enabled}
-              onChange={event => setDraft({ ...draft, enabled: event.target.checked })} />
-            通知を受け取る
-            <span>{draft.enabled ? 'ON' : 'OFF'}</span>
-          </label>
-          <fieldset disabled={!draft.enabled} className={styles.notificationEvents}>
+          <fieldset className={styles.notificationEvents}>
             <legend>通知するアクション</legend>
             {PROCESS_NOTIFICATION_EVENTS.map(item => (
               <label key={item.value}>
@@ -46,11 +41,11 @@ export default function ProcessNotificationSettingsModal({ member, onSave, onClo
             ))}
           </fieldset>
         </fieldset>
-        {draft.enabled && draft.events.length === 0 && <p role="status">通知するアクションを1つ以上選んでください。</p>}
+        {draft.events.length === 0 && <p role="status">担当者として受け取る通知はありません。進捗管理者への通知はこの選択に影響されません。</p>}
         {error && <p role="alert">{error}</p>}
         <div className={styles.notificationActions}>
           <button type="button" onClick={onClose} disabled={saving}>キャンセル</button>
-          <button type="submit" disabled={saving || (draft.enabled && (!member.linkedUserId || draft.events.length === 0))}>
+          <button type="submit" disabled={saving || !member.linkedUserId}>
             {saving ? '保存中…' : '保存'}
           </button>
         </div>

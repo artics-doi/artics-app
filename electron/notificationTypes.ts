@@ -2,7 +2,7 @@ export interface ProcessNotificationDetails {
   projectId: string;
   taskId: string;
   projectName: string;
-  event: 'created' | 'todo' | 'doing' | 'done' | 'hold';
+  event: 'created' | 'todo' | 'doing' | 'done' | 'hold' | 'approved';
   previousStatus: string;
   nextStatus: string;
   actorName: string;
@@ -25,7 +25,7 @@ export function parseProcessNotification(value: unknown): ProcessNotificationDet
   const data = value as Record<string, unknown>;
   if (typeof data.projectId !== 'string' || !data.projectId || data.projectId.includes('/')
     || typeof data.taskId !== 'string' || !data.taskId || data.taskId.includes('/')) return;
-  if (!['created', 'todo', 'doing', 'done', 'hold'].includes(String(data.event))) return;
+  if (!['created', 'todo', 'doing', 'done', 'hold', 'approved'].includes(String(data.event))) return;
   const text = (key: string) => typeof data[key] === 'string' ? data[key].slice(0, 500) : '';
   return {
     projectId: data.projectId, taskId: data.taskId,

@@ -22,6 +22,7 @@ import { buildMemberReorderUpdates } from '../../lib/process/memberOrdering';
 import type { ProcessMember, ProcessMemberInput } from '../../types/process';
 import MemberFormModal from '../../components/process/MemberFormModal';
 import ProcessNotificationSettingsModal from '../../components/process/ProcessNotificationSettingsModal';
+import TaskProgressManagersSection from '../../components/process/TaskProgressManagersSection';
 import ConfirmModal from '../../components/modals/ConfirmModal';
 import { GripVerticalIcon, PlusIcon, MoreIcon } from '../../components/process/icons';
 import styles from './Members.module.css';
@@ -88,10 +89,10 @@ function SortableMemberRow({
         )}
       </span>
       <div className={styles.spacer} />
-      <button type="button" className={`${styles.notificationButton} ${member.notification?.enabled ? styles.notificationEnabled : ''}`}
-        aria-label={`${member.name} の通知設定（${member.notification?.enabled ? 'ON' : 'OFF'}）`}
+      <button type="button" className={styles.notificationButton}
+        aria-label={`${member.name} の通知設定`}
         onClick={onNotification}>
-        通知 {member.notification?.enabled ? 'ON' : 'OFF'}
+        通知設定
       </button>
       <button
         type="button"
@@ -127,7 +128,7 @@ function SortableMemberRow({
 
 export default function Members() {
   const { currentUser } = useAuth();
-  const { members, loading, createMember, updateMember, deleteMember, reorderMembers, updateNotification } =
+  const { members, loading, createMember, updateMember, deleteMember, reorderMembers, updateNotification, updateProgressManager } =
     useProcessMembers(currentUser);
   const { users, fetchUsers } = useUsers({ includeSelf: true });
 
@@ -196,8 +197,10 @@ export default function Members() {
       </div>
       <p className={styles.subTitle}>
         ここで登録した担当者を、カンバンのタスクやダッシュボードに割り当てられます。
-        通知は登録メンバーのみが対象です。「通知 OFF / ON」から、受け取るアクションを設定できます。
+        タスクの担当者へ通知します。「通知設定」から、担当タスクで受け取るアクションを選べます。
       </p>
+
+      <TaskProgressManagersSection members={members} loading={loading} onChange={updateProgressManager} />
 
       {loading ? (
         <p className={styles.loadingText}>読み込み中...</p>
@@ -254,7 +257,7 @@ export default function Members() {
       )}
 
       {notificationMember && (
-        <ProcessNotificationSettingsModal member={notificationMember}
+        <ProcessNotificationSettingsModal member={members.find(member => member.id === notificationMember.id) ?? notificationMember}
           onSave={settings => updateNotification(notificationMember.id, settings)}
           onClose={() => setNotificationMember(null)} />
       )}

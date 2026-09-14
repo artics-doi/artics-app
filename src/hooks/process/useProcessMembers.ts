@@ -17,6 +17,7 @@ import {
 import { db } from '../../lib/firebase';
 import { PROCESS_COLLECTIONS } from '../../constants/process';
 import { memberInputToCreateData, toMember } from '../../lib/process/converters';
+import { normalizeProcessNotification } from '../../lib/process/notifications';
 import type { MemberOrderUpdate } from '../../lib/process/memberOrdering';
 import type { ProcessMember, ProcessMemberInput, ProcessNotificationSettings } from '../../types/process';
 
@@ -90,8 +91,16 @@ export function useProcessMembers(currentUser: FirebaseUser | null) {
 
   const updateNotification = useCallback(async (memberId: string, notification: ProcessNotificationSettings) => {
     if (!currentUser) throw new Error('ログインが必要です');
-    await updateDoc(doc(db, PROCESS_COLLECTIONS.members, memberId), { notification });
+    await updateDoc(doc(db, PROCESS_COLLECTIONS.members, memberId), { notification: normalizeProcessNotification(notification) });
   }, [currentUser]);
+
+  const updateProgressManager = useCallback(async (memberId: string, isTaskProgressManager: boolean) => {
+    if (!currentUser) throw new Error('ログインが必要です');
+    const member = members.find(item => item.id === memberId);
+    if (!member || (isTaskProgressManager && !member.linkedUserId)) throw new Error('登録ユーザーと紐付いたメンバーを選んでください');
+    // 他メンバーの変更や通知設定を上書きしないよう、該当フィールドだけ更新する。
+    await updateDoc(doc(db, PROCESS_COLLECTIONS.members, memberId), { isTaskProgressManager });
+  }, [currentUser, members]);
 
   const reorderMembers = useCallback(
     async (updates: readonly MemberOrderUpdate[]) => {
@@ -118,6 +127,7 @@ export function useProcessMembers(currentUser: FirebaseUser | null) {
     createMember,
     updateMember,
     updateNotification,
+    updateProgressManager,
     deleteMember,
     reorderMembers,
   };

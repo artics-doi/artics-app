@@ -252,12 +252,12 @@ export function generateNotificationHTML(notifications: NotificationDisplayItem[
             if (data.nextStatus) {
               const transition = document.createElement('div');
               transition.className = 'process-transition';
-              if (data.event !== 'created') {
+              if (data.event !== 'created' && data.event !== 'approved') {
                 transition.appendChild(element('process-status', data.previousStatus));
                 const arrow = document.createElement('span');
                 arrow.innerHTML = ${JSON.stringify(notificationIcons['arrow-right'])};
                 transition.appendChild(arrow);
-              } else {
+              } else if (data.event === 'created') {
                 transition.appendChild(element('process-status', '新タスク'));
               }
               transition.appendChild(element('process-status next', data.nextStatus));
@@ -266,7 +266,7 @@ export function generateNotificationHTML(notifications: NotificationDisplayItem[
             if (data.actorName) {
               const date = new Date(data.occurredAt);
               const time = Number.isNaN(date.getTime()) ? '' : date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-              item.appendChild(element('process-actor', (data.event === 'created' ? '作成者：' : '変更者：') + data.actorName + '  ' + time));
+              item.appendChild(element('process-actor', (data.event === 'created' ? '作成者：' : data.event === 'approved' ? '承認者：' : '変更者：') + data.actorName + '  ' + time));
             }
             const open = element('process-open', 'クリックしてタスクを確認');
             const chevron = document.createElement('span');

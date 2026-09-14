@@ -13,7 +13,8 @@ exports.createProcessTaskNotifications = (0, firestore_2.onDocumentWrittenWithAu
     var _a, _b, _c;
     const after = (_a = event.data) === null || _a === void 0 ? void 0 : _a.after.data();
     const before = (_b = event.data) === null || _b === void 0 ? void 0 : _b.before.data();
-    if (!after || (before && before.columnId === after.columnId))
+    if (!after || (before && before.columnId === after.columnId
+        && !(before.completionChecked !== true && after.completionChecked === true)))
         return;
     const db = admin.firestore();
     const projectId = after.projectId;
@@ -27,7 +28,8 @@ exports.createProcessTaskNotifications = (0, firestore_2.onDocumentWrittenWithAu
     if (!change)
         return;
     const members = await db.collection('processMembers').get();
-    const recipients = (0, notificationPolicy_1.processRecipientIds)(members.docs.map(doc => doc.data()), change.event);
+    const assigneeIds = Array.isArray(after.assigneeIds) ? after.assigneeIds.filter(id => typeof id === 'string') : [];
+    const recipients = (0, notificationPolicy_1.processRecipientIds)(members.docs.map(doc => (Object.assign(Object.assign({}, doc.data()), { id: doc.id }))), change.event, assigneeIds);
     if (!recipients.length)
         return;
     // authId は実際の書き込み元。古いクライアントの残存 updatedBy は使わない。
@@ -46,7 +48,7 @@ exports.createProcessTaskNotifications = (0, firestore_2.onDocumentWrittenWithAu
             const [existing, user] = await Promise.all([transaction.get(ref), transaction.get(db.collection('users').doc(uid))]);
             if (existing.exists || !user.exists || ((_b = (_a = user.data()) === null || _a === void 0 ? void 0 : _a.lifecycleState) !== null && _b !== void 0 ? _b : 'active') !== 'active')
                 return;
-            transaction.create(ref, Object.assign(Object.assign({ projectId, taskId: event.params.taskId, projectName: String(project.name || 'プロジェクト'), taskTitle: String(after.title || 'タスク') }, change), { actorName: String(actorName), occurredAt, createdAt: occurredAt }));
+            transaction.create(ref, Object.assign(Object.assign({ projectId, taskId: event.params.taskId, projectName: String(project.name || 'プロジェクト'), taskTitle: String(after.title || 'タスク') }, change), { actorName: String(actorName), occurredAt, createdAt: occurredAt, assigneeIds, recipientPolicyVersion: 2 }));
         });
     }
 });
@@ -56,15 +58,25 @@ exports.sendProcessTaskNotification = (0, firestore_2.onDocumentCreated)({ docum
     const notification = (_a = event.data) === null || _a === void 0 ? void 0 : _a.data();
     if (!notification)
         return;
+    // 旧「全メンバー」仕様の保留通知を、新仕様で意図せず配信しない。
+    if (notification.recipientPolicyVersion !== 2 || typeof notification.taskId !== 'string' || !notification.taskId || notification.taskId.includes('/'))
+        return;
     const db = admin.firestore();
     const uid = event.params.userId;
-    const [user, members] = await Promise.all([
+    const [user, members, task] = await Promise.all([
         db.collection('users').doc(uid).get(),
         db.collection('processMembers').where('linkedUserId', '==', uid).get(),
+        db.collection('tasks').doc(notification.taskId).get(),
     ]);
     if (!user.exists || ((_c = (_b = user.data()) === null || _b === void 0 ? void 0 : _b.lifecycleState) !== null && _c !== void 0 ? _c : 'active') !== 'active')
         return;
-    if (!(0, notificationPolicy_1.processRecipientIds)(members.docs.map(doc => doc.data()), notification.event).includes(uid))
+    const currentTask = task.data();
+    if (!currentTask || currentTask.projectId !== notification.projectId || currentTask.archived === true || currentTask.isArchived === true)
+        return;
+    const currentMembers = members.docs.map(doc => (Object.assign(Object.assign({}, doc.data()), { id: doc.id })));
+    // 設定・担当・管理者指定が解除されていたら、再試行時にも送信しない。
+    if (!(0, notificationPolicy_1.processRecipientIds)(currentMembers, notification.event, notification.assigneeIds).includes(uid)
+        || !(0, notificationPolicy_1.processRecipientIds)(currentMembers, notification.event, currentTask.assigneeIds).includes(uid))
         return;
     const deliveryId = `process_${uid}_${event.params.notificationId}`;
     const claim = await (0, notificationDelivery_1.claimDelivery)(db, deliveryId);
@@ -93,7 +105,7 @@ exports.sendProcessTaskNotification = (0, firestore_2.onDocumentCreated)({ docum
                 tokens: chunk,
                 data: {
                     title: `工程管理｜${notification.taskTitle}`,
-                    body: `${notification.projectName}\n${notification.event === 'created' ? '新タスク作成' : `${notification.previousStatus} → ${notification.nextStatus}`}\n変更者：${notification.actorName}`,
+                    body: `${notification.projectName}\n${notification.event === 'created' ? '新タスク作成' : notification.event === 'approved' ? '完了承認' : `${notification.previousStatus} → ${notification.nextStatus}`}\n${notification.event === 'approved' ? '承認者' : '変更者'}：${notification.actorName}`,
                     processNotificationId: event.params.notificationId,
                     projectId: notification.projectId, taskId: notification.taskId, url,
                 },

@@ -12,7 +12,8 @@ export const createProcessTaskNotifications = onDocumentWrittenWithAuthContext(
   async event => {
     const after = event.data?.after.data();
     const before = event.data?.before.data();
-    if (!after || (before && before.columnId === after.columnId)) return;
+    if (!after || (before && before.columnId === after.columnId
+      && !(before.completionChecked !== true && after.completionChecked === true))) return;
     const db = admin.firestore();
     const projectId = after.projectId;
     if (typeof projectId !== 'string' || !projectId) return;
@@ -22,7 +23,8 @@ export const createProcessTaskNotifications = onDocumentWrittenWithAuthContext(
     const change = resolveProcessEvent(before, after, project);
     if (!change) return;
     const members = await db.collection('processMembers').get();
-    const recipients = processRecipientIds(members.docs.map(doc => doc.data()), change.event);
+    const assigneeIds = Array.isArray(after.assigneeIds) ? after.assigneeIds.filter(id => typeof id === 'string') : [];
+    const recipients = processRecipientIds(members.docs.map(doc => ({ ...doc.data(), id: doc.id })), change.event, assigneeIds);
     if (!recipients.length) return;
     // authId は実際の書き込み元。古いクライアントの残存 updatedBy は使わない。
     const actorId = event.authId || (!before && typeof after.createdBy === 'string' ? after.createdBy : '');
@@ -40,7 +42,7 @@ export const createProcessTaskNotifications = onDocumentWrittenWithAuthContext(
         transaction.create(ref, {
           projectId, taskId: event.params.taskId, projectName: String(project.name || 'プロジェクト'),
           taskTitle: String(after.title || 'タスク'), ...change, actorName: String(actorName),
-          occurredAt, createdAt: occurredAt,
+          occurredAt, createdAt: occurredAt, assigneeIds, recipientPolicyVersion: 2,
         });
       });
     }
@@ -53,14 +55,22 @@ export const sendProcessTaskNotification = onDocumentCreated(
   async event => {
     const notification = event.data?.data();
     if (!notification) return;
+    // 旧「全メンバー」仕様の保留通知を、新仕様で意図せず配信しない。
+    if (notification.recipientPolicyVersion !== 2 || typeof notification.taskId !== 'string' || !notification.taskId || notification.taskId.includes('/')) return;
     const db = admin.firestore();
     const uid = event.params.userId;
-    const [user, members] = await Promise.all([
+    const [user, members, task] = await Promise.all([
       db.collection('users').doc(uid).get(),
       db.collection('processMembers').where('linkedUserId', '==', uid).get(),
+      db.collection('tasks').doc(notification.taskId).get(),
     ]);
     if (!user.exists || (user.data()?.lifecycleState ?? 'active') !== 'active') return;
-    if (!processRecipientIds(members.docs.map(doc => doc.data()), notification.event as ProcessEvent).includes(uid)) return;
+    const currentTask = task.data();
+    if (!currentTask || currentTask.projectId !== notification.projectId || currentTask.archived === true || currentTask.isArchived === true) return;
+    const currentMembers = members.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+    // 設定・担当・管理者指定が解除されていたら、再試行時にも送信しない。
+    if (!processRecipientIds(currentMembers, notification.event as ProcessEvent, notification.assigneeIds).includes(uid)
+      || !processRecipientIds(currentMembers, notification.event as ProcessEvent, currentTask.assigneeIds).includes(uid)) return;
     const deliveryId = `process_${uid}_${event.params.notificationId}`;
     const claim = await claimDelivery(db, deliveryId);
     if (claim === 'already_sent' || claim === 'exhausted') return;
@@ -84,7 +94,7 @@ export const sendProcessTaskNotification = onDocumentCreated(
           tokens: chunk,
           data: {
             title: `工程管理｜${notification.taskTitle}`,
-            body: `${notification.projectName}\n${notification.event === 'created' ? '新タスク作成' : `${notification.previousStatus} → ${notification.nextStatus}`}\n変更者：${notification.actorName}`,
+            body: `${notification.projectName}\n${notification.event === 'created' ? '新タスク作成' : notification.event === 'approved' ? '完了承認' : `${notification.previousStatus} → ${notification.nextStatus}`}\n${notification.event === 'approved' ? '承認者' : '変更者'}：${notification.actorName}`,
             processNotificationId: event.params.notificationId,
             projectId: notification.projectId, taskId: notification.taskId, url,
           },

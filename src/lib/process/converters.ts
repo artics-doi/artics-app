@@ -120,6 +120,7 @@ export function toMember(id: string, data: DocumentData): ProcessMember {
     order: asNumber(data.order),
     linkedUserId: typeof data.linkedUserId === 'string' ? data.linkedUserId : null,
     notification: normalizeProcessNotification(data.notification),
+    isTaskProgressManager: data.isTaskProgressManager === true,
   };
 }
 
@@ -237,5 +238,6 @@ export function memberInputToCreateData(input: ProcessMemberInput, order: number
     linkedUserId: input.linkedUserId,
     order,
     notification: normalizeProcessNotification(null),
+    isTaskProgressManager: false,
   };
 }
