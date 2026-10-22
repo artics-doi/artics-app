@@ -302,6 +302,8 @@
   flex-direction: column;
   gap: 8px;
   background: var(--bg-chat);
+  /* 名前・時刻・日付へ選択が広がらないようにする。本文と入力欄だけ後で text に戻す。 */
+  user-select: none;
 }
 
 .dateDivider {
@@ -914,6 +916,22 @@
   white-space: pre-wrap;
   line-height: 1.45;
   font-size: 15px;
+  user-select: text;
+}
+
+/* 一覧全体は選択不可。編集中の本文と送信欄は選べるように戻す。 */
+.editTextarea,
+.messageInput {
+  user-select: text;
+}
+
+/* スマホの長押しはメニュー用。ブラウザ標準の選択とコールアウトは出さない。 */
+@media (pointer: coarse) {
+  .messageText {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
 }
 
 .deletedFile {

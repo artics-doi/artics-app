@@ -104,7 +104,7 @@ schedules/{scheduleId}, projects/{projectId}, tasks/{taskId}, settings/{releaseN
 | テスト | 対象 | 実行 |
 |---|---|---|
 | `tests/lib/utils/` | dateUtils / room / passwordStrength | `npm run test`（vitest、emulator 不要） |
-| `tests/lib/chat/` | reactions / menuPosition / messageText | 同上 |
+| `tests/lib/chat/` | reactions / menuPosition / messageText / messageSelection | 同上 |
 | `tests/lib/schedule/` | calendar / events / form | 同上 |
 | `tests/lib/process/` | 工程管理の純ロジック 11 ファイル | 同上 |
 | `tests/lib/desktop/` | デスクトップ更新ファイルの選択と配信 URL の一致 | 同上 |

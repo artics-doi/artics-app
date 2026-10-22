@@ -2,12 +2,19 @@
 // Chat.tsx から機械的に移動（挙動変更なし）。状態と Firestore 操作はすべて親が保持し props で受け取る。
 // スタイルは親ページの Chat.module.css をそのまま使う。
 
-import { Fragment, type Dispatch, type RefObject, type SetStateAction } from 'react';
+import { Fragment, memo, useCallback, useEffect, useRef, type Dispatch, type RefObject, type SetStateAction } from 'react';
 import type { User as FirebaseUser } from 'firebase/auth';
 import type { ChatRoom, ExtendedMessage } from '../../types';
 import type { MenuPosition } from '../../lib/chat/menuPosition';
 import type { ToastType } from '../../contexts/ToastContext';
 import { getReactionEntries, hasUserReacted } from '../../lib/chat/reactions';
+import {
+  messageTextIdFromNode,
+  resolveCopyText,
+  selectedTextWithinMessage,
+  selectionClampPlan,
+  trimSelectionToElement,
+} from '../../lib/chat/messageSelection';
 import { formatDateLabel, formatTimeSmart } from '../../utils/dateUtils';
 import { downloadFile } from '../../utils/fileDownload';
 import { PRIMARY_REACTION_EMOJIS, SECONDARY_REACTION_EMOJIS } from '../../constants';
@@ -16,6 +23,41 @@ import { renderMessageText } from './messageText';
 import styles from '../../pages/Chat.module.css';
 
 const formatTime = formatTimeSmart;
+
+interface StableMessageBodyProps {
+  messageId: string;
+  text: string;
+  isEdited: boolean;
+  showToast: (type: ToastType, message: string) => void;
+}
+
+// メニューの開閉で本文の DOM を作り直すと、選択範囲が消える。
+// 本文・編集表示が同じ間は再描画しない。
+const StableMessageBody = memo(function StableMessageBody({
+  messageId,
+  text,
+  isEdited,
+  showToast,
+}: StableMessageBodyProps) {
+  return (
+    <p className={styles.messageText} data-message-text={messageId}>
+      {renderMessageText(text, showToast)}
+      {isEdited && (
+        <span className={styles.editedLabel} title="このメッセージは編集されました">
+          <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ marginRight: 2, verticalAlign: 'middle' }} aria-hidden="true">
+            <path d="M12 20h9" />
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+          </svg>
+          (編集済み)
+        </span>
+      )}
+    </p>
+  );
+}, (prev, next) => (
+  prev.messageId === next.messageId
+  && prev.text === next.text
+  && prev.isEdited === next.isEdited
+));
 
 interface ChatMessageListProps {
   messages: ExtendedMessage[];
@@ -100,6 +142,45 @@ export default function ChatMessageList({
   dismissOptimistic,
   showToast,
 }: ChatMessageListProps) {
+  // 右クリックでメニューを開く直前の選択文字。描画で範囲が消えてもコピーに使う。
+  const copySelectionRef = useRef<{ messageId: string; text: string | null } | null>(null);
+  const prepareMessageMenu = useCallback((messageId: string) => {
+    copySelectionRef.current = {
+      messageId,
+      text: selectedTextWithinMessage(messageId, window.getSelection()),
+    };
+  }, []);
+
+  useEffect(() => {
+    const root = messageListRef.current;
+    if (!root) return;
+    let adjusting = false;
+    const onSelectionChange = () => {
+      if (adjusting) return;
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return;
+      const plan = selectionClampPlan(
+        messageTextIdFromNode(selection.anchorNode),
+        messageTextIdFromNode(selection.focusNode),
+      );
+      if (plan.type !== 'trim-to') return;
+      const textRoot = root.querySelector(
+        `[data-message-text="${CSS.escape(plan.messageId)}"]`,
+      );
+      if (!(textRoot instanceof HTMLElement)) return;
+      adjusting = true;
+      try {
+        trimSelectionToElement(selection, textRoot);
+      } finally {
+        queueMicrotask(() => {
+          adjusting = false;
+        });
+      }
+    };
+    document.addEventListener('selectionchange', onSelectionChange);
+    return () => document.removeEventListener('selectionchange', onSelectionChange);
+  }, [messageListRef]);
+
   return (
     <div className={styles.messageList} ref={messageListRef} onScroll={onScroll}>
       {loadingMore && (
@@ -197,6 +278,7 @@ export default function ChatMessageList({
                     <MessageBubbleInteractive
                       messageId={message.id}
                       className={styles.messageContainer}
+                      onPrepareMenu={prepareMessageMenu}
                       onToggleMenu={(id) => {
                         if (showMessageMenu === id) {
                           setShowMessageMenu(null);
@@ -214,6 +296,10 @@ export default function ChatMessageList({
                           onClick={(e) => e.stopPropagation()}
                           onPointerDown={(e) => e.stopPropagation()}
                           onPointerUp={(e) => e.stopPropagation()}
+                          onMouseDown={(e) => {
+                            // 選択中にボタンを押しても範囲を消さない。消えるとコピーが全文になる。
+                            if (window.getSelection()?.isCollapsed === false) e.preventDefault();
+                          }}
                         >
                           <button onClick={() => {
                             setReplyingTo(message);
@@ -223,7 +309,13 @@ export default function ChatMessageList({
                             返信
                           </button>
                           {!message.isDeleted && message.text && (
-                            <button onClick={() => copyMessageText(message.text)}>
+                            <button onClick={() => {
+                              const live = selectedTextWithinMessage(message.id, window.getSelection());
+                              const remembered = copySelectionRef.current?.messageId === message.id
+                                ? copySelectionRef.current.text
+                                : null;
+                              copyMessageText(resolveCopyText(message.text, live ?? remembered));
+                            }}>
                               コピー
                             </button>
                           )}
@@ -385,19 +477,12 @@ export default function ChatMessageList({
                               </div>
                             ) : (
                               message.text && (
-                                <p className={styles.messageText}>
-                                  {renderMessageText(message.text, showToast)}
-                                  {message.isEdited && (
-                                    <span className={styles.editedLabel} title="このメッセージは編集されました">
-                                      {/* L-3: 編集済みアイコン併用 */}
-                                      <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ marginRight: 2, verticalAlign: 'middle' }} aria-hidden="true">
-                                        <path d="M12 20h9" />
-                                        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
-                                      </svg>
-                                      (編集済み)
-                                    </span>
-                                  )}
-                                </p>
+                                <StableMessageBody
+                                  messageId={message.id}
+                                  text={message.text}
+                                  isEdited={Boolean(message.isEdited)}
+                                  showToast={showToast}
+                                />
                               )
                             )}
                           </>
