@@ -19,7 +19,7 @@ import { formatDateLabel, formatTimeSmart } from '../../utils/dateUtils';
 import { downloadFile } from '../../utils/fileDownload';
 import { PRIMARY_REACTION_EMOJIS, SECONDARY_REACTION_EMOJIS } from '../../constants';
 import MessageBubbleInteractive from './MessageBubbleInteractive';
-import { renderMessageText } from './messageText';
+import { renderLinkPreview, renderMessageText } from './messageText';
 import styles from '../../pages/Chat.module.css';
 
 const formatTime = formatTimeSmart;
@@ -485,6 +485,7 @@ export default function ChatMessageList({
                                 />
                               )
                             )}
+                            {editingMessageId !== message.id && renderLinkPreview(message.linkPreview)}
                           </>
                         )}
                       </div>

@@ -71,7 +71,10 @@ import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { resolveMenuPosition } from '../lib/chat/menuPosition';
 import { createScheduleFormFromMessage, createTaskInputFromMessage } from '../lib/chat/createFromMessage';
 import { isPermissionDeniedError, withoutAttachmentFields } from '../lib/chat/attachmentCompat';
-import { getClipboardImageFiles, validatePendingAttachments } from '../lib/chat/pendingAttachments';
+import { getClipboardFiles, validatePendingAttachments } from '../lib/chat/pendingAttachments';
+import { blockedAttachmentMessage, isBlockedAttachmentName } from '../lib/chat/blockedAttachments';
+import { firstPreviewUrl } from '../lib/chat/linkPreview';
+import { fetchStoredLinkPreview } from '../lib/chat/linkPreviewClient';
 import { canDeleteChatRoom } from '../lib/chat/roomDeletion';
 import { deleteChatRoom } from '../lib/chat/roomDeletionClient';
 import { getArrivingMessages } from '../lib/chat/messageScroll';
@@ -602,6 +605,9 @@ export default function Chat({ embeddedRoomId, onEmbeddedBack }: ChatProps = {})
       if (messageInputRef.current) messageInputRef.current.style.height = 'auto';
 
       try {
+        // プレビューは送信のときだけ1回取る。失敗しても本文のリンクはそのまま送る。
+        const previewUrl = firstPreviewUrl(text);
+        const linkPreview = previewUrl ? await fetchStoredLinkPreview(previewUrl) : null;
         const messageData: Record<string, unknown> = {
           chatRoomId: roomId,
           senderId: currentUser.uid,
@@ -624,6 +630,7 @@ export default function Chat({ embeddedRoomId, onEmbeddedBack }: ChatProps = {})
           isPinned: false,
           mentions,
         };
+        if (linkPreview) messageData.linkPreview = linkPreview;
 
         await addDoc(collection(db, 'chatRooms', roomId, 'messages'), messageData);
         await updateDoc(doc(db, 'chatRooms', roomId), {
@@ -978,7 +985,13 @@ export default function Chat({ embeddedRoomId, onEmbeddedBack }: ChatProps = {})
   // ファイルは選択時点では送信せず、送信ボタンが押されるまで入力欄に保持する。
   function queueFiles(files: File[]) {
     if (files.length === 0) return;
-    const nextFiles = [...pendingFiles, ...files];
+    const blocked = files.filter((file) => isBlockedAttachmentName(file.name));
+    const allowed = files.filter((file) => !isBlockedAttachmentName(file.name));
+    if (blocked.length > 0) {
+      showToast('warning', blockedAttachmentMessage(blocked.map((file) => file.name)));
+    }
+    if (allowed.length === 0) return;
+    const nextFiles = [...pendingFiles, ...allowed];
     const validation = validatePendingAttachments(nextFiles, MAX_FILE_SIZE);
     if (!validation.valid) {
       const sizeMB = (validation.size / (1024 * 1024)).toFixed(1);
@@ -1000,12 +1013,12 @@ export default function Chat({ embeddedRoomId, onEmbeddedBack }: ChatProps = {})
 
   function handleMessagePaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
     if (sending || uploading) return;
-    const imageFiles = getClipboardImageFiles(Array.from(e.clipboardData.items));
-    if (imageFiles.length === 0) return;
+    const files = getClipboardFiles(Array.from(e.clipboardData.items));
+    if (files.length === 0) return;
 
-    // 画像貼り付け時にブラウザ固有の代替テキストやHTMLが入力されないようにする。
+    // ファイル貼り付け時に、ブラウザがファイル名やHTMLを本文へ入れないようにする。
     e.preventDefault();
-    queueFiles(imageFiles);
+    queueFiles(files);
   }
 
   function removePendingFile(index: number) {
@@ -1019,6 +1032,11 @@ export default function Chat({ embeddedRoomId, onEmbeddedBack }: ChatProps = {})
     replyToSnapshot: ExtendedMessage['replyTo'],
   ): Promise<boolean> => {
     if (!currentUser || !roomId) return false;
+    const blocked = files.find((file) => isBlockedAttachmentName(file.name));
+    if (blocked) {
+      showToast('warning', blockedAttachmentMessage([blocked.name]));
+      return false;
+    }
     setUploadProgress({ current: 0, total: files.length });
     try {
       for (let i = 0; i < files.length; i++) {
@@ -1703,7 +1721,6 @@ export default function Chat({ embeddedRoomId, onEmbeddedBack }: ChatProps = {})
           onChange={handleFileSelection}
           style={{ display: 'none' }}
           multiple
-          accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
         />
         <button
           type="button"

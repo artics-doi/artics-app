@@ -74,6 +74,12 @@ export interface ExtendedMessage extends Message {
   } | null;
   isPinned?: boolean;
   mentions?: string[]; // mentioned userIds
+  linkPreview?: {
+    url: string;
+    title: string;
+    description: string;
+    siteName: string;
+  } | null;
   // 楽観的更新用フラグ（Firestore には存在しないクライアント内部の状態）
   _pending?: 'sending' | 'failed';
 }

@@ -7,6 +7,7 @@ import { isElectronEnv } from '../../hooks/useElectronNotification';
 import type { ToastType } from '../../contexts/ToastContext';
 import styles from '../../pages/Chat.module.css';
 import { isAllowedHttpsUrl } from '../../lib/security/resourceTarget';
+import type { LinkPreview } from '../../lib/chat/linkPreview';
 
 const HTTP_URL_REGEX = /(https?:\/\/[^\s]+)/g;
 const NAS_PATH_REGEX = /"(\\\\(?:Nas-1|Nas-3)\\[^"\r\n]+)"|(\\\\(?:Nas-1|Nas-3)\\[^\s\r\n]+)/g;
@@ -99,4 +100,31 @@ export function renderMessageText(text: string, showToast: ShowToast): React.Rea
 
     return elements;
   });
+}
+
+// 保存済みのタイトルと説明だけを出す。HTMLは受け取らない。
+export function renderLinkPreview(preview: LinkPreview | null | undefined): React.ReactNode {
+  if (!preview || (!preview.title && !preview.description)) return null;
+  if (!isAllowedHttpsUrl(preview.url)) return null;
+  return (
+    <a
+      className={styles.linkPreview}
+      href={preview.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      onPointerDown={(event) => event.stopPropagation()}
+      onPointerUp={(event) => event.stopPropagation()}
+      onClick={(event) => {
+        event.stopPropagation();
+        if (isElectronEnv() && window.electronAPI?.openExternal) {
+          event.preventDefault();
+          window.electronAPI.openExternal(preview.url);
+        }
+      }}
+    >
+      {preview.siteName && <span className={styles.linkPreviewSite}>{preview.siteName}</span>}
+      {preview.title && <span className={styles.linkPreviewTitle}>{preview.title}</span>}
+      {preview.description && <span className={styles.linkPreviewDescription}>{preview.description}</span>}
+    </a>
+  );
 }
