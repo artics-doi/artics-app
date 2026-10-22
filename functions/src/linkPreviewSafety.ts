@@ -98,6 +98,24 @@ export function isBlockedPreviewHostname(hostname: string): boolean {
   return !host.includes('.');
 }
 
+/** Node 22 は lookup を all:true で呼ぶ。確認済みのIPだけを、求められた形で返す。 */
+export function answerPinnedLookup(
+  pinnedAddress: string,
+  options: { all?: boolean },
+  callback: (
+    err: NodeJS.ErrnoException | null,
+    address: string | Array<{ address: string; family: number }>,
+    family?: number,
+  ) => void,
+): void {
+  const family = pinnedAddress.includes(':') ? 6 : 4;
+  if (options.all) {
+    callback(null, [{ address: pinnedAddress, family }]);
+    return;
+  }
+  callback(null, pinnedAddress, family);
+}
+
 export function normalizePreviewUrl(raw: string): NormalizedPreviewUrl | null {
   if (raw.length === 0 || raw.length > 2000) return null;
   let parsed: URL;

@@ -8,6 +8,7 @@ const node_crypto_1 = require("node:crypto");
 const promises_1 = require("node:dns/promises");
 const https = require("node:https");
 const admin = require("firebase-admin");
+const logger = require("firebase-functions/logger");
 const https_1 = require("firebase-functions/v2/https");
 const linkPreviewSafety_1 = require("./linkPreviewSafety");
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -26,15 +27,25 @@ function headerValue(value) {
         return (_a = value[0]) !== null && _a !== void 0 ? _a : '';
     return value !== null && value !== void 0 ? value : '';
 }
+function logFetchFailure(hostname, reason) {
+    logger.info('link preview fetch failed', { host: hostname, reason });
+}
 function fetchHttps(url, address) {
     const parsed = new URL(url);
     return new Promise((resolve) => {
         let settled = false;
+        let failureLogged = false;
         const finish = (page) => {
             if (settled)
                 return;
             settled = true;
             resolve(page);
+        };
+        const fail = (reason) => {
+            if (failureLogged)
+                return;
+            failureLogged = true;
+            logFetchFailure(parsed.hostname, reason);
         };
         const request = https.request({
             protocol: 'https:',
@@ -48,11 +59,12 @@ function fetchHttps(url, address) {
                 Host: parsed.host,
             },
             timeout: REQUEST_TIMEOUT_MS,
+            // Node 22 の型定義には無いが、別アドレスへ繋ぎ直さないために切る。
+            autoSelectFamily: false,
             // 接続先は、直前に社内アドレスでないと確認したIPだけにする。
             lookup: (hostname, options, callback) => {
                 void hostname;
-                void options;
-                callback(null, address, address.includes(':') ? 6 : 4);
+                (0, linkPreviewSafety_1.answerPinnedLookup)(address, options, callback);
             },
         }, (response) => {
             var _a;
@@ -65,6 +77,7 @@ function fetchHttps(url, address) {
             const contentType = headerValue(response.headers['content-type']);
             if (status < 200 || status >= 300 || !/^(text\/html|application\/xhtml\+xml)/i.test(contentType)) {
                 response.resume();
+                fail(status < 200 || status >= 300 ? `status-${status}` : 'content-type');
                 finish({ type: 'ignore' });
                 return;
             }
@@ -95,15 +108,21 @@ function fetchHttps(url, address) {
             response.on('error', () => {
                 if (chunks.length > 0)
                     finishHtml();
-                else
+                else {
+                    fail('response-error');
                     finish({ type: 'ignore' });
+                }
             });
         });
         request.on('timeout', () => {
+            fail('timeout');
             request.destroy();
             finish({ type: 'ignore' });
         });
-        request.on('error', () => finish({ type: 'ignore' }));
+        request.on('error', (error) => {
+            fail(error.code || 'request-error');
+            finish({ type: 'ignore' });
+        });
         request.end();
     });
 }

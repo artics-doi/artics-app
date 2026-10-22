@@ -5,6 +5,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.isBlockedIpv4 = isBlockedIpv4;
 exports.isBlockedIpAddress = isBlockedIpAddress;
 exports.isBlockedPreviewHostname = isBlockedPreviewHostname;
+exports.answerPinnedLookup = answerPinnedLookup;
 exports.normalizePreviewUrl = normalizePreviewUrl;
 exports.previewPlainText = previewPlainText;
 exports.extractLinkPreview = extractLinkPreview;
@@ -91,6 +92,15 @@ function isBlockedPreviewHostname(hostname) {
     if (host.includes(':'))
         return isBlockedIpAddress(host);
     return !host.includes('.');
+}
+/** Node 22 は lookup を all:true で呼ぶ。確認済みのIPだけを、求められた形で返す。 */
+function answerPinnedLookup(pinnedAddress, options, callback) {
+    const family = pinnedAddress.includes(':') ? 6 : 4;
+    if (options.all) {
+        callback(null, [{ address: pinnedAddress, family }]);
+        return;
+    }
+    callback(null, pinnedAddress, family);
 }
 function normalizePreviewUrl(raw) {
     if (raw.length === 0 || raw.length > 2000)

@@ -8,8 +8,10 @@ import { lookup } from 'node:dns/promises';
 import type { IncomingMessage } from 'node:http';
 import * as https from 'node:https';
 import * as admin from 'firebase-admin';
+import * as logger from 'firebase-functions/logger';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import {
+  answerPinnedLookup,
   normalizePreviewUrl,
   resolveLinkPreview,
   type PreviewPage,
@@ -40,14 +42,24 @@ function headerValue(value: string | string[] | undefined): string {
   return value ?? '';
 }
 
+function logFetchFailure(hostname: string, reason: string): void {
+  logger.info('link preview fetch failed', { host: hostname, reason });
+}
+
 function fetchHttps(url: string, address: string): Promise<PreviewPage> {
   const parsed = new URL(url);
   return new Promise((resolve) => {
     let settled = false;
+    let failureLogged = false;
     const finish = (page: PreviewPage) => {
       if (settled) return;
       settled = true;
       resolve(page);
+    };
+    const fail = (reason: string) => {
+      if (failureLogged) return;
+      failureLogged = true;
+      logFetchFailure(parsed.hostname, reason);
     };
     const request = https.request({
       protocol: 'https:',
@@ -61,13 +73,14 @@ function fetchHttps(url: string, address: string): Promise<PreviewPage> {
         Host: parsed.host,
       },
       timeout: REQUEST_TIMEOUT_MS,
+      // Node 22 の型定義には無いが、別アドレスへ繋ぎ直さないために切る。
+      autoSelectFamily: false,
       // 接続先は、直前に社内アドレスでないと確認したIPだけにする。
-      lookup: (hostname: string, options: LookupOptions, callback: (err: NodeJS.ErrnoException | null, address: string, family: number) => void) => {
+      lookup: (hostname: string, options: LookupOptions, callback: (err: NodeJS.ErrnoException | null, address: string | Array<{ address: string; family: number }>, family?: number) => void) => {
         void hostname;
-        void options;
-        callback(null, address, address.includes(':') ? 6 : 4);
+        answerPinnedLookup(address, options, callback);
       },
-    }, (response: IncomingMessage) => {
+    } as https.RequestOptions, (response: IncomingMessage) => {
       const status = response.statusCode ?? 0;
       if (status >= 300 && status < 400) {
         response.resume();
@@ -77,6 +90,7 @@ function fetchHttps(url: string, address: string): Promise<PreviewPage> {
       const contentType = headerValue(response.headers['content-type']);
       if (status < 200 || status >= 300 || !/^(text\/html|application\/xhtml\+xml)/i.test(contentType)) {
         response.resume();
+        fail(status < 200 || status >= 300 ? `status-${status}` : 'content-type');
         finish({ type: 'ignore' });
         return;
       }
@@ -105,14 +119,21 @@ function fetchHttps(url: string, address: string): Promise<PreviewPage> {
       response.on('end', finishHtml);
       response.on('error', () => {
         if (chunks.length > 0) finishHtml();
-        else finish({ type: 'ignore' });
+        else {
+          fail('response-error');
+          finish({ type: 'ignore' });
+        }
       });
     });
     request.on('timeout', () => {
+      fail('timeout');
       request.destroy();
       finish({ type: 'ignore' });
     });
-    request.on('error', () => finish({ type: 'ignore' }));
+    request.on('error', (error: NodeJS.ErrnoException) => {
+      fail(error.code || 'request-error');
+      finish({ type: 'ignore' });
+    });
     request.end();
   });
 }

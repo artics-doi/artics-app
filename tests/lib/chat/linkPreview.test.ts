@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { firstPreviewUrl, linkPreviewCard, sanitizeLinkPreview } from '../../../src/lib/chat/linkPreview';
 import {
+  answerPinnedLookup,
   extractLinkPreview,
   isBlockedIpAddress,
   normalizePreviewUrl,
@@ -144,6 +145,27 @@ describe('カードに出す行', () => {
       description: '詳しい説明',
       path: '',
     });
+  });
+});
+
+describe('確認済みIPの返し方', () => {
+  test('all のときは配列で、そのIPだけを返す', () => {
+    let received: unknown;
+    answerPinnedLookup('13.227.66.143', { all: true }, (_err, address) => {
+      received = address;
+    });
+    expect(received).toEqual([{ address: '13.227.66.143', family: 4 }]);
+  });
+
+  test('all でなければアドレスとファミリーを返す', () => {
+    let address = '';
+    let family = 0;
+    answerPinnedLookup('2600:9000::1', {}, (_err, value, addressFamily) => {
+      address = String(value);
+      family = addressFamily ?? 0;
+    });
+    expect(address).toBe('2600:9000::1');
+    expect(family).toBe(6);
   });
 });
 
