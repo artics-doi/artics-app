@@ -12,7 +12,9 @@ import {
   updateDoc,
 } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
+import { BUNDLED_RELEASE_NOTES } from '../../data/releaseNotes';
 import { db, storage } from '../../lib/firebase';
+import { mergeReleaseNotes } from '../../lib/releaseNotes';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { useElectronNotification, isElectronEnv } from '../../hooks/useElectronNotification';
@@ -85,7 +87,7 @@ export default function DesktopUtilityModals({
   });
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [releaseNotesOpen, setReleaseNotesOpen] = useState(false);
-  const [releaseNotes, setReleaseNotes] = useState('');
+  const [releaseNotes, setReleaseNotes] = useState(BUNDLED_RELEASE_NOTES);
   const [appVersion, setAppVersion] = useState('');
   const [alwaysOnTop, setAlwaysOnTop] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'latest' | 'error'>('idle');
@@ -112,11 +114,12 @@ export default function DesktopUtilityModals({
     if (!releaseNotesOpen) return;
     void getDoc(doc(db, 'settings', 'releaseNotes'))
       .then((snapshot) => {
-        setReleaseNotes(snapshot.exists() ? snapshot.data().content || '' : '');
+        const remote = snapshot.exists() ? String(snapshot.data().content || '') : '';
+        setReleaseNotes(mergeReleaseNotes(BUNDLED_RELEASE_NOTES, remote));
       })
       .catch((error) => {
         console.error('更新ノート取得エラー:', error);
-        setReleaseNotes('');
+        setReleaseNotes(BUNDLED_RELEASE_NOTES);
       });
   }, [releaseNotesOpen]);
 
@@ -312,7 +315,6 @@ export default function DesktopUtilityModals({
         }}
         onCheckForUpdates={checkForUpdates}
         onLogout={handleLogout}
-        onTitleClick={() => undefined}
       />
 
       <ProfileEditModal

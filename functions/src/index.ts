@@ -537,3 +537,4 @@ export const syncMemberDetailsOnProfileUpdate = onDocumentUpdated(
 export * from './process';
 export * from './userLifecycle';
 export * from './roomLifecycle';
+export { fetchLinkPreview } from './linkPreview';

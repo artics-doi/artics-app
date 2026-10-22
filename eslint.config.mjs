@@ -9,7 +9,7 @@ import { defineConfig, globalIgnores } from 'eslint/config'
 export default defineConfig([
   globalIgnores(['dist', 'dist-electron', 'release', 'test-results', 'playwright-report']),
   {
-    files: ['**/*.{ts,tsx}'],
+    files: ['**/*.{ts,tsx,mts}'],
     extends: [
       js.configs.recommended,
       tseslint.configs.recommended,
@@ -27,6 +27,12 @@ export default defineConfig([
       'jsx-a11y/click-events-have-key-events': 'off',
       'jsx-a11y/no-static-element-interactions': 'off',
       'jsx-a11y/no-noninteractive-element-interactions': 'off',
+    },
+  },
+  {
+    files: ['scripts/**/*.mts'],
+    languageOptions: {
+      globals: globals.node,
     },
   },
 ])

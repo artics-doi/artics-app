@@ -316,6 +316,28 @@ describe('Firestore rules', () => {
       eventId: 'blocked-read',
     }));
   });
+
+  it('stores a link preview on a new message and hides the preview cache from clients', async () => {
+    const aliceDb = testEnv.authenticatedContext('alice').firestore();
+    await assertSucceeds(addDoc(collection(aliceDb, 'chatRooms/room1/messages'), {
+      chatRoomId: 'room1',
+      senderId: 'alice',
+      text: 'https://example.com/item',
+      readBy: ['alice'],
+      createdAt: serverTimestamp(),
+      linkPreview: {
+        url: 'https://example.com/item',
+        title: '商品',
+        description: '説明',
+        siteName: 'Example',
+      },
+    }));
+    await assertFails(getDoc(doc(aliceDb, 'linkPreviews/example')));
+    await assertFails(setDoc(doc(aliceDb, 'linkPreviews/example'), {
+      url: 'https://example.com/item',
+      title: '偽造',
+    }));
+  });
 });
 
 describe('Storage rules', () => {
@@ -359,6 +381,40 @@ describe('Storage rules', () => {
       ref(aliceStorage, 'chatFiles/room1/blocked.txt'),
       new Uint8Array([1]),
       { contentType: 'text/plain' },
+    ));
+  });
+
+  it('allows gzip and rejects executable names on the drop upload path', async () => {
+    const aliceStorage = testEnv.authenticatedContext('alice').storage();
+    await assertSucceeds(uploadBytes(
+      ref(aliceStorage, 'chatFiles/room1/1/backup.gz'),
+      new Uint8Array([1]),
+      { contentType: 'application/gzip' },
+    ));
+    await assertSucceeds(uploadBytes(
+      ref(aliceStorage, 'chatFiles/room1/1/notes.txt'),
+      new Uint8Array([1]),
+      { contentType: 'text/plain' },
+    ));
+    await assertFails(uploadBytes(
+      ref(aliceStorage, 'chatFiles/room1/1/setup.exe'),
+      new Uint8Array([1]),
+      { contentType: 'application/octet-stream' },
+    ));
+    await assertFails(uploadBytes(
+      ref(aliceStorage, 'chatFiles/room1/1/SETUP.EXE'),
+      new Uint8Array([1]),
+      { contentType: 'application/octet-stream' },
+    ));
+    await assertFails(uploadBytes(
+      ref(aliceStorage, 'chatFiles/room1/1/nested/run.bat'),
+      new Uint8Array([1]),
+      { contentType: 'application/octet-stream' },
+    ));
+    await assertFails(uploadBytes(
+      ref(aliceStorage, 'chatFiles/room1/1/script.js'),
+      new Uint8Array([1]),
+      { contentType: 'text/javascript' },
     ));
   });
 });

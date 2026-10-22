@@ -3,7 +3,6 @@ export { default as ThemeModal } from './ThemeModal';
 export { default as ProfileEditModal } from './ProfileEditModal';
 export { default as NotificationSettingsModal } from './NotificationSettingsModal';
 export { default as ReleaseNotesModal } from './ReleaseNotesModal';
-export { default as ReleaseNotesEditModal } from './ReleaseNotesEditModal';
 export { default as StorageEditModal } from './StorageEditModal';
 export { default as SearchModal } from './SearchModal';
 export { default as NewChatModal } from './NewChatModal';

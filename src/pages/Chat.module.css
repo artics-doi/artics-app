@@ -302,6 +302,8 @@
   flex-direction: column;
   gap: 8px;
   background: var(--bg-chat);
+  /* 名前・時刻・日付へ選択が広がらないようにする。本文と入力欄だけ後で text に戻す。 */
+  user-select: none;
 }
 
 .dateDivider {
@@ -914,6 +916,71 @@
   white-space: pre-wrap;
   line-height: 1.45;
   font-size: 15px;
+  user-select: text;
+}
+
+.linkPreview {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.06);
+  color: inherit;
+  text-decoration: none;
+  max-width: 100%;
+}
+
+.linkPreviewSite {
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+.linkPreviewTitle {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.linkPreviewPath {
+  font-size: 12px;
+  line-height: 1.4;
+  opacity: 0.75;
+  word-break: break-all;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.linkPreviewDescription {
+  font-size: 12px;
+  line-height: 1.4;
+  opacity: 0.85;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.messageWrapper.own .linkPreview {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+/* 一覧全体は選択不可。編集中の本文と送信欄は選べるように戻す。 */
+.editTextarea,
+.messageInput {
+  user-select: text;
+}
+
+/* スマホの長押しはメニュー用。ブラウザ標準の選択とコールアウトは出さない。 */
+@media (pointer: coarse) {
+  .messageText {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
 }
 
 .deletedFile {

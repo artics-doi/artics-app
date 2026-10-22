@@ -14,7 +14,7 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.syncMemberDetailsOnProfileUpdate = exports.updateStorageUsageOnRoomWrite = exports.updateStorageUsageOnUserWrite = exports.cleanupDeletingAttachment = exports.updateStorageUsageOnMessageWrite = exports.normalizeUnreadCountOnReadStateWrite = exports.sendScheduleNotifications = exports.sendPushNotificationOnNewMessage = exports.updateUnreadCountsOnNewMessage = void 0;
+exports.fetchLinkPreview = exports.syncMemberDetailsOnProfileUpdate = exports.updateStorageUsageOnRoomWrite = exports.updateStorageUsageOnUserWrite = exports.cleanupDeletingAttachment = exports.updateStorageUsageOnMessageWrite = exports.normalizeUnreadCountOnReadStateWrite = exports.sendScheduleNotifications = exports.sendPushNotificationOnNewMessage = exports.updateUnreadCountsOnNewMessage = void 0;
 const admin = require("firebase-admin");
 const firestore_1 = require("firebase-functions/v2/firestore");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
@@ -496,4 +496,6 @@ exports.syncMemberDetailsOnProfileUpdate = (0, firestore_1.onDocumentUpdated)('u
 __exportStar(require("./process"), exports);
 __exportStar(require("./userLifecycle"), exports);
 __exportStar(require("./roomLifecycle"), exports);
+var linkPreview_1 = require("./linkPreview");
+Object.defineProperty(exports, "fetchLinkPreview", { enumerable: true, get: function () { return linkPreview_1.fetchLinkPreview; } });
 //# sourceMappingURL=index.js.map

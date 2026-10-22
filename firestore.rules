@@ -292,5 +292,10 @@ service cloud.firestore {
           (isRoomMember(roomId) && resource.data.senderId == request.auth.uid);
       }
     }
+
+    // プレビューのキャッシュは Functions だけが読み書きする。
+    match /linkPreviews/{previewId} {
+      allow read, write: if false;
+    }
   }
 }

@@ -1,8 +1,10 @@
 import { describe, expect, test } from 'vitest';
 import {
+  getClipboardFiles,
   getClipboardImageFiles,
   validatePendingAttachments,
 } from '../../../src/lib/chat/pendingAttachments';
+import { blockedAttachmentMessage, isBlockedAttachmentName } from '../../../src/lib/chat/blockedAttachments';
 
 describe('validatePendingAttachments', () => {
   const maxBytes = 25;
@@ -51,5 +53,40 @@ describe('getClipboardImageFiles', () => {
     expect(getClipboardImageFiles([
       { kind: 'file', type: 'image/png', getAsFile: () => null },
     ])).toEqual([]);
+  });
+});
+
+describe('実行形式の添付', () => {
+  test('実行形式と、その兄弟形式だけを拒否する', () => {
+    expect(isBlockedAttachmentName('setup.EXE')).toBe(true);
+    expect(isBlockedAttachmentName('folder/run.bat')).toBe(true);
+    expect(isBlockedAttachmentName('tool.ps1.')).toBe(true);
+    expect(isBlockedAttachmentName('script.js')).toBe(true);
+    expect(isBlockedAttachmentName('link.lnk')).toBe(true);
+  });
+
+  test('gz や通常の文書は許可する', () => {
+    expect(isBlockedAttachmentName('backup.tar.gz')).toBe(false);
+    expect(isBlockedAttachmentName('photo.png')).toBe(false);
+    expect(isBlockedAttachmentName('notes.txt')).toBe(false);
+  });
+
+  test('拒否理由に、zipへまとめれば送れることを書く', () => {
+    expect(blockedAttachmentMessage(['setup.exe'])).toBe(
+      '「setup.exe」は実行形式のファイルのため送信できません。zipにまとめれば送れます。',
+    );
+  });
+});
+
+describe('getClipboardFiles', () => {
+  test('画像以外のファイルも貼り付け対象に含める', () => {
+    const archive = { name: 'backup.gz', size: 10, type: 'application/gzip' } as File;
+    const program = { name: 'setup.exe', size: 10, type: 'application/octet-stream' } as File;
+    const result = getClipboardFiles([
+      { kind: 'string', type: 'text/plain', getAsFile: () => null },
+      { kind: 'file', type: 'application/gzip', getAsFile: () => archive },
+      { kind: 'file', type: 'application/octet-stream', getAsFile: () => program },
+    ]);
+    expect(result).toEqual([archive, program]);
   });
 });

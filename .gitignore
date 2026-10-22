@@ -12,6 +12,11 @@ dist
 dist-ssr
 dist-electron
 release
+
+# Electron 更新配信のステージング。インストーラー本体はコミットしない
+desktop-updates/*
+!desktop-updates/README.md
+!desktop-updates/.gitkeep
 *.local
 
 # Editor directories and files

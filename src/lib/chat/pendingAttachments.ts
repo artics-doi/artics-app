@@ -37,3 +37,12 @@ export function getClipboardImageFiles(items: readonly ClipboardItemLike[]): Fil
     return file ? [file] : [];
   });
 }
+
+/** 貼り付けられたファイルを、画像以外も含めて取り出す。実行形式の判定は呼び出し側で行う。 */
+export function getClipboardFiles(items: readonly ClipboardItemLike[]): File[] {
+  return items.flatMap((item) => {
+    if (item.kind !== 'file') return [];
+    const file = item.getAsFile();
+    return file ? [file] : [];
+  });
+}

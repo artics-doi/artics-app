@@ -54,7 +54,7 @@ import {
   type SearchableMessage,
 } from '../lib/search/globalSearch';
 import styles from './Home.module.css';
-import { SettingsModal, ThemeModal, ProfileEditModal, NotificationSettingsModal, ReleaseNotesModal, ReleaseNotesEditModal, StorageEditModal, SearchModal, NewChatModal, NewGroupModal, InviteMemberModal, DeleteRoomConfirmModal, UsersListModal, UserManagementModal, UserEditModal, DeleteUserConfirmModal } from '../components/home/modals';
+import { SettingsModal, ThemeModal, ProfileEditModal, NotificationSettingsModal, ReleaseNotesModal, StorageEditModal, SearchModal, NewChatModal, NewGroupModal, InviteMemberModal, DeleteRoomConfirmModal, UsersListModal, UserManagementModal, UserEditModal, DeleteUserConfirmModal } from '../components/home/modals';
 import { requestUserDeletion, watchUserDeletion } from '../lib/userLifecycle/client';
 import { canDeleteChatRoom } from '../lib/chat/roomDeletion';
 import { deleteChatRoom } from '../lib/chat/roomDeletionClient';
@@ -83,13 +83,10 @@ export default function Home() {
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
   const { theme, toggleTheme } = useTheme();
-  const { releaseNotes, setReleaseNotes } = useReleaseNotes();
+  const { releaseNotes } = useReleaseNotes();
   const { setStorageUsage } = useStorageUsage();
   const { appVersion, updateStatus, checkForUpdates } = useAppVersion();
   const { alwaysOnTop, toggleAlwaysOnTop } = useAlwaysOnTop();
-  const [releaseNotesEdit, setReleaseNotesEdit] = useState('');
-  const [savingReleaseNotes, setSavingReleaseNotes] = useState(false);
-  const [settingsTitleClickCount, setSettingsTitleClickCount] = useState(0);
   const [storageEditValue, setStorageEditValue] = useState('');
 
   // ユーザー管理機能用
@@ -351,43 +348,6 @@ export default function Home() {
     } catch (error) {
       console.error('ストレージ使用量の更新エラー:', error);
       showToast('error', '更新に失敗しました');
-    }
-  }
-
-  // 更新ノートを保存
-  async function saveReleaseNotes() {
-    if (!isAdmin) {
-      showToast('error', '管理者権限が必要です');
-      return;
-    }
-
-    setSavingReleaseNotes(true);
-    try {
-      await setDoc(doc(db, 'settings', 'releaseNotes'), {
-        content: releaseNotesEdit,
-        updatedAt: serverTimestamp()
-      });
-      setReleaseNotes(releaseNotesEdit);
-      closeModal('showReleaseNotesEdit');
-      showToast('success', '更新ノートを保存しました');
-    } catch (error) {
-      console.error('更新ノート保存エラー:', error);
-      showToast('error', '更新ノートの保存に失敗しました');
-    } finally {
-      setSavingReleaseNotes(false);
-    }
-  }
-
-  // 設定タイトルクリック処理（10回で編集モード）
-  function handleSettingsTitleClick() {
-    if (!isAdmin) return;
-    const newCount = settingsTitleClickCount + 1;
-    setSettingsTitleClickCount(newCount);
-    if (newCount >= 10) {
-      setSettingsTitleClickCount(0);
-      setReleaseNotesEdit(releaseNotes);
-      closeModal('showSettings');
-      openModal('showReleaseNotesEdit');
     }
   }
 
@@ -888,7 +848,6 @@ export default function Home() {
         onReleaseNotes={() => { closeModal('showSettings'); openModal('showReleaseNotes'); }}
         onCheckForUpdates={checkForUpdates}
         onLogout={handleLogout}
-        onTitleClick={handleSettingsTitleClick}
       />
 
       {/* プロフィール編集モーダル */}
@@ -971,16 +930,6 @@ export default function Home() {
         isOpen={modals.showReleaseNotes}
         releaseNotes={releaseNotes}
         onClose={() => closeSettingsChildModal('showReleaseNotes')}
-      />
-
-      {/* 更新ノート編集モーダル */}
-      <ReleaseNotesEditModal
-        isOpen={modals.showReleaseNotesEdit && isAdmin}
-        releaseNotesEdit={releaseNotesEdit}
-        savingReleaseNotes={savingReleaseNotes}
-        onClose={() => closeModal('showReleaseNotesEdit')}
-        onReleaseNotesEditChange={setReleaseNotesEdit}
-        onSave={saveReleaseNotes}
       />
 
       {/* 通知設定モーダル */}

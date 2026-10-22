@@ -11,7 +11,6 @@ export interface HomeModalsState {
   showDeleteConfirm: boolean;
   showUsers: boolean;
   showReleaseNotes: boolean;
-  showReleaseNotesEdit: boolean;
   showStorageEdit: boolean;
   showNotificationSettings: boolean;
   showUserManagement: boolean;
@@ -31,7 +30,6 @@ const initialHomeModalsState: HomeModalsState = {
   showDeleteConfirm: false,
   showUsers: false,
   showReleaseNotes: false,
-  showReleaseNotesEdit: false,
   showStorageEdit: false,
   showNotificationSettings: false,
   showUserManagement: false,
