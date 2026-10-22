@@ -18,7 +18,6 @@ interface SettingsModalProps {
   onReleaseNotes: () => void;
   onCheckForUpdates: () => void;
   onLogout: () => void;
-  onTitleClick: () => void;
 }
 
 export default function SettingsModal({
@@ -36,8 +35,7 @@ export default function SettingsModal({
   onNotificationSettings,
   onReleaseNotes,
   onCheckForUpdates,
-  onLogout,
-  onTitleClick
+  onLogout
 }: SettingsModalProps) {
   const { modalProps } = useModal({ isOpen, onClose });
 
@@ -76,7 +74,7 @@ export default function SettingsModal({
       <div className={`${styles.modalContent} ${styles.settingsModalContent}`} onClick={(e) => e.stopPropagation()}>
         <div className={styles.settingsHeader}>
           <div>
-            <h2 id="settings-modal-title" onClick={onTitleClick}>設定</h2>
+            <h2 id="settings-modal-title">設定</h2>
             <p className={styles.settingsLead}>表示や通知、アプリの情報をまとめて管理します</p>
           </div>
           <button type="button" className={styles.settingsCloseIcon} onClick={onClose} aria-label="閉じる">

@@ -7,7 +7,7 @@ import { isElectronEnv } from '../../hooks/useElectronNotification';
 import type { ToastType } from '../../contexts/ToastContext';
 import styles from '../../pages/Chat.module.css';
 import { isAllowedHttpsUrl } from '../../lib/security/resourceTarget';
-import type { LinkPreview } from '../../lib/chat/linkPreview';
+import { linkPreviewCard, type LinkPreview } from '../../lib/chat/linkPreview';
 
 const HTTP_URL_REGEX = /(https?:\/\/[^\s]+)/g;
 const NAS_PATH_REGEX = /"(\\\\(?:Nas-1|Nas-3)\\[^"\r\n]+)"|(\\\\(?:Nas-1|Nas-3)\\[^\s\r\n]+)/g;
@@ -102,10 +102,11 @@ export function renderMessageText(text: string, showToast: ShowToast): React.Rea
   });
 }
 
-// 保存済みのタイトルと説明だけを出す。HTMLは受け取らない。
+// 保存済みの文字だけを出す。HTMLは受け取らない。題名が弱いときはパスも出す。
 export function renderLinkPreview(preview: LinkPreview | null | undefined): React.ReactNode {
-  if (!preview || (!preview.title && !preview.description)) return null;
-  if (!isAllowedHttpsUrl(preview.url)) return null;
+  if (!preview) return null;
+  const card = linkPreviewCard(preview);
+  if (!card) return null;
   return (
     <a
       className={styles.linkPreview}
@@ -122,9 +123,10 @@ export function renderLinkPreview(preview: LinkPreview | null | undefined): Reac
         }
       }}
     >
-      {preview.siteName && <span className={styles.linkPreviewSite}>{preview.siteName}</span>}
-      {preview.title && <span className={styles.linkPreviewTitle}>{preview.title}</span>}
-      {preview.description && <span className={styles.linkPreviewDescription}>{preview.description}</span>}
+      {card.siteName && <span className={styles.linkPreviewSite}>{card.siteName}</span>}
+      {card.title && <span className={styles.linkPreviewTitle}>{card.title}</span>}
+      {card.path && <span className={styles.linkPreviewPath}>{card.path}</span>}
+      {card.description && <span className={styles.linkPreviewDescription}>{card.description}</span>}
     </a>
   );
 }

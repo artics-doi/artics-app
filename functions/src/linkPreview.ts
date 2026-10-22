@@ -131,7 +131,7 @@ async function readFreshCache(
   if (typeof data.title !== 'string' || typeof data.description !== 'string' || typeof data.siteName !== 'string') {
     return null;
   }
-  if (!data.title && !data.description) return null;
+  if (!data.title && !data.description && !data.siteName) return null;
   return {
     url: data.url,
     title: data.title,

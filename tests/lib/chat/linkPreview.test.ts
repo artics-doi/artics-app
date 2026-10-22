@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { firstPreviewUrl, sanitizeLinkPreview } from '../../../src/lib/chat/linkPreview';
+import { firstPreviewUrl, linkPreviewCard, sanitizeLinkPreview } from '../../../src/lib/chat/linkPreview';
 import {
   extractLinkPreview,
   isBlockedIpAddress,
@@ -38,13 +38,27 @@ describe('プレビュー結果の文字', () => {
     });
   });
 
-  test('タイトルも説明も無い結果は表示しない', () => {
+  test('タイトルも説明も無くても、サイト名があれば表示する', () => {
     expect(sanitizeLinkPreview({
       url: 'https://example.com/a',
       title: '',
       description: '   ',
       siteName: 'Example',
-    })).toBeNull();
+    })).toEqual({
+      url: 'https://example.com/a',
+      title: '',
+      description: '',
+      siteName: 'Example',
+    });
+  });
+
+  test('サイト名が空ならURLのホスト名を使う', () => {
+    expect(sanitizeLinkPreview({
+      url: 'https://www.example.com/news',
+      title: '',
+      description: '',
+      siteName: '',
+    })?.siteName).toBe('www.example.com');
   });
 
   test('http の結果は表示しない', () => {
@@ -85,6 +99,51 @@ describe('プレビュー先の安全判定', () => {
     expect(isBlockedIpAddress('::1')).toBe(true);
     expect(isBlockedIpAddress('fe80::1')).toBe(true);
     expect(isBlockedIpAddress('8.8.8.8')).toBe(false);
+  });
+});
+
+describe('カードに出す行', () => {
+  test('サイト名だけの題名でも、サイト名とパスを出す', () => {
+    const url = 'https://www.msn.com/ja-jp/technology/news/ar-AA2fLJ3W';
+    expect(linkPreviewCard({
+      url,
+      title: 'MSN',
+      description: '',
+      siteName: 'www.msn.com',
+    })).toEqual({
+      siteName: 'www.msn.com',
+      title: 'MSN',
+      description: '',
+      path: '/ja-jp/technology/news/ar-AA2fLJ3W',
+    });
+  });
+
+  test('題名も説明も無くても、サイト名とパスを出す', () => {
+    expect(linkPreviewCard({
+      url: 'https://www.msn.com/ja-jp/technology',
+      title: '',
+      description: '',
+      siteName: 'www.msn.com',
+    })).toEqual({
+      siteName: 'www.msn.com',
+      title: '',
+      description: '',
+      path: '/ja-jp/technology',
+    });
+  });
+
+  test('記事の題名があるときはパスを足さない', () => {
+    expect(linkPreviewCard({
+      url: 'https://example.com/items/1',
+      title: '箱とテープ',
+      description: '詳しい説明',
+      siteName: 'Example',
+    })).toEqual({
+      siteName: 'Example',
+      title: '箱とテープ',
+      description: '詳しい説明',
+      path: '',
+    });
   });
 });
 
@@ -150,6 +209,35 @@ describe('転送先も含めた取得', () => {
       fetchPage: async () => ({ type: 'redirect', location: 'http://example.com/plain' }),
     });
     expect(preview).toBeNull();
+  });
+
+  test('題名がサイト名だけでも、貼ったURLとして返す', async () => {
+    const preview = await resolveLinkPreview('https://www.msn.com/ja-jp/technology/news/ar-AA2fLJ3W', {
+      lookup: async () => [PUBLIC_IP],
+      fetchPage: async () => ({
+        type: 'html',
+        body: '<title>MSN</title>',
+      }),
+    });
+    expect(preview).toEqual({
+      url: 'https://www.msn.com/ja-jp/technology/news/ar-AA2fLJ3W',
+      title: 'MSN',
+      description: '',
+      siteName: 'www.msn.com',
+    });
+  });
+
+  test('題名も説明も無いHTMLでも、サイト名を返す', async () => {
+    const preview = await resolveLinkPreview('https://example.com/plain', {
+      lookup: async () => [PUBLIC_IP],
+      fetchPage: async () => ({ type: 'html', body: '<html></html>' }),
+    });
+    expect(preview).toEqual({
+      url: 'https://example.com/plain',
+      title: '',
+      description: '',
+      siteName: 'example.com',
+    });
   });
 
   test('名前解決に失敗したら取得しない', async () => {

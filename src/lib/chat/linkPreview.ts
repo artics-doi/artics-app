@@ -27,6 +27,54 @@ export function firstPreviewUrl(text: string): string | null {
   return candidate;
 }
 
+function compactLabel(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, '');
+}
+
+/** タイトルが空、またはサイト名そのものなら、記事の題名としては弱い。 */
+export function isWeakPreviewTitle(title: string, siteName: string, hostname: string): boolean {
+  const label = compactLabel(title);
+  if (!label) return true;
+  const host = hostname.trim().toLowerCase().replace(/\.$/, '');
+  const withoutWww = host.replace(/^www\./, '');
+  const bare = withoutWww.split('.')[0] ?? withoutWww;
+  const names = [siteName, host, withoutWww, bare].map(compactLabel).filter(Boolean);
+  return names.includes(label);
+}
+
+export type LinkPreviewCard = {
+  siteName: string;
+  title: string;
+  description: string;
+  path: string;
+};
+
+/** 画面に出す行。題名が弱いときはサイト名とパスを残す。 */
+export function linkPreviewCard(preview: LinkPreview): LinkPreviewCard | null {
+  if (!isAllowedHttpsUrl(preview.url)) return null;
+  let hostname = '';
+  let path = '';
+  try {
+    const parsed = new URL(preview.url);
+    hostname = parsed.hostname;
+    const suffix = `${parsed.pathname}${parsed.search}`;
+    path = suffix && suffix !== '/' ? suffix : '';
+  } catch {
+    return null;
+  }
+  const siteName = preview.siteName || hostname;
+  const title = preview.title;
+  const description = preview.description;
+  if (!title && !description && !siteName) return null;
+  const weak = isWeakPreviewTitle(title, siteName, hostname);
+  return {
+    siteName,
+    title,
+    description,
+    path: weak ? path : '',
+  };
+}
+
 /** 関数の戻り値を、画面に出してよい文字だけにする。HTMLはそのまま出さない。 */
 export function sanitizeLinkPreview(value: unknown): LinkPreview | null {
   if (!value || typeof value !== 'object') return null;
@@ -35,7 +83,14 @@ export function sanitizeLinkPreview(value: unknown): LinkPreview | null {
   if (!isAllowedHttpsUrl(url)) return null;
   const title = plainPreviewText(record.title);
   const description = plainPreviewText(record.description);
-  const siteName = plainPreviewText(record.siteName);
-  if (!title && !description) return null;
+  let siteName = plainPreviewText(record.siteName);
+  if (!siteName) {
+    try {
+      siteName = new URL(url).hostname;
+    } catch {
+      siteName = '';
+    }
+  }
+  if (!title && !description && !siteName) return null;
   return { url, title, description, siteName };
 }

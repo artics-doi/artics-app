@@ -110,7 +110,7 @@ Windows で行います。インストーラーは Windows 用（NSIS、x64）�
 
    1つ目の応答本文の `version` が `1.3.6` であること。あとの2つは `HTTP/2 200`（または `HTTP/1.1 200`）であること。HTML が返ってきたら、ファイルが無いか、Web 版のサイトの方を見ています。
 
-7. アプリ内の更新ノートへ、`docs/release-notes/v1.3.6.draft.txt` を既存の文の先頭に足す。日付は 2026/10/22 で確定している。見出しは「リンク表示・コピー・添付を改善」。保存は、Web 版とデスクトップ版の両方が利用者から取れるようになったあと、管理者アカウントで行う。設定を開き、タイトルを10回クリックすると「更新ノート編集」が開く。既存の本文は消さず、下書きを先頭に貼って保存する。保存先は Firestore の `settings/releaseNotes` の `content` で、`updatedAt` も同時に更新される。書き込みは Auth の custom claim `admin == true` が必要。
+7. v1.3.6 の更新ノートは、公開時に管理者がアプリへ保存しました。v1.3.7 以降の正本は `src/data/releaseNotes.ts` です。設定タイトルの10回クリックによる編集画面はありません。新しい版を出すときは、このファイルの先頭に「日付：バージョン：見出し」と「・」の項目を足します。
 
 8. **そのあと** GitHub Release を作る。タグは `v1.3.6`、下書きやプレリリースにはしません。載せるファイルは Firebase に置いた3つと同じものです。ファイル名は変えないでください。説明文は `docs/release-notes/v1.3.6-github.md` を使えます。
 
@@ -136,13 +136,19 @@ Windows で行います。インストーラーは Windows 用（NSIS、x64）�
 
 非公開にしてよいのは「もう GitHub を見に行く端末が残っていない」と分かったあとです。早めに閉じる判断は、残った端末を手作業で入れる覚悟とセットです。
 
-## v1.3.7 以降
+## v1.3.7 を出す
 
-1. `package.json` のバージョンを上げる
+関数、Web 版、Windows の更新ファイルを出します。GitHub Release は作りません。コマンドは [v1.3.7-backend.md](v1.3.7-backend.md) です。更新ノートは `src/data/releaseNotes.ts` に入っているので、Firestore へ貼り直す操作はありません。
+
+## v1.3.8 以降
+
+1. `package.json` のバージョンを上げ、`src/data/releaseNotes.ts` の先頭にその版の項目を足す
 2. Windows で `npm run build:electron`
 3. `npm run stage:desktop-updates`
 4. 上と同じ公開スイッチを付けて `npm run publish:desktop-updates`
 5. `curl` で `latest.yml` の `version` が新しい番号であることを確認する
+
+画面や関数も変えた版は、その変更に必要な公開を更新ファイルより先に出します。v1.3.7 の例は [v1.3.7-backend.md](v1.3.7-backend.md) です。
 
 GitHub Release は作りません。作ると、まだ v1.3.4 の端末がその版へ直接飛びます。そのビルドも Firebase を見るなら動きますが、Firebase への置き忘れがあると、その端末は次の更新を受け取れません。非公開のあとは GitHub Release のファイル自体が認証なしでは取れません。
 

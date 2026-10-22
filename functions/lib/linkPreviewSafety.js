@@ -214,8 +214,7 @@ async function resolveLinkPreview(rawUrl, deps) {
         if (page.type !== 'html')
             return null;
         const fields = extractLinkPreview(page.body, destination.hostname);
-        if (!fields.title && !fields.description)
-            return null;
+        // 題名が空でも、サイト名と利用者が貼ったURLはカードに出せる。
         return Object.assign({ url: initial.url }, fields);
     }
     return null;
