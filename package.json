@@ -1,7 +1,7 @@
 {
   "name": "artics",
   "private": true,
-  "version": "1.3.4",
+  "version": "1.3.5",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
@@ -17,6 +17,8 @@
     "preview:e2e": "vite preview --host 127.0.0.1 --port 4174 --strictPort",
     "dev:electron": "vite --config vite.electron.config.ts",
     "build:electron": "tsc -p tsconfig.electron.json && vite build --config vite.electron.config.ts && electron-builder",
+    "stage:desktop-updates": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/stage-desktop-updates.mts",
+    "publish:desktop-updates": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/stage-desktop-updates.mts --deploy",
     "test:rules": "firebase emulators:exec --only firestore,storage --project demo-artics-refactor \"vitest run tests/rules --no-file-parallelism\"",
     "test:integration:user-lifecycle": "firebase emulators:exec --only auth,firestore,storage,functions,database,pubsub --project demo-artics-refactor \"node functions/test/userLifecycle.emulator.mjs\"",
     "test:integration:room-lifecycle": "npm --prefix functions run build && firebase emulators:exec --only auth,firestore,storage,functions,database,pubsub --project demo-artics-refactor \"node functions/test/roomLifecycle.emulator.mjs\"",

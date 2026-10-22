@@ -45,9 +45,9 @@
     "include": "build/installer.nsh"
   },
   "publish": {
-    "provider": "github",
-    "owner": "artics-doi",
-    "repo": "artics-app",
-    "releaseType": "release"
+    "provider": "generic",
+    "url": "https://company-chat-a9cf0-updates.web.app/",
+    "channel": "latest",
+    "useMultipleRangeRequest": false
   }
 }

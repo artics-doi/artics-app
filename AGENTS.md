@@ -10,7 +10,7 @@ ArticsChat（社内チャットアプリ、React 19 + TypeScript + Vite + Fireba
 - 抽出コンポーネントは親ページの `*.module.css` をそのまま import（CSS ファイル分割禁止）
 - 完了ゲート: `npm run lint` / `npm run typecheck` / `npm run build` / `npm run test`。
   functions 変更時は `cd functions && npm run build` で lib/ を再生成して同一コミットへ
-- **デプロイ禁止**: `firebase deploy` 全種 / functions の deploy / electron-builder `--publish` / GH_TOKEN 設定は、ユーザーの明示的な指示なしに実行しない
+- **デプロイ禁止**: `firebase deploy` 全種 / `npm run publish:desktop-updates` / functions の deploy / electron-builder `--publish` / GH_TOKEN 設定は、ユーザーの明示的な指示なしに実行しない
 - `functions/src/index.ts` の export 名 = デプロイされる関数名。変更禁止
 - `.env` / `functions/serviceAccountKey.json` はコミットしない
 - 教訓は `tasks/lessons.md` に記録する。作業開始時と完了前に関連項目を確認する

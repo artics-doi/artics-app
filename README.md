@@ -26,6 +26,7 @@ cp .env.example .env   # Firebase 設定を記入（VITE_FIREBASE_* / VITE_FIREB
 | `npm run dev:electron` | Electron 開発モード |
 | `npm run build` | typecheck + Web ビルド |
 | `npm run build:electron` | Electron インストーラー生成（release/） |
+| `npm run stage:desktop-updates` | 更新ファイルを desktop-updates/ に揃える（公開はしない） |
 | `npm run lint` / `npm run typecheck` | 静的チェック |
 | `npm run test` | ユニットテスト（vitest、emulator 不要） |
 | `npm run test:rules` | セキュリティルールテスト（Java + emulator 必須） |
@@ -34,4 +35,4 @@ cp .env.example .env   # Firebase 設定を記入（VITE_FIREBASE_* / VITE_FIREB
 
 - **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — 構成・規約・データフロー・危険地帯の索引（開発前に必読）
 - `PROJECT.md` — 過去の設計判断と変更履歴
-- 公開手順 — `.claude/skills/artics-chat-release/skill.md`（デプロイは手順書に従い明示的に行う）
+- [docs/desktop-updates.md](docs/desktop-updates.md) — Windows 版の更新配信（Firebase Hosting）。デプロイは手順書に従い明示的に行う

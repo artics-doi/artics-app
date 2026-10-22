@@ -8,7 +8,7 @@ AI コーディングエージェント（Claude Code / Codex）と開発者向�
 社内チャットアプリ。同一コードベースから2形態で提供する。
 
 - **PWA**: Firebase Hosting で配信（`vite.config.ts`、Service Worker 2本構成）
-- **Electron**: Windows デスクトップアプリ（`vite.electron.config.ts`、GitHub Releases + electron-updater）
+- **Electron**: Windows デスクトップアプリ（`vite.electron.config.ts`、electron-updater）。v1.3.5 以降の更新先は Firebase Hosting の更新専用サイト。v1.3.4 以前は GitHub Releases を見に行く
 
 ルーティングは file:// 対応のため全環境 **HashRouter**（`#/chat/xxx` 形式）。
 
@@ -93,6 +93,7 @@ schedules/{scheduleId}, projects/{projectId}, tasks/{taskId}, settings/{releaseN
 | `hooks/useMessages.ts`・通知フック群（useGlobalNotification / useFCMToken / useElectronNotification / useScheduleNotifications） | 2026-06 の不具合修正で安定化済み。楽観的更新の merge と通知の初回判定はタイミング依存 |
 | `pages/process/Board.tsx` の DOM 同期 effect（MutationObserver / ResizeObserver）と Symbol タグ | SVAR Gantt の内部 DOM に依存。抽出・並べ替え禁止 |
 | `functions/src/index.ts` の export 名 | **export 名 = デプロイされる関数名**。変更・削除はデプロイ事故になる。`export * from './process'` を消すと工程管理の関数が無言で消える |
+| `electron-builder.json` の `publish` と `firebase.desktop-updates.json` | ビルド時にアプリへ書き込まれる更新先。PWA 用 `firebase.json` の Hosting とは別サイト。手順は `docs/desktop-updates.md` |
 | `functions/lib/` | Git 管理されたビルド成果物。`functions/src` を変えたら `cd functions && npm run build` して**同一コミットに含める** |
 | `admin.initializeApp()` の初期化順 | `functions/src/index.ts` で1回だけ実行。ヘルパーモジュールはモジュールスコープで `admin.firestore()` を呼ばず、db を引数で受け取る |
 | メッセージの `local-` 接頭辞 ID / `_pending` | 楽観的更新中の仮 ID。Firestore 操作（更新・削除・リアクション）に渡してはいけない |
@@ -106,6 +107,7 @@ schedules/{scheduleId}, projects/{projectId}, tasks/{taskId}, settings/{releaseN
 | `tests/lib/chat/` | reactions / menuPosition / messageText | 同上 |
 | `tests/lib/schedule/` | calendar / events / form | 同上 |
 | `tests/lib/process/` | 工程管理の純ロジック 11 ファイル | 同上 |
+| `tests/lib/desktop/` | デスクトップ更新ファイルの選択と配信 URL の一致 | 同上 |
 | `tests/rules/` | firestore.rules / storage.rules | `npm run test:rules`（**Java + emulator 必須**） |
 | `tests/e2e/` | Playwright スモーク | `npm run test:e2e`（環境構築が別途必要） |
 
@@ -130,8 +132,9 @@ npx vite build --config vite.electron.config.ts     # Electron バンドル（pu
 - `firebase deploy`（全種。--only hosting / functions / firestore:rules 含む）
 - `functions/` の `npm run deploy`
 - `npm run build:electron` の electron-builder で `--publish` を付けること、`GH_TOKEN` / `GITHUB_TOKEN` の設定
+- `npm run publish:desktop-updates`（更新専用サイトへの `firebase deploy`。環境変数を付けても同じ）
 - GitHub Releases の作成・更新
 
-公開手順は `.claude/skills/artics-chat-release/skill.md` を参照（特に latest.yml とファイル名の一致確認）。
+デスクトップ更新の公開手順は [desktop-updates.md](desktop-updates.md)。`latest.yml` と実ファイル名の一致、更新専用サイトへの配置、v1.3.5 を旧クライアントへ渡すための GitHub Release を扱う。PWA の Hosting 公開とは別コマンド。
 
 `npm run build`（PWA）と `npm run build:electron` は同じ `dist/` に出力する。`build:electron` 後の `dist/` は `manifest.webmanifest` と生成 SW を持たない Electron 用バンドルなので、その状態で Hosting に出さない。
