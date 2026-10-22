@@ -8,7 +8,7 @@ AI コーディングエージェント（Claude Code / Codex）と開発者向�
 社内チャットアプリ。同一コードベースから2形態で提供する。
 
 - **PWA**: Firebase Hosting で配信（`vite.config.ts`、Service Worker 2本構成）
-- **Electron**: Windows デスクトップアプリ（`vite.electron.config.ts`、electron-updater）。v1.3.5 以降の更新先は Firebase Hosting の更新専用サイト。v1.3.4 以前は GitHub Releases を見に行く
+- **Electron**: Windows デスクトップアプリ（`vite.electron.config.ts`、electron-updater）。v1.3.6 以降の更新先は Firebase Hosting の更新専用サイト。v1.3.4 以前は GitHub Releases を見に行く
 
 ルーティングは file:// 対応のため全環境 **HashRouter**（`#/chat/xxx` 形式）。
 
@@ -31,7 +31,7 @@ AI コーディングエージェント（Claude Code / Codex）と開発者向�
 | 認証・ログアウト | `src/contexts/AuthContext.tsx` | `lib/firebase.ts`（初期化・FCMトークン削除） |
 | 在席（オンライン）表示 | `src/hooks/usePresence.ts` / `useOnlineStatus.ts` | Realtime Database `status/{userId}`、ルールは `database.rules.json` |
 | Electron 本体 | `electron/main.ts`（ウィンドウ/トレイ/IPC/自動更新） | `electron/store.ts`（設定永続化）、`electron/notificationManager.ts`、`electron/navigationPolicies.ts`（URL/NAS許可） |
-| Cloud Functions | `functions/src/index.ts`（全トリガー定義） | ヘルパー: `storageUsage.ts` / `unread.ts` / `fcm.ts` / `scheduleTime.ts`、URLプレビュー: `linkPreview.ts`、工程管理: `process/index.ts`。公開手順は [v1.3.5-backend.md](v1.3.5-backend.md) |
+| Cloud Functions | `functions/src/index.ts`（全トリガー定義） | ヘルパー: `storageUsage.ts` / `unread.ts` / `fcm.ts` / `scheduleTime.ts`、URLプレビュー: `linkPreview.ts`、工程管理: `process/index.ts`。公開手順は [v1.3.6-backend.md](v1.3.6-backend.md) |
 
 ## ディレクトリ規約
 
@@ -92,7 +92,7 @@ schedules/{scheduleId}, projects/{projectId}, tasks/{taskId}, settings/{releaseN
 |---|---|
 | `hooks/useMessages.ts`・通知フック群（useGlobalNotification / useFCMToken / useElectronNotification / useScheduleNotifications） | 2026-06 の不具合修正で安定化済み。楽観的更新の merge と通知の初回判定はタイミング依存 |
 | `pages/process/Board.tsx` の DOM 同期 effect（MutationObserver / ResizeObserver）と Symbol タグ | SVAR Gantt の内部 DOM に依存。抽出・並べ替え禁止 |
-| `functions/src/index.ts` の export 名 | **export 名 = デプロイされる関数名**。変更・削除はデプロイ事故になる。`export * from './process'` を消すと工程管理の関数が無言で消える。追加した `fetchLinkPreview` の手順は [v1.3.5-backend.md](v1.3.5-backend.md) |
+| `functions/src/index.ts` の export 名 | **export 名 = デプロイされる関数名**。変更・削除はデプロイ事故になる。`export * from './process'` を消すと工程管理の関数が無言で消える。追加した `fetchLinkPreview` の手順は [v1.3.6-backend.md](v1.3.6-backend.md) |
 | `electron-builder.json` の `publish` と `firebase.desktop-updates.json` | ビルド時にアプリへ書き込まれる更新先。PWA 用 `firebase.json` の Hosting とは別サイト。手順は `docs/desktop-updates.md` |
 | `functions/lib/` | Git 管理されたビルド成果物。`functions/src` を変えたら `cd functions && npm run build` して**同一コミットに含める** |
 | `admin.initializeApp()` の初期化順 | `functions/src/index.ts` で1回だけ実行。ヘルパーモジュールはモジュールスコープで `admin.firestore()` を呼ばず、db を引数で受け取る |
@@ -135,6 +135,6 @@ npx vite build --config vite.electron.config.ts     # Electron バンドル（pu
 - `npm run publish:desktop-updates`（更新専用サイトへの `firebase deploy`。環境変数を付けても同じ）
 - GitHub Releases の作成・更新
 
-デスクトップ更新の公開手順は [desktop-updates.md](desktop-updates.md)。`latest.yml` と実ファイル名の一致、更新専用サイトへの配置、v1.3.5 を旧クライアントへ渡すための GitHub Release を扱う。PWA の Hosting 公開とは別コマンド。
+デスクトップ更新の公開手順は [desktop-updates.md](desktop-updates.md)。`latest.yml` と実ファイル名の一致、更新専用サイトへの配置、v1.3.6 を旧クライアントへ渡すための GitHub Release を扱う。PWA の Hosting 公開とは別コマンド。
 
 `npm run build`（PWA）と `npm run build:electron` は同じ `dist/` に出力する。`build:electron` 後の `dist/` は `manifest.webmanifest` と生成 SW を持たない Electron 用バンドルなので、その状態で Hosting に出さない。

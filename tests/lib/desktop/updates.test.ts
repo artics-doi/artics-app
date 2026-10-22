@@ -6,10 +6,10 @@ import {
   planDesktopUpdateFiles,
 } from '../../../src/lib/desktopUpdates';
 
-const exe = 'ArticsChat.Setup.1.3.5.exe';
+const exe = 'ArticsChat.Setup.1.3.6.exe';
 const blockmap = `${exe}.blockmap`;
 const latestYml = [
-  'version: 1.3.5',
+  'version: 1.3.6',
   'files:',
   `  - url: ${exe}`,
   '    sha512: abc+def/ghi=',
@@ -78,7 +78,7 @@ describe('planDesktopUpdateFiles', () => {
   test('latest.yml と exe と blockmap だけを選ぶ', () => {
     const result = planDesktopUpdateFiles({
       ymlText: latestYml,
-      expectedVersion: '1.3.5',
+      expectedVersion: '1.3.6',
       availableNames: ['latest.yml', exe, blockmap, 'builder-debug.yml', 'unrelated.txt'],
     });
 
@@ -89,7 +89,7 @@ describe('planDesktopUpdateFiles', () => {
   test('改行が CRLF でもファイル名を読める', () => {
     const result = planDesktopUpdateFiles({
       ymlText: latestYml.replaceAll('\n', '\r\n'),
-      expectedVersion: '1.3.5',
+      expectedVersion: '1.3.6',
       availableNames: ['latest.yml', exe, blockmap],
     });
 
@@ -110,12 +110,12 @@ describe('planDesktopUpdateFiles', () => {
   test('フォルダ区切りや URL は配信しない', () => {
     const escaped = planDesktopUpdateFiles({
       ymlText: latestYml.replace(exe, '../secret.exe'),
-      expectedVersion: '1.3.5',
+      expectedVersion: '1.3.6',
       availableNames: ['latest.yml', '../secret.exe'],
     });
     const absolute = planDesktopUpdateFiles({
       ymlText: latestYml.replaceAll(exe, 'https://example.com/app.exe'),
-      expectedVersion: '1.3.5',
+      expectedVersion: '1.3.6',
       availableNames: ['latest.yml', 'https://example.com/app.exe'],
     });
 
@@ -127,7 +127,7 @@ describe('planDesktopUpdateFiles', () => {
   test('blockmap が無いと拒否する', () => {
     const result = planDesktopUpdateFiles({
       ymlText: latestYml,
-      expectedVersion: '1.3.5',
+      expectedVersion: '1.3.6',
       availableNames: ['latest.yml', exe],
     });
 

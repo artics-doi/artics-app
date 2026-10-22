@@ -5,9 +5,9 @@ ArticsChat のデスクトップ版は、起動したときに「新しいイン
 | 入っている版 | 見に行く場所 |
 |---|---|
 | v1.3.4 以前 | GitHub Releases（`artics-doi/artics-app`） |
-| v1.3.5 以降 | `https://company-chat-a9cf0-updates.web.app/` |
+| v1.3.6 以降 | `https://company-chat-a9cf0-updates.web.app/` |
 
-v1.3.5 は、古いアプリがまだ届く GitHub Release と、これからの置き場である Firebase Hosting の両方に出します。v1.3.6 以降は Firebase だけで足ります。
+v1.3.6 は、古いアプリがまだ届く GitHub Release と、これからの置き場である Firebase Hosting の両方に出します。v1.3.7 以降は Firebase だけで足ります。
 
 この文書のコマンドは手順です。リポジトリを非公開にすること、Firebase への公開、GitHub Release の作成は、リリース担当者が別に行います。
 
@@ -36,11 +36,13 @@ npx firebase hosting:sites:create company-chat-a9cf0-updates --project company-c
 
 この作成は空のサイトを作るだけで、ファイルはまだ上がりません。
 
-## v1.3.5 を出す
+## v1.3.6 を出す
 
-Windows で行います。インストーラーは Windows 用です。コマンドは Node.js 22 で動きます。Functions と同じ世代です。
+Windows で行います。インストーラーは Windows 用（NSIS、x64）です。electron-builder の Windows ターゲットは Windows 上で作る前提で、Linux から Wine でクロスビルドする手順はこのリポジトリでは使いません。Wine を足しても展開や署名で失敗しやすく、できた exe の更新先が generic であることを別途確認する必要があります。コマンドは Node.js 22 で動きます。Functions と同じ世代です。
 
-1. 依存関係を入れ、バージョンが `1.3.5` であることを `package.json` で確認する。
+ルール、プレビュー関数、Web 版 Hosting は、利用者へこの版を渡す前に出します。手順は [v1.3.6-backend.md](v1.3.6-backend.md) です。更新専用サイトの作成は、サイト ID が取れなかったときにインストーラーへ書き込む URL を変えるため、Windows ビルドより前です。
+
+1. 依存関係を入れ、バージョンが `1.3.6` であることを `package.json` で確認する。
 
    ```bash
    npm ci
@@ -68,9 +70,9 @@ Windows で行います。インストーラーは Windows 用です。コマン
    npm run stage:desktop-updates
    ```
 
-   `desktop-updates/` に `latest.yml`、`ArticsChat.Setup.1.3.5.exe`、`ArticsChat.Setup.1.3.5.exe.blockmap` がコピーされます。
+   `desktop-updates/` に `latest.yml`、`ArticsChat.Setup.1.3.6.exe`、`ArticsChat.Setup.1.3.6.exe.blockmap` がコピーされます。
 
-5. **先に** Firebase へ公開する。v1.3.5 を起動した瞬間にこの URL を見に行くためです。公開スイッチは、コマンドを打ち間違えて上がるのを防ぐためのものです。
+5. **先に** Firebase へ公開する。v1.3.6 を起動した瞬間にこの URL を見に行くためです。公開スイッチは、コマンドを打ち間違えて上がるのを防ぐためのものです。
 
    PowerShell:
 
@@ -102,39 +104,39 @@ Windows で行います。インストーラーは Windows 用です。コマン
 
    ```bash
    curl -fsS https://company-chat-a9cf0-updates.web.app/latest.yml
-   curl -I https://company-chat-a9cf0-updates.web.app/ArticsChat.Setup.1.3.5.exe
-   curl -I https://company-chat-a9cf0-updates.web.app/ArticsChat.Setup.1.3.5.exe.blockmap
+   curl -I https://company-chat-a9cf0-updates.web.app/ArticsChat.Setup.1.3.6.exe
+   curl -I https://company-chat-a9cf0-updates.web.app/ArticsChat.Setup.1.3.6.exe.blockmap
    ```
 
-   1つ目の応答本文の `version` が `1.3.5` であること。あとの2つは `HTTP/2 200`（または `HTTP/1.1 200`）であること。HTML が返ってきたら、ファイルが無いか、Web 版のサイトの方を見ています。
+   1つ目の応答本文の `version` が `1.3.6` であること。あとの2つは `HTTP/2 200`（または `HTTP/1.1 200`）であること。HTML が返ってきたら、ファイルが無いか、Web 版のサイトの方を見ています。
 
-7. アプリ内の更新ノートへ、`docs/release-notes/v1.3.5.draft.txt` を既存の文の先頭に足す。ほかの修正をこの版に含めるときは、同じ見出しの下へ「・」で1行ずつ足してから保存する。先頭の日付は仮なので、公開日に直す。保存は管理者がアプリの「更新ノート編集」から行い、この手順の中ではまだ保存しない。
+7. アプリ内の更新ノートへ、`docs/release-notes/v1.3.6.draft.txt` を既存の文の先頭に足す。日付は 2026/10/22 で確定している。見出しは「リンク表示・コピー・添付を改善」。保存は、Web 版とデスクトップ版の両方が利用者から取れるようになったあと、管理者アカウントで行う。設定を開き、タイトルを10回クリックすると「更新ノート編集」が開く。既存の本文は消さず、下書きを先頭に貼って保存する。保存先は Firestore の `settings/releaseNotes` の `content` で、`updatedAt` も同時に更新される。書き込みは Auth の custom claim `admin == true` が必要。
 
-8. **そのあと** GitHub Release を作る。タグは `v1.3.5`、下書きやプレリリースにはしません。載せるファイルは Firebase に置いた3つと同じものです。ファイル名は変えないでください。説明文は `docs/release-notes/v1.3.5-github.md` を使えます。
+8. **そのあと** GitHub Release を作る。タグは `v1.3.6`、下書きやプレリリースにはしません。載せるファイルは Firebase に置いた3つと同じものです。ファイル名は変えないでください。説明文は `docs/release-notes/v1.3.6-github.md` を使えます。
 
    ```bash
-   gh release create v1.3.5 release/latest.yml release/ArticsChat.Setup.1.3.5.exe release/ArticsChat.Setup.1.3.5.exe.blockmap --title "v1.3.5" --notes-file docs/release-notes/v1.3.5-github.md --repo artics-doi/artics-app
+   gh release create v1.3.6 release/latest.yml release/ArticsChat.Setup.1.3.6.exe release/ArticsChat.Setup.1.3.6.exe.blockmap --title "v1.3.6" --notes-file docs/release-notes/v1.3.6-github.md --repo artics-doi/artics-app
    ```
 
-9. v1.3.4 の端末でトレイアイコンを右クリックし、「アップデートを確認」を押す。v1.3.5 が入ったら、設定の「現在のバージョン」が v1.3.5 になること。もう一度確認すると「最新バージョンです」となり、失敗の赤文字が出ないこと。これで、新しいアプリが Firebase を読めています。
+9. v1.3.4 の端末でトレイアイコンを右クリックし、「アップデートを確認」を押す。v1.3.6 が入ったら、設定の「現在のバージョン」が v1.3.6 になること。もう一度確認すると「最新バージョンです」となり、失敗の赤文字が出ないこと。これで、新しいアプリが Firebase を読めています。
 
 ## リポジトリを非公開にしてよいとき
 
 次が全部そろってからです。
 
-- v1.3.5 の3ファイルが、上の Firebase URL で認証なしに取れる
-- GitHub Release `v1.3.5` が下書きではない
-- 更新を続けたい端末のバージョンが、すべて v1.3.5 以上である
+- v1.3.6 の3ファイルが、上の Firebase URL で認証なしに取れる
+- GitHub Release `v1.3.6` が下書きではない
+- 更新を続けたい端末のバージョンが、すべて v1.3.6 以上である
 
 バージョンは、各 PC の設定画面「現在のバージョン」、またはトレイメニューの「バージョン」で見ます。このアプリは端末の版をサーバーで集計していないので、人が確認します。電源が入っていない PC は、非公開にしたあと自動では更新できません。
 
 非公開にすると、v1.3.4 以前は GitHub からインストーラーを取れなくなります。その PC には、ブラウザで次のファイルを保存して手作業でインストールします。
 
-`https://company-chat-a9cf0-updates.web.app/ArticsChat.Setup.1.3.5.exe`
+`https://company-chat-a9cf0-updates.web.app/ArticsChat.Setup.1.3.6.exe`
 
 非公開にしてよいのは「もう GitHub を見に行く端末が残っていない」と分かったあとです。早めに閉じる判断は、残った端末を手作業で入れる覚悟とセットです。
 
-## v1.3.6 以降
+## v1.3.7 以降
 
 1. `package.json` のバージョンを上げる
 2. Windows で `npm run build:electron`
@@ -150,5 +152,5 @@ GitHub Release は作りません。作ると、まだ v1.3.4 の端末がその
 
 - `npm run build:electron` のあと、その `dist/` を Web 版として Hosting に出さない。Electron 用の中身になり、チャット画面の Service Worker が欠けます。
 - 更新ファイルを `dist/updates/` にコピーして、Web 版と一緒に公開しない。
-- `electron-builder --publish always` で GitHub へ出そうとしない。v1.3.5 以降の設定は generic なので、そこからはアップロードされません。v1.3.5 の GitHub Release は、上の `gh release create` でファイルを添付します。
+- `electron-builder --publish always` で GitHub へ出そうとしない。v1.3.6 以降の設定は generic なので、そこからはアップロードされません。v1.3.6 の GitHub Release は、上の `gh release create` でファイルを添付します。
 - `.env` の値を手順やリリースノートに貼らない。
